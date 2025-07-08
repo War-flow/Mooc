@@ -1,0 +1,124 @@
+﻿@implements IDisposable
+
+@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Identity
+@using Mooc.Data
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">
+            <img src="27.png" alt="logo" style="width:62px; height:62px;">
+            POINT COM
+        </a>
+    </div>
+</div>
+
+<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+
+<div class="nav" onclick="document.querySelector('.navbar-toggler').click()">
+    <nav class="nav flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Accueil
+            </NavLink>
+        </div>
+        <AuthorizeView>
+            <Authorized>
+                @if (currentUser != null)
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="Account/Manage">
+                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @currentUser.LastName @currentUser.FirstName
+                        </NavLink>
+                    </div>
+                }
+                else
+                {
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="Account/Manage">
+                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
+                        </NavLink>
+                    </div>
+                }
+                <AuthorizeView Policy="GérerUtilisateurs" Context="adminContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="gestion">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Gérez les utilisateurs
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="GestionFormation" Context="FormateurContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="formation">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Formation
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+
+                <AuthorizeView Policy="VoirCours" Context="UsersContext">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="weather">
+                            <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Mes Formations
+                        </NavLink>
+                    </div>
+                </AuthorizeView>
+                <div class="nav-item px-3">
+                    <form action="Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                        <button type="submit" class="nav-link">
+                            <span class="bi bi-arrow-bar-left-nav-menu" aria-hidden="true"></span> Déconnexion
+                        </button>
+                    </form>
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="Account/Login">
+                        <span class="bi bi-person-badge-nav-menu" aria-hidden="true"></span> Connexion
+                    </NavLink>
+                </div>
+            </NotAuthorized>
+        </AuthorizeView>
+        <div class="nav-item px-4">
+            <form class="d-flex" role="search">
+                <input class="form-control me-2" type="search" placeholder="Recherche" aria-label="Search" />
+                <button class="btn d-flex justify-content-center align-items-center w-25 p-2" type="submit">
+                    <i class="bi bi-search px-3"></i>
+                </button>
+            </form>
+        </div>
+    </nav>
+</div>
+
+@code {
+    private string? currentUrl;
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+
+    private ApplicationUser? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(user.Identity.Name))
+        {
+            currentUser = await UserManager.FindByNameAsync(user.Identity.Name);
+        }
+    }
+}
+
