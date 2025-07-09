@@ -1,5 +1,5 @@
 ﻿@page "/manager"
-@rendermode InteractiveServer  
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using Mooc.Data
@@ -7,10 +7,16 @@
 @inject UserManager<ApplicationUser> UserManagerService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @attribute [Authorize(Roles = "Admin")]
+@attribute [StreamRendering]
 
-<PageTitle>Gestion Utilisateur</PageTitle>  
+<PageTitle>Gestion des formateurs</PageTitle>  
 
-<h1>Liste des Utilisateurs</h1>  
+<h1>Administration</h1>  
+
+<!-- Bouton pour ajouter un formateur -->
+<div class="mb-4">
+    <a href="/ajouter-formateur" class="btn btn-primary">Ajouter un formateur</a>
+</div>
 
 @if (users == null)  
 {  
@@ -24,7 +30,8 @@ else
                 <tr>  
                     <th>Nom</th>  
                     <th>Prénom</th>  
-                    <th>Email</th>  
+                    <th>Email</th>
+                    <th>Rôle</th>
                     <th>Actions</th>  
                 </tr>  
             </thead>  
@@ -34,11 +41,11 @@ else
                     <tr>  
                         <td>@user.LastName</td>  
                         <td>@user.FirstName</td>  
-                        <td>@user.Email</td>  
+                        <td>@user.Email</td>
+                        <td>@GetUserRole(user)</td>
                         <td>  
-                            <button class="btn btn-info btn-sm" @onclick="() => ViewUserDetails(user.Id)">Détails</button>  
-                            <button class="btn btn-warning btn-sm" @onclick="() => EditUser(user.Id)">Modifier</button>  
-                            <button class="btn btn-danger btn-sm" @onclick="() => DeleteUser(user.Id)">Supprimer</button>  
+                            <button class="btn" @onclick="() => EditUser(user.Id)">Modifier</button>  
+                            <button class="btn" @onclick="() => DeleteUser(user.Id)">Supprimer</button>  
                         </td>  
                     </tr>  
                 }  
@@ -47,8 +54,27 @@ else
     </div>  
 }  
 
+@if (showError) {
+    <div class="alert alert-danger" role="alert">
+        @errorMessage
+    </div>
+}
+
+<!-- Ajout du modal pour les détails -->
+@if (showEdit && selectedUserId != null)
+{
+    <Edit UserId="@selectedUserId" OnClose="CloseEdit" />
+}
+
 @code {  
     private List<ApplicationUser>? users;  
+    private string? selectedUserId;
+    private bool showEdit = false;
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+
+    // Ajoutez un dictionnaire pour stocker les rôles des utilisateurs
+    private Dictionary<string, string> userRoles = new Dictionary<string, string>();
 
     protected override async Task OnInitializedAsync()  
     {  
@@ -61,33 +87,91 @@ else
         // Création d'un nouveau contexte pour cette opération
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
         
-        // Récupération des utilisateurs depuis ce contexte spécifique
-        users = await dbContext.Users.ToListAsync();
+        // Récupération de tous les utilisateurs
+        var allUsers = await dbContext.Users.ToListAsync();
+        
+        // Liste qui contiendra uniquement les utilisateurs ayant les rôles souhaités
+        users = new List<ApplicationUser>();
+        userRoles.Clear(); // Réinitialiser le dictionnaire des rôles
+        
+        // Pour chaque utilisateur, vérifier s'il a un des rôles requis
+        foreach (var user in allUsers)
+        {
+            if (user.Id == null)
+            {
+                continue; // Ignorer les utilisateurs sans ID valide
+            }
+            
+            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
+            bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+            
+            if (isFormateur || isAdmin)
+            {
+                users.Add(user);
+                
+                // Stocker le rôle le plus important
+                if (isAdmin)
+                    userRoles[user.Id] = "Admin";
+                else if (isFormateur)
+                    userRoles[user.Id] = "Formateur";
+                else
+                    userRoles[user.Id] = "Utilisateur";
+            }
+        }
     }
 
-    private void ViewUserDetails(string userId)  
-    {  
-        // Implémenter la logique pour afficher les détails d'un utilisateur  
-    }  
+    private void CloseEdit()
+    {
+        showEdit = false;
+        selectedUserId = null;
+    }
 
     private void EditUser(string userId)  
     {  
+        showEdit = true;
+        selectedUserId = userId;
         // Implémenter la logique pour modifier un utilisateur  
     }  
 
     private async Task DeleteUser(string userId)  
     {  
-        // Implémenter la logique pour supprimer un utilisateur  
         var user = await UserManagerService.FindByIdAsync(userId);  
         if (user != null)  
-        {  
+        {
+            // Vérifier si l'utilisateur est un admin
+            var isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+            
+            if (isAdmin)
+            {
+                // Afficher un message d'erreur
+                errorMessage = "Impossible de supprimer Super Admin.";
+                showError = true;
+                return;
+            }
+            
             // Vous pourriez ajouter une confirmation avant suppression  
             var result = await UserManagerService.DeleteAsync(user);
             if (result.Succeeded)
             {
                 // Rafraîchir la liste seulement si la suppression a réussi
                 await RefreshUsers();
+                // Réinitialiser le message d'erreur
+                showError = false;
+                errorMessage = string.Empty;
             }
         }  
     }  
+
+    // Méthode pour récupérer le rôle d'un utilisateur
+    private string GetUserRole(ApplicationUser user)
+    {
+        if (user?.Id == null)
+        {
+            return "Non défini";
+        }
+
+        if (userRoles.TryGetValue(user.Id!, out string role))
+            return role;
+        return "Non défini";
+    }
 }

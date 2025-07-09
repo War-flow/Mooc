@@ -1,0 +1,159 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Identity
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@inject UserManager<ApplicationUser> UserManagerService
+
+@if (user != null)
+{
+    <div class="modal fade show" id="userEditModal" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Modifier l'utilisateur</h5>
+                    <button type="button" class="btn-close" @onclick="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@user" OnValidSubmit="Submit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label">Nom</label>
+                            <InputText @bind-Value="user.LastName" class="form-control" />
+                            <ValidationMessage For="@(() => user.LastName)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Prénom</label>
+                            <InputText @bind-Value="user.FirstName" class="form-control" />
+                            <ValidationMessage For="@(() => user.FirstName)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText @bind-Value="user.Email" class="form-control" />
+                            <ValidationMessage For="@(() => user.Email)" />
+                        </div>
+                        
+                        <hr />
+                        <h6>Changer le mot de passe</h6>
+                        
+                        @if (showPasswordError)
+                        {
+                            <div class="alert alert-danger">
+                                @passwordErrorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Nouveau mot de passe</label>
+                            <InputText type="password" @bind-Value="passwordModel.NewPassword" class="form-control" />
+                            <ValidationMessage For="@(() => passwordModel.NewPassword)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Confirmer le mot de passe</label>
+                            <InputText type="password" @bind-Value="passwordModel.ConfirmPassword" class="form-control" />
+                            <ValidationMessage For="@(() => passwordModel.ConfirmPassword)" />
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="Close">Annuler</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public string UserId { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private ApplicationUser user;
+    private PasswordModel passwordModel = new();
+    private bool showPasswordError = false;
+    private string passwordErrorMessage = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!string.IsNullOrEmpty(UserId))
+        {
+            user = await UserManagerService.FindByIdAsync(UserId);
+        }
+    }
+
+    private async Task Close()
+    {
+        await OnClose.InvokeAsync();
+    }
+
+    private async Task Submit()
+    {
+        showPasswordError = false;
+        bool hasChanges = false;
+        
+        // Sauvegarde des modifications du profil
+        var result = await UserManagerService.UpdateAsync(user);
+        if (result.Succeeded)
+        {
+            hasChanges = true;
+        }
+        else
+        {
+            // Gérer les erreurs de mise à jour du profil
+            return;
+        }
+        
+        // Vérifier si un nouveau mot de passe a été saisi
+        if (!string.IsNullOrEmpty(passwordModel.NewPassword))
+        {
+            // Vérifier si les mots de passe correspondent
+            if (passwordModel.NewPassword != passwordModel.ConfirmPassword)
+            {
+                showPasswordError = true;
+                passwordErrorMessage = "Le nouveau mot de passe et la confirmation ne correspondent pas.";
+                return;
+            }
+
+            // Génère un token de réinitialisation pour l'utilisateur
+            var token = await UserManagerService.GeneratePasswordResetTokenAsync(user);
+            
+            // Réinitialise le mot de passe avec le token
+            var resetResult = await UserManagerService.ResetPasswordAsync(user, token, passwordModel.NewPassword);
+            
+            if (resetResult.Succeeded)
+            {
+                hasChanges = true;
+            }
+            else
+            {
+                showPasswordError = true;
+                passwordErrorMessage = string.Join(", ", resetResult.Errors.Select(e => e.Description));
+                return;
+            }
+        }
+        
+        if (hasChanges)
+        {
+            await OnClose.InvokeAsync();
+        }
+    }
+
+    private class PasswordModel
+    {
+        [StringLength(100, ErrorMessage = "Le {0} doit comporter au moins {2} et au maximum {1} caractères.", MinimumLength = 6)]
+        [DataType(DataType.Password)]
+        [Display(Name = "Nouveau mot de passe")]
+        public string NewPassword { get; set; } = "";
+
+        [DataType(DataType.Password)]
+        [Display(Name = "Confirmer le mot de passe")]
+        [Compare("NewPassword", ErrorMessage = "Le nouveau mot de passe et le mot de passe de confirmation ne correspondent pas.")]
+        public string ConfirmPassword { get; set; } = "";
+    }
+}

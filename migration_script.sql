@@ -39,8 +39,6 @@ BEGIN
         [PasswordHash] nvarchar(max) NULL,
         [SecurityStamp] nvarchar(max) NULL,
         [ConcurrencyStamp] nvarchar(max) NULL,
-        [PhoneNumber] nvarchar(max) NULL,
-        [PhoneNumberConfirmed] bit NOT NULL,
         [LockoutEnd] datetimeoffset NULL,
         [LockoutEnabled] bit NOT NULL,
         [AccessFailedCount] int NOT NULL,

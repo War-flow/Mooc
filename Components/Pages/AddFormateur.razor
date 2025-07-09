@@ -1,0 +1,133 @@
+﻿@page "/ajouter-formateur"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using System.ComponentModel.DataAnnotations
+@inject UserManager<ApplicationUser> UserManagerService
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Ajouter un formateur</PageTitle>
+
+<div class="container mt-4">
+    <h1>Ajouter un formateur</h1>
+
+    <EditForm Model="@model" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3">
+            <label for="firstName" class="form-label">Prénom</label>
+            <InputText id="firstName" class="form-control" @bind-Value="model.FirstName" />
+            <ValidationMessage For="@(() => model.FirstName)" />
+        </div>
+
+        <div class="mb-3">
+            <label for="lastName" class="form-label">Nom</label>
+            <InputText id="lastName" class="form-control" @bind-Value="model.LastName" />
+            <ValidationMessage For="@(() => model.LastName)" />
+        </div>
+
+        <div class="mb-3">
+            <label for="email" class="form-label">Email</label>
+            <InputText id="email" class="form-control" @bind-Value="model.Email" />
+            <ValidationMessage For="@(() => model.Email)" />
+        </div>
+
+        <div class="mb-3">
+            <label for="password" class="form-label">Mot de passe</label>
+            <InputText id="password" type="password" class="form-control" @bind-Value="model.Password" />
+            <ValidationMessage For="@(() => model.Password)" />
+        </div>
+
+        <div class="mb-3">
+            <label for="confirmPassword" class="form-label">Confirmer le mot de passe</label>
+            <InputText id="confirmPassword" type="password" class="form-control" @bind-Value="model.ConfirmPassword" />
+            <ValidationMessage For="@(() => model.ConfirmPassword)" />
+        </div>
+
+        @if (showError)
+        {
+            <div class="alert alert-danger" role="alert">
+                @errorMessage
+            </div>
+        }
+
+        <button type="submit" class="btn btn-primary">Ajouter le formateur</button>
+        <button type="button" class="btn btn-secondary ms-2" @onclick="NavigateBack">Annuler</button>
+    </EditForm>
+</div>
+
+@code {
+    private FormateurModel model = new();
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            // Créer un nouvel utilisateur
+            var user = new ApplicationUser
+            {
+                UserName = model.Email,
+                Email = model.Email,
+                FirstName = model.FirstName,
+                LastName = model.LastName,
+                EmailConfirmed = true // Pour simplifier, on confirme directement l'email
+            };
+
+            // Ajouter l'utilisateur avec son mot de passe
+            var result = await UserManagerService.CreateAsync(user, model.Password);
+
+            if (result.Succeeded)
+            {
+                // Ajouter le rôle de formateur
+                await UserManagerService.AddToRoleAsync(user, "formateur");
+                
+                // Rediriger vers la page de gestion des utilisateurs
+                NavigationManager.NavigateTo("/manager");
+            }
+            else
+            {
+                showError = true;
+                errorMessage = string.Join(", ", result.Errors.Select(e => e.Description));
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de la création du formateur: {ex.Message}";
+        }
+    }
+
+    private void NavigateBack()
+    {
+        NavigationManager.NavigateTo("/manager");
+    }
+
+    // Modèle pour le formulaire
+    private class FormateurModel
+    {
+        [Required(ErrorMessage = "Le prénom est requis")]
+        [StringLength(100, ErrorMessage = "Le prénom ne doit pas dépasser 100 caractères")]
+        public string FirstName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le nom est requis")]
+        [StringLength(100, ErrorMessage = "Le nom ne doit pas dépasser 100 caractères")]
+        public string LastName { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "L'email est requis")]
+        [EmailAddress(ErrorMessage = "Format d'email invalide")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le mot de passe est requis")]
+        [StringLength(100, ErrorMessage = "Le mot de passe doit comporter au moins {2} caractères", MinimumLength = 6)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La confirmation du mot de passe est requise")]
+        [Compare("Password", ErrorMessage = "Le mot de passe et la confirmation ne correspondent pas")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+    }
+}
