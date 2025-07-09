@@ -196,9 +196,11 @@ BEGIN
     CREATE TABLE [Session] (
         [Id] int NOT NULL IDENTITY,
         [Title] nvarchar(100) NOT NULL,
-        [Description] nvarchar(450) NULL,
+        [Image] nvarchar(256) NOT NULL,
+        [Description] nvarchar(300) NULL,
         [StartDate] date NOT NULL,
         [EndDate] date NULL,
+        [Work] int NOT NULL,
         [UserId] nvarchar(450) NULL,
         CONSTRAINT [PK_Session] PRIMARY KEY ([Id]),
         CONSTRAINT [FK_Session_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE SET NULL

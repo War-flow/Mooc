@@ -24,15 +24,26 @@ namespace Mooc.Data
                       .HasColumnType("varchar") // Utiliser varchar pour le titre
                       .HasMaxLength(100);  // Limite à 100 caractères
 
+                entity.Property(e => e.Image)
+                      .HasColumnType("varchar") // Utiliser varchar pour l'image
+                      .IsRequired();
+
                 entity.Property(e => e.Description)
                       .HasColumnType("varchar") // Utiliser varchar pour le titre
-                      .HasMaxLength(450);
+                      .HasMaxLength(300);
 
                 entity.Property(e => e.StartDate)
                       .HasColumnType("date"); // Utiliser date au lieu de timestamp
 
                 entity.Property(e => e.EndDate)
                       .HasColumnType("date");
+
+                entity.Property(e => e.Work)
+                      .HasColumnType("int"); // Utiliser int pour le travail
+
+                entity.HasMany(s => s.Courses)
+                      .WithOne(c => c.Session)
+                      .HasForeignKey(c => c.SessionId);
             });
 
             // Configuration de la relation Session-Cours

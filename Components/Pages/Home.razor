@@ -20,50 +20,30 @@
             <h1 class="hello">Bonjour, @context.User.Identity?.Name</h1>
         }
     </Authorized>
-    <NotAuthorized>
-    </NotAuthorized>
 </AuthorizeView>
 
-<div class="row row-cols-1 row-cols-md-3 g-4">
-    <div class="col">
-        <div class="card mooc">
-            <img src="1.png" class="card-img-top" alt="...">
-            <div class="card-body">
-                <h5 class="card-title">Card title</h5>
-                <p class="card-text">This is a longer card with supporting text below as a natural lead-in to additional content. This content is a little bit longer.</p>
-                <a href="#" class="btn">S'inscrire</a>
-                <p class="d-inline-flex gap-1">
-                    <button class="btn btn-primary" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExample" aria-expanded="false" aria-controls="collapseExample">
-                        Voir plus
-                    </button>
-                </p>
-                <div class="collapse" id="collapseExample">
-                    <div class="card card-body">
-                        <div class="list-group">
-                            <a href="#" class="list-group-item list-group-item-action list-group-item-light">Date de début : XX/XX/XXXX</a>
-                            <a href="#" class="list-group-item list-group-item-action list-group-item-light">Date de fin : XX/XX/XXXX</a>
-                            <a href="#" class="list-group-item list-group-item-action list-group-item-light">Temps d'effort : X h</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<CardHome Sessions="@availableSessions" />
 
 @code {
     private ApplicationUser? currentUser;
+    private List<Session>? availableSessions;
 
     protected override async Task OnInitializedAsync()
     {
+        // Utilisation de IDbContextFactory pour obtenir une nouvelle instance de DbContext
+        using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        
+        // Récupération des sessions disponibles (pour tous les utilisateurs)
+        availableSessions = await dbContext.Sessions
+            .Include(s => s.Courses)
+            .OrderBy(s => s.StartDate)
+            .ToListAsync();
+            
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated == true)
         {
-            // Utilisation de IDbContextFactory pour obtenir une nouvelle instance de DbContext
-            using var dbContext = await DbContextFactory.CreateDbContextAsync();
-
             // Récupération directe depuis le contexte
             var userName = user.Identity.Name;
             currentUser = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == userName);
