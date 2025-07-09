@@ -15,14 +15,14 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Incriptions</PageTitle>
+<PageTitle>Inscriptions</PageTitle>
 
 <h1>Inscription</h1>
 
 <div class="row">
     <div class="col-lg-6">
         <StatusMessage Message="@Message" />
-        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
             <h2>Créer un nouveau compte.</h2>
             <hr />
@@ -32,13 +32,13 @@
                 <label for="Input.Email">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Mot de passe" />
-                <label for="Input.Password">Password</label>
+            <div class="form-floating mb-3 position-relative">
+                <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Mot de passe" />
+                <label for="Input.Password">Mot de passe</label>
                 <ValidationMessage For="() => Input.Password" class="text-danger" />
             </div>
-            <div class="form-floating mb-3">
-                <InputText type="password" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Mot de passe" />
+            <div class="form-floating mb-3 position-relative">
+                <InputText type="@(showConfirmPassword ? "text" : "password")" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Confirmez le mot de passe" />
                 <label for="Input.ConfirmPassword">Confirmez le mot de passe</label>
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
@@ -59,6 +59,8 @@
 
 @code {
     private IEnumerable<IdentityError>? identityErrors;
+    private bool showPassword = false;
+    private bool showConfirmPassword = false;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();

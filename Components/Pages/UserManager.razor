@@ -1,0 +1,93 @@
+﻿@page "/manager"
+@rendermode InteractiveServer  
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> UserManagerService
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@attribute [Authorize(Roles = "Admin")]
+
+<PageTitle>Gestion Utilisateur</PageTitle>  
+
+<h1>Liste des Utilisateurs</h1>  
+
+@if (users == null)  
+{  
+    <p><em>Chargement...</em></p>  
+}  
+else  
+{  
+    <div class="table-responsive">  
+        <table class="table table-striped">  
+            <thead>  
+                <tr>  
+                    <th>Nom</th>  
+                    <th>Prénom</th>  
+                    <th>Email</th>  
+                    <th>Actions</th>  
+                </tr>  
+            </thead>  
+            <tbody>  
+                @foreach (var user in users)  
+                {  
+                    <tr>  
+                        <td>@user.LastName</td>  
+                        <td>@user.FirstName</td>  
+                        <td>@user.Email</td>  
+                        <td>  
+                            <button class="btn btn-info btn-sm" @onclick="() => ViewUserDetails(user.Id)">Détails</button>  
+                            <button class="btn btn-warning btn-sm" @onclick="() => EditUser(user.Id)">Modifier</button>  
+                            <button class="btn btn-danger btn-sm" @onclick="() => DeleteUser(user.Id)">Supprimer</button>  
+                        </td>  
+                    </tr>  
+                }  
+            </tbody>  
+        </table>  
+    </div>  
+}  
+
+@code {  
+    private List<ApplicationUser>? users;  
+
+    protected override async Task OnInitializedAsync()  
+    {  
+        // Récupérer tous les utilisateurs  
+        await RefreshUsers();  
+    }  
+
+    private async Task RefreshUsers()
+    {
+        // Création d'un nouveau contexte pour cette opération
+        using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        
+        // Récupération des utilisateurs depuis ce contexte spécifique
+        users = await dbContext.Users.ToListAsync();
+    }
+
+    private void ViewUserDetails(string userId)  
+    {  
+        // Implémenter la logique pour afficher les détails d'un utilisateur  
+    }  
+
+    private void EditUser(string userId)  
+    {  
+        // Implémenter la logique pour modifier un utilisateur  
+    }  
+
+    private async Task DeleteUser(string userId)  
+    {  
+        // Implémenter la logique pour supprimer un utilisateur  
+        var user = await UserManagerService.FindByIdAsync(userId);  
+        if (user != null)  
+        {  
+            // Vous pourriez ajouter une confirmation avant suppression  
+            var result = await UserManagerService.DeleteAsync(user);
+            if (result.Succeeded)
+            {
+                // Rafraîchir la liste seulement si la suppression a réussi
+                await RefreshUsers();
+            }
+        }  
+    }  
+}
