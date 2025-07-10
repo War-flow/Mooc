@@ -1,0 +1,261 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@implements IDisposable
+@inject FileUploadService FileUploadService
+@inject IJSRuntime JSRuntime
+
+<div class="audio-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="audio-title">
+        @if (IsEditing)
+        {
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => Block.Title)" />
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+    </h4>
+    <div class="audio-content">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputFile OnChange="OnFileSelected" accept="audio/*" class="form-control" />
+                <small class="form-text text-muted">Formats acceptés : MP3, WAV, OGG (max 10 MB)</small>
+                <ValidationMessage For="@(() => Block.AudioUrl)" />
+            </div>
+
+            @if (isUploading)
+            {
+                <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: @uploadProgress%" aria-valuenow="@uploadProgress" aria-valuemin="0" aria-valuemax="100">@uploadProgress%</div>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(uploadError))
+            {
+                <div class="alert alert-danger">@uploadError</div>
+            }
+
+            @if (!string.IsNullOrEmpty(Block.AudioUrl))
+            {
+                <div class="d-flex align-items-center mb-2">
+                    <span class="me-2">Audio actuel :</span>
+                    <audio controls class="audio-preview">
+                        <source src="@Block.AudioUrl" type="audio/mpeg" />
+                        Votre navigateur ne prend pas en charge l'élément audio.
+                    </audio>
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-2" @onclick="RemoveAudio">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        }
+        else if (!string.IsNullOrEmpty(Block.AudioUrl))
+        {
+            <audio controls>
+                <source src="@Block.AudioUrl" type="audio/mpeg" />
+                Votre navigateur ne prend pas en charge l'élément audio.
+            </audio>
+        }
+    </div>
+    <div class="block-controls mt-2 d-flex justify-content-between">
+        <div>
+            <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm" @onclick="ToggleEdit">
+                <i class="bi @(IsEditing ? "bi-check-lg" : "bi-pencil")"></i>
+                @(IsEditing ? "Enregistrer" : "Modifier")
+            </button>
+            @if (IsEditing)
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="CancelEdit">
+                    <i class="bi bi-x-lg"></i> Annuler
+                </button>
+            }
+        </div>
+        @if (!IsEditing)
+        {
+            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i>
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CoursBlock Block { get; set; } = default!;
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    [Parameter]
+    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+
+    [Parameter]
+    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+
+    private bool IsEditing { get; set; }
+    private string? originalTitle;
+    private string? originalAudioUrl;
+    private bool isUploading = false;
+    private int uploadProgress = 0;
+    private string? uploadError;
+
+    private void ToggleEdit()
+    {
+        IsEditing = !IsEditing;
+
+        if (IsEditing)
+        {
+            originalTitle = Block.Title;
+            originalAudioUrl = Block.AudioUrl;
+        }
+        else
+        {
+            // Save changes
+            originalTitle = null;
+            originalAudioUrl = null;
+
+            // Notifier le parent que le bloc a changé
+            OnBlockChanged.InvokeAsync(Block);
+        }
+
+        // Réinitialiser l'état de l'upload
+        uploadError = null;
+    }
+
+    private string GetTypeClass()
+    {
+        var classes = new List<string> { "audio-block" };
+
+        if (string.IsNullOrEmpty(Block.AudioUrl))
+        {
+            classes.Add("empty");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private void CancelEdit()
+    {
+        IsEditing = false;
+        Block.Title = originalTitle;
+        Block.AudioUrl = originalAudioUrl;
+        uploadError = null;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs args)
+    {
+        try
+        {
+            // Obtenir le fichier
+            var file = args.File;
+
+            // Vérifier le type de fichier
+            if (!file.ContentType.StartsWith("audio/"))
+            {
+                uploadError = "Le fichier doit être au format audio.";
+                return;
+            }
+
+            // Limiter la taille (10 MB)
+            const long maxFileSize = 10 * 1024 * 1024;
+            if (file.Size > maxFileSize)
+            {
+                uploadError = "La taille du fichier ne doit pas dépasser 10 MB.";
+                return;
+            }
+
+            // Commencer l'upload
+            isUploading = true;
+            uploadProgress = 0;
+            uploadError = null;
+            StateHasChanged();
+
+            // Créer un dossier uploads/audio s'il n'existe pas déjà
+            var uploadsFolder = Path.Combine("wwwroot", "uploads", "audio");
+            if (!Directory.Exists(uploadsFolder))
+            {
+                Directory.CreateDirectory(uploadsFolder);
+            }
+
+            // Générer un nom de fichier unique
+            var fileName = $"{Guid.NewGuid()}_{Path.GetFileName(file.Name)}";
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            // Lire le fichier avec la barre de progression
+            using var stream = file.OpenReadStream(maxFileSize);
+            using var fileStream = new FileStream(filePath, FileMode.Create);
+
+            var buffer = new byte[4096];
+            long totalBytes = file.Size;
+            long bytesRead = 0;
+            int read;
+
+            while ((read = await stream.ReadAsync(buffer)) > 0)
+            {
+                await fileStream.WriteAsync(buffer, 0, read);
+                bytesRead += read;
+
+                var newProgress = (int)((bytesRead * 100) / totalBytes);
+                if (newProgress != uploadProgress)
+                {
+                    uploadProgress = newProgress;
+                    StateHasChanged();
+                }
+            }
+
+            // Mettre à jour l'URL de l'audio
+            Block.AudioUrl = $"/uploads/audio/{fileName}";
+
+            isUploading = false;
+            uploadProgress = 100;
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur lors de l'upload : {ex.Message}";
+            isUploading = false;
+        }
+    }
+
+    private async Task RemoveAudio()
+    {
+        if (string.IsNullOrEmpty(Block.AudioUrl))
+            return;
+
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Voulez-vous vraiment supprimer cet audio ?");
+        if (!confirmed)
+            return;
+
+        try
+        {
+            // Supprimer le fichier si nécessaire
+            var filePath = Path.Combine("wwwroot", Block.AudioUrl.TrimStart('/'));
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            // Mettre à jour le bloc
+            Block.AudioUrl = null;
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur lors de la suppression : {ex.Message}";
+        }
+    }
+
+    private async Task RequestDelete(MouseEventArgs args)
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc audio ?");
+        if (confirmed)
+        {
+            await OnDeleteRequested.InvokeAsync(Block);
+        }
+    }
+
+    public void Dispose()
+    {
+        // Nettoyer les ressources si nécessaire
+    }
+}

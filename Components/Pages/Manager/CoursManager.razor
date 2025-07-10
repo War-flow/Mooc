@@ -17,21 +17,39 @@
 
 <PageTitle>Liste des modules</PageTitle>
 
-
-
 @if (session != null)
 {
-    <h1>Session : @session.Title</h1>
-    <h2>Liste des Modules</h2>
+    <div class="mb-4">
+        <h2>@session.Title</h2>
+    </div>
+    <a class="btn" href="/Manager/Cours?sessionId=@session.Id">Voir les cours</a>
+    <h3>Cours de cette session</h3>
+    @if (coursList.Any())
+    {
+        <ul class="list-group">
+            @foreach (var cours in coursList)
+            {
+                <li class="list-group-item">
+                    <strong>@cours.Title</strong>
+                    @* Ajoutez d'autres propriétés si besoin *@
+                </li>
+            }
+        </ul>
+    }
+    else
+    {
+        <div>Aucun cours pour cette session.</div>
+    }
 }
 else if (sessionId != null)
 {
-    <div>Chargement de la session...</div>
+    <div>Chargement...</div>
 }
 
 @code {
     private int? sessionId;
     private Session? session;
+    private List<Cours> coursList = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -45,9 +63,14 @@ else if (sessionId != null)
 
                 // Charger la session depuis la base de données
                 using var context = await DbContextFactory.CreateDbContextAsync();
+                // Charger la session et ses cours associés
                 session = await context.Sessions
                     .Include(s => s.Courses)
                     .FirstOrDefaultAsync(s => s.Id == sessionId);
+
+                // Charger la liste des cours (sécurité si la navigation n'est pas chargée)
+                if (session?.Courses != null)
+                    coursList = session.Courses.ToList();
             }
         }
     }

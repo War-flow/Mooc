@@ -12,6 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Mooc.Services;
 using System.IO.Compression;
 using System.Text.Json.Serialization;
+using Microsoft.JSInterop;
 
 namespace Mooc
 {
@@ -114,6 +115,7 @@ namespace Mooc
             // Configuration des services additionnels
             builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
             builder.Services.AddSingleton<IUserCacheService, UserCacheService>();
+            builder.Services.AddScoped<RichEditorService>();
 
             // Ajout de la compression des réponses
             builder.Services.AddResponseCompression(options =>
@@ -211,4 +213,5 @@ namespace Mooc
             await app.RunAsync();
         }
     }
+        
 }

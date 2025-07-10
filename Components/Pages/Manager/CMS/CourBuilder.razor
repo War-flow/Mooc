@@ -1,0 +1,60 @@
+﻿@using Mooc.Components.Pages.Manager.CMS.Block
+
+<h3>Créateur de cours</h3>
+
+<button class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un texte</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("image")'>Ajouter une image</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("video")'>Ajouter une vidéo</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("lien")'>Ajouter un lien</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("fichier")'>Ajouter un fichier</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("separateur")'>Ajouter un séparateur</button>
+<button class="btn btn-secondary" @onclick='() => AddBlock("info")'>Ajouter une info</button>
+<!-- Ajoutez d'autres boutons pour chaque type de bloc -->
+
+@foreach (var block in Blocks)
+{
+    <div class="mb-3">
+        <DynamicComponent Type="@GetBlockComponent(block.Type)" Parameters="@(new Dictionary<string, object> { ["Block"] = block })" />
+        <button class="btn btn-danger btn-sm" @onclick="() => RemoveBlock(block)">Supprimer</button>
+    </div>
+}
+
+@code {
+    public class CoursBlock
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Type { get; set; } = string.Empty;
+        public object? Content { get; set; }
+    }
+
+    private List<CoursBlock> Blocks { get; set; } = new();
+
+    void AddBlock(string type)
+    {
+        Blocks.Add(new CoursBlock { Type = type });
+    }
+
+    void RemoveBlock(CoursBlock block)
+    {
+        Blocks.Remove(block);
+    }
+
+    Type GetBlockComponent(string type) => type switch
+    {
+        "texte" => typeof(TextBlock),
+        "image" => typeof(ImageBlock),
+        "quiz" => typeof(QuizBlock),
+        "lien" => typeof(LinkBlock),
+        "video" => typeof(VideoBlock),
+        "audio" => typeof(AudioBlock),
+        "tableau" => typeof(TableBlock),
+        "fichier" => typeof(FileBlock),
+        "separateur" => typeof(SpaceBlock),
+        "info" => typeof(InfoBlock),
+        // Ajoutez d'autres types ici
+        _ => typeof(TextBlock)
+    };
+}

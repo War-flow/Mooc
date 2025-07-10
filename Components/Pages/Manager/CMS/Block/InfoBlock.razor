@@ -1,0 +1,157 @@
+﻿@using Microsoft.AspNetCore.Components.Forms
+@implements IDisposable
+
+<div class="info-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="info-title">
+        @if (IsEditing)
+        {
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => Block.Title)" />
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+    </h4>
+
+    <div class="info-content">
+        @if (IsEditing)
+        {
+            <InputSelect class="form-select mb-2" @bind-Value="TypedContent.Type">
+                <option value="info">Information</option>
+                <option value="warning">Avertissement</option>
+                <option value="success">Succès</option>
+                <option value="danger">Important</option>
+            </InputSelect>
+
+            <InputTextArea class="form-control" @bind-Value="Block.Message" rows="3" placeholder="Contenu du message d'information" />
+            <ValidationMessage For="@(() => Block.Message)" />
+        }
+        else
+        {
+            <div class="info-message">@Block.Message</div>
+        }
+    </div>
+
+    <div class="block-controls mt-2">
+        <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm" @onclick="ToggleEdit" aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
+            <i class="bi @(IsEditing ? "bi-check-lg" : "bi-pencil")"></i>
+            @(IsEditing ? "Enregistrer" : "Modifier")
+        </button>
+        @if (IsEditing)
+        {
+            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="CancelEdit" aria-label="Annuler les modifications">
+                <i class="bi bi-x-lg"></i> Annuler
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public CoursBlock Block { get; set; } = default!;
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    [CascadingParameter]
+    private EditContext? EditContext { get; set; }
+
+    private bool IsEditing { get; set; } = false;
+    private InfoBlockContent? _originalContent;
+
+    protected override void OnInitialized()
+    {
+        // Initialiser le contenu si nécessaire
+        if (Block.Content is not InfoBlockContent)
+        {
+            Block.Content = new InfoBlockContent
+            {
+                Title = Block.Title,
+                Message = Block.Message ?? string.Empty,
+                Type = "info"
+            };
+        }
+    }
+
+    protected override void OnParametersSet()
+    {
+        // S'assurer que Title et Message sont synchronisés avec le content
+        if (Block.Content is InfoBlockContent content)
+        {
+            // Synchroniser les valeurs
+            if (Block.Title != content.Title)
+            {
+                content.Title = Block.Title;
+            }
+
+            if (Block.Message != content.Message)
+            {
+                content.Message = Block.Message ?? string.Empty;
+            }
+        }
+    }
+
+    private void ToggleEdit()
+    {
+        if (IsEditing)
+        {
+            // Sauvegarde des modifications
+            Block.Title = TypedContent.Title;
+            Block.Message = TypedContent.Message;
+            _originalContent = null;
+            IsEditing = false;
+        }
+        else
+        {
+            // Backup pour pouvoir annuler
+            _originalContent = new InfoBlockContent
+            {
+                Title = TypedContent.Title,
+                Message = TypedContent.Message ?? string.Empty,
+                Type = TypedContent.Type
+            };
+            IsEditing = true;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        if (_originalContent != null)
+        {
+            // Restaurer les valeurs originales
+            Block.Content = _originalContent;
+            Block.Title = _originalContent.Title;
+            Block.Message = _originalContent.Message;
+        }
+        IsEditing = false;
+    }
+
+    private string GetTypeClass()
+    {
+        return TypedContent.Type switch
+        {
+            "warning" => "alert alert-warning",
+            "success" => "alert alert-success",
+            "danger" => "alert alert-danger",
+            _ => "alert alert-info"
+        };
+    }
+
+    // Classe pour contenu spécifique à InfoBlock
+    public class InfoBlockContent
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Type { get; set; } = "info";
+    }
+
+    // Propriété de commodité pour accéder au contenu typé
+    private InfoBlockContent TypedContent => Block.Content as InfoBlockContent ?? new InfoBlockContent();
+
+    public void Dispose()
+    {
+        // Nettoyer les ressources si nécessaire
+        _originalContent = null;
+    }
+}
