@@ -1,6 +1,5 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using Mooc.Services
-@implements IDisposable
 @inject FileUploadService FileUploadService
 @inject IJSRuntime JSRuntime
 
@@ -136,13 +135,13 @@
         return string.Join(" ", classes);
     }
 
-    private void CancelEdit()
+   private void CancelEdit()
     {
         IsEditing = false;
         Block.Title = originalTitle;
         Block.AudioUrl = originalAudioUrl;
         uploadError = null;
-    }
+    } 
 
     private async Task OnFileSelected(InputFileChangeEventArgs args)
     {

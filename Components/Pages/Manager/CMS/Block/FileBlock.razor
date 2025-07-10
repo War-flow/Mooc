@@ -1,5 +1,257 @@
-﻿<h3>FileBlock</h3>
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using System.IO
+@inject FileUploadService FileUploadService
+@inject IJSRuntime JSRuntime
+
+<div class="file-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="file-title">
+        @if (IsEditing)
+        {
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => Block.Title)" />
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+    </h4>
+    <div class="file-content">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputFile OnChange="OnFileSelected" accept="@AllowedFileTypes" class="form-control" />
+                <small class="form-text text-muted">Formats acceptés : @AllowedFileTypes (max @(MaxFileSizeMB) MB)</small>
+                <ValidationMessage For="@(() => Block.FileUrl)" />
+            </div>
+            @if (isUploading)
+            {
+                <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: @uploadProgress%" aria-valuenow="@uploadProgress" aria-valuemin="0" aria-valuemax="100">@uploadProgress%</div>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(uploadError))
+            {
+                <div class="alert alert-danger">@uploadError</div>
+            }
+            @if (!string.IsNullOrEmpty(Block.FileUrl))
+            {
+                <div class="d-flex align-items-center mb-2">
+                    <span class="me-2">Fichier actuel :</span>
+                    <div class="file-icon @GetFileIconClass(Block.FileUrl)"></div>
+                    <a href="@Block.FileUrl" target="_blank">@Path.GetFileName(Block.FileUrl)</a>
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-2" @onclick="RemoveFile">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        }
+        else if (!string.IsNullOrEmpty(Block.FileUrl))
+        {
+            <div class="d-flex align-items-center">
+                <div class="file-icon @GetFileIconClass(Block.FileUrl) me-2"></div>
+                <a href="@Block.FileUrl" target="_blank" class="file-link">
+                    <span class="file-name">@Path.GetFileName(Block.FileUrl)</span>
+                    <i class="bi bi-download ms-2"></i>
+                </a>
+            </div>
+        }
+    </div>
+    <div class="block-controls mt-3">
+        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
+            <i class="bi @(IsEditing ? "bi-check-lg" : "bi-pencil")"></i>
+            @(IsEditing ? "Enregistrer" : "Modifier")
+        </button>
+        @if (IsEditing)
+        {
+            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit">
+                <i class="bi bi-x-lg"></i> Annuler
+            </button>
+        }
+    </div>
+</div>
 
 @code {
+    [Parameter]
+    public CoursBlock Block { get; set; } = default!;
 
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    [Parameter]
+    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+
+    private bool IsEditing { get; set; }
+    private string? originalTitle;
+    private string? originalFileUrl;
+    private bool isUploading = false;
+    private int uploadProgress = 0;
+    private string? uploadError;
+
+    private const string AllowedFileTypes = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt";
+    private const int MaxFileSizeMB = 10;
+    private const long MaxFileSizeBytes = MaxFileSizeMB * 1024 * 1024;
+
+    protected override void OnInitialized()
+    {
+        originalTitle = Block.Title;
+        originalFileUrl = Block.FileUrl;
+        base.OnInitialized();
+    }
+
+    private string GetTypeClass()
+    {
+        var classes = new List<string> { "file-block" };
+
+        if (string.IsNullOrEmpty(Block.FileUrl))
+        {
+            classes.Add("empty");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetFileIconClass(string fileUrl)
+    {
+        if (string.IsNullOrEmpty(fileUrl))
+            return "bi-file";
+
+        string extension = Path.GetExtension(fileUrl).ToLowerInvariant();
+
+        return extension switch
+        {
+            ".pdf" => "bi-file-earmark-pdf",
+            ".doc" or ".docx" => "bi-file-earmark-word",
+            ".xls" or ".xlsx" => "bi-file-earmark-excel",
+            ".ppt" or ".pptx" => "bi-file-earmark-slides",
+            ".zip" => "bi-file-earmark-zip",
+            ".txt" => "bi-file-earmark-text",
+            _ => "bi-file-earmark"
+        };
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file == null)
+                return;
+
+            if (file.Size > MaxFileSizeBytes)
+            {
+                uploadError = $"Le fichier dépasse la taille maximale autorisée de {MaxFileSizeMB} MB";
+                return;
+            }
+
+            isUploading = true;
+            uploadProgress = 0;
+            uploadError = null;
+
+            // Création d'un stream pour suivre la progression
+            var progressStream = new ProgressStream(file.OpenReadStream(MaxFileSizeBytes),
+                progress =>
+                {
+                    uploadProgress = progress;
+                    StateHasChanged();
+                });
+
+            // Utilisation du service de téléchargement
+            var result = await FileUploadService.UploadFileAsync(progressStream, file.Name);
+            if (result.Success)
+            {
+                Block.FileUrl = result.FileUrl;
+                await OnBlockChanged.InvokeAsync(Block);
+            }
+            else
+            {
+                uploadError = result.ErrorMessage ?? "Erreur lors du téléchargement du fichier";
+            }
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur: {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+        }
+    }
+
+    private void RemoveFile()
+    {
+        Block.FileUrl = null;
+        StateHasChanged();
+    }
+
+    private async Task ToggleEdit()
+    {
+        if (IsEditing)
+        {
+            // Sauvegarde des modifications
+            IsEditing = false;
+            await OnBlockChanged.InvokeAsync(Block);
+        }
+        else
+        {
+            // Entrée en mode édition
+            originalTitle = Block.Title;
+            originalFileUrl = Block.FileUrl;
+            IsEditing = true;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        IsEditing = false;
+        Block.Title = originalTitle;
+        Block.FileUrl = originalFileUrl;
+        uploadError = null;
+    }
+
+    // Classe utilitaire pour suivre la progression du téléchargement
+    private class ProgressStream : Stream
+    {
+        private readonly Stream _stream;
+        private readonly Action<int> _progressChanged;
+        private long _totalBytes;
+        private long _bytesRead;
+
+        public ProgressStream(Stream stream, Action<int> progressChanged)
+        {
+            _stream = stream;
+            _progressChanged = progressChanged;
+            _totalBytes = stream.Length;
+            _bytesRead = 0;
+        }
+
+        public override bool CanRead => _stream.CanRead;
+        public override bool CanSeek => _stream.CanSeek;
+        public override bool CanWrite => _stream.CanWrite;
+        public override long Length => _stream.Length;
+        public override long Position
+        {
+            get => _stream.Position;
+            set => _stream.Position = value;
+        }
+
+        public override void Flush() => _stream.Flush();
+        public override long Seek(long offset, SeekOrigin origin) => _stream.Seek(offset, origin);
+        public override void SetLength(long value) => _stream.SetLength(value);
+        public override void Write(byte[] buffer, int offset, int count) => _stream.Write(buffer, offset, count);
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int bytesRead = _stream.Read(buffer, offset, count);
+
+            if (bytesRead > 0)
+            {
+                _bytesRead += bytesRead;
+                int progressPercentage = (int)((_bytesRead * 100) / _totalBytes);
+                _progressChanged?.Invoke(progressPercentage);
+            }
+
+            return bytesRead;
+        }
+    }
 }
