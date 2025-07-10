@@ -12,6 +12,7 @@ namespace Mooc.Data
         public DateTime StartDate { get; set; }
         public DateTime? EndDate { get; set; }
         public int Work { get; set; }
+        public bool IsActive { get; set; } = false; // Indique si la session est active
 
         // Propriété de navigation vers l'utilisateur
         public string? UserId { get; set; }

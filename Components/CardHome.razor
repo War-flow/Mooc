@@ -2,10 +2,15 @@
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
 
-@if (Sessions != null && Sessions.Any())
+@{
+    // Filtrer pour n'afficher que les sessions qui sont en ligne (IsActive = true)
+    var activeSessions = Sessions?.Where(s => s.IsActive).ToList();
+}
+
+@if (activeSessions != null && activeSessions.Any())
 {
     <div class="row row-cols-1 row-cols-md-3 g-4">
-        @foreach (var session in Sessions)
+        @foreach (var session in activeSessions)
         {
             <div class="col">
                 <div class="card mooc">

@@ -41,6 +41,10 @@ namespace Mooc.Data
                 entity.Property(e => e.Work)
                       .HasColumnType("int"); // Utiliser int pour le travail
 
+                entity.Property(e => e.IsActive)
+                        .HasColumnType("boolean") // Utiliser boolean pour le booléen
+                        .HasDefaultValue(false); // Par défaut, la session est active
+
                 entity.HasMany(s => s.Courses)
                       .WithOne(c => c.Session)
                       .HasForeignKey(c => c.SessionId);

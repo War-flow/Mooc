@@ -1,0 +1,442 @@
+﻿@page "/Manager/Session"
+
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@inject FileUploadService FileUploadService
+@attribute [Authorize(Policy = "GestionFormation")]
+@attribute [StreamRendering]
+
+<PageTitle>Gestion des Sessions</PageTitle>
+
+<h1>Gestion des Sessions</h1>
+
+<div class="container mt-4">
+    <div class="row mb-4">
+        <div class="col">
+            <button class="btn btn-primary" @onclick="ShowCreateSessionModal">Nouvelle Session</button>
+        </div>
+    </div>
+
+    @if (sessions != null)
+    {
+        <div class="row">
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Image</th>
+                            <th>Titre</th>
+                            <th>Description</th>
+                            <th>Date de début</th>
+                            <th>Date de fin</th>
+                            <th>Statut actuel</th>
+                            <th>Actions</th>
+                            <th>Cours</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var session in sessions)
+                        {
+                            <tr>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(session.Image))
+                                    {
+                                        <img src="@session.Image" alt="@session.Title" style="max-height: 50px; max-width: 100px;" />
+                                    }
+                                    else
+                                    {
+                                        <span>Aucune image</span>
+                                    }
+                                </td>
+                                <td>@session.Title</td>
+                                <td>@(session.Description?.Length > 30 ? session.Description.Substring(0, 30) + "..." : session.Description)</td>
+                                <td>@session.StartDate.ToShortDateString()</td>
+                                <td>@(session.EndDate.HasValue ? session.EndDate.Value.ToShortDateString() : "-")</td>
+                                <td>
+                                    <button class="btn btn-sm @(session.IsActive ? "btn-success" : "btn-secondary")" 
+                                            @onclick="() => ToggleSessionStatus(session.Id)">
+                                        @(session.IsActive ? "En ligne" : "Hors ligne")
+                                    </button>
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-info me-2" @onclick="() => EditSession(session.Id)">Modifier</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteSessionConfirmation(session.Id)">Supprimer</button>
+                                </td>
+                                <td>
+                                    <a class="btn" href="/Manager/Cours?sessionId=@session.Id">Voir les cours</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    }
+</div>
+
+@if (showModal)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">@modalTitle</h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <EditForm Model="@sessionModel" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        @if (showError)
+                        {
+                            <div class="alert alert-danger">
+                                @errorMessage
+                            </div>
+                        }
+
+                        <div class="mb-3">
+                            <label class="form-label">Titre</label>
+                            <InputText @bind-Value="sessionModel.Title" class="form-control" />
+                            <ValidationMessage For="@(() => sessionModel.Title)" />
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Image</label>
+                            <div class="d-flex flex-column">
+                                @if (!string.IsNullOrEmpty(sessionModel.Image))
+                                {
+                                    <div class="mb-2">
+                                        <img src="@sessionModel.Image" alt="Image actuelle" style="max-height: 100px;" />
+                                    </div>
+                                }
+                                <InputFile OnChange="OnImageFileSelected" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
+                                <small class="form-text text-muted">Formats acceptés: JPG, PNG, GIF. Taille max: 2MB</small>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea @bind-Value="sessionModel.Description" class="form-control" rows="3" />
+                            <ValidationMessage For="@(() => sessionModel.Description)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date de début</label>
+                            <InputDate @bind-Value="sessionModel.StartDate" class="form-control" />
+                            <ValidationMessage For="@(() => sessionModel.StartDate)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Date de fin</label>
+                            <InputDate @bind-Value="sessionModel.EndDate" class="form-control" />
+                            <ValidationMessage For="@(() => sessionModel.EndDate)" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Travail (heures)</label>
+                            <InputNumber @bind-Value="sessionModel.Work" class="form-control" />
+                            <ValidationMessage For="@(() => sessionModel.Work)" />
+                        </div>
+                        <div class="mb-3 form-check">
+                            <InputCheckbox @bind-Value="sessionModel.IsActive" class="form-check-input" id="isActiveCheck" />
+                            <label class="form-check-label" for="isActiveCheck">
+                                Session en ligne
+                            </label>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" @onclick="CloseModal">Annuler</button>
+                            <button type="submit" class="btn btn-primary">Enregistrer</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@if (showDeleteConfirmation)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmer la suppression</h5>
+                    <button type="button" class="btn-close" @onclick="() => showDeleteConfirmation = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir supprimer cette session ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showDeleteConfirmation = false">Annuler</button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteSession">Supprimer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Mooc.Data.Session>? sessions;
+    private SessionModel sessionModel = new();
+    private bool showModal = false;
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+    private string modalTitle = "Créer une session";
+    private bool isEditing = false;
+    private int currentSessionId = 0;
+    private bool showDeleteConfirmation = false;
+    private IBrowserFile? selectedImageFile;
+    private string? oldImagePath;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessions();
+    }
+
+    private async Task LoadSessions()
+    {
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        sessions = await context.Sessions.ToListAsync();
+    }
+
+    private async Task ToggleSessionStatus(int sessionId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var session = await context.Sessions.FindAsync(sessionId);
+
+            if (session != null)
+            {
+                session.IsActive = !session.IsActive;
+                await context.SaveChangesAsync();
+                await LoadSessions();
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors du changement de statut: {ex.Message}";
+        }
+    }
+
+    private void ShowCreateSessionModal()
+    {
+        sessionModel = new SessionModel();
+        selectedImageFile = null;
+        oldImagePath = null;
+        modalTitle = "Créer une session";
+        isEditing = false;
+        showModal = true;
+        showError = false;
+    }
+
+    private async Task EditSession(int sessionId)
+    {
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        var session = await context.Sessions.FindAsync(sessionId);
+
+        if (session != null)
+        {
+            currentSessionId = sessionId;
+            oldImagePath = session.Image;
+            sessionModel = new SessionModel
+            {
+                Title = session.Title,
+                Image = session.Image ?? string.Empty,
+                Description = session.Description ?? string.Empty,
+                StartDate = session.StartDate,
+                EndDate = session.EndDate ?? DateTime.Today.AddDays(30),
+                Work = session.Work,
+                IsActive = session.IsActive
+            };
+
+            modalTitle = "Modifier la session";
+            isEditing = true;
+            showModal = true;
+            showError = false;
+            selectedImageFile = null;
+        }
+    }
+
+    private async Task OnImageFileSelected(InputFileChangeEventArgs e)
+    {
+        // Stocke le fichier sélectionné pour l'upload lors de la soumission du formulaire
+        selectedImageFile = e.File;
+        
+        try
+        {
+            // Vérifie que c'est bien une image
+            if (!selectedImageFile.ContentType.StartsWith("image/"))
+            {
+                errorMessage = "Le fichier doit être une image.";
+                showError = true;
+                selectedImageFile = null;
+                return;
+            }
+
+            // Vérifie la taille du fichier (max 2MB)
+            if (selectedImageFile.Size > 2 * 1024 * 1024)
+            {
+                errorMessage = "La taille de l'image ne doit pas dépasser 2MB.";
+                showError = true;
+                selectedImageFile = null;
+                return;
+            }
+
+            showError = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la sélection de l'image : {ex.Message}";
+            showError = true;
+            selectedImageFile = null;
+        }
+    }
+
+    private void DeleteSessionConfirmation(int sessionId)
+    {
+        currentSessionId = sessionId;
+        showDeleteConfirmation = true;
+    }
+
+    private async Task ConfirmDeleteSession()
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var session = await context.Sessions.FindAsync(currentSessionId);
+
+            if (session != null)
+            {
+                // Supprimer l'image si elle existe
+                if (!string.IsNullOrEmpty(session.Image) && session.Image.StartsWith("/uploads/"))
+                {
+                    FileUploadService.DeleteImage(session.Image);
+                }
+
+                context.Sessions.Remove(session);
+                await context.SaveChangesAsync();
+                await LoadSessions();
+            }
+
+            showDeleteConfirmation = false;
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la suppression: {ex.Message}";
+            showError = true;
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            string imagePath = sessionModel.Image;
+
+            // Upload de la nouvelle image si elle est sélectionnée
+            if (selectedImageFile != null)
+            {
+                imagePath = await FileUploadService.UploadImageAsync(selectedImageFile);
+            }
+
+            using var context = await DbContextFactory.CreateDbContextAsync();
+
+            if (isEditing)
+            {
+                // Modification d'une session existante
+                var session = await context.Sessions.FindAsync(currentSessionId);
+
+                if (session != null)
+                {
+                    session.Title = sessionModel.Title;
+                    
+                    // Supprimer l'ancienne image si une nouvelle a été sélectionnée et que l'ancienne existe
+                    if (selectedImageFile != null && !string.IsNullOrEmpty(oldImagePath) && oldImagePath.StartsWith("/uploads/"))
+                    {
+                        FileUploadService.DeleteImage(oldImagePath);
+                    }
+                    
+                    session.Image = imagePath;
+                    session.Description = sessionModel.Description;
+                    session.StartDate = sessionModel.StartDate;
+                    session.EndDate = sessionModel.EndDate;
+                    session.Work = sessionModel.Work;
+                    session.IsActive = sessionModel.IsActive;
+
+                    await context.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                // Création d'une nouvelle session
+                var session = new Mooc.Data.Session
+                {
+                    Title = sessionModel.Title,
+                    Image = imagePath,
+                    Description = sessionModel.Description,
+                    StartDate = sessionModel.StartDate,
+                    EndDate = sessionModel.EndDate,
+                    Work = sessionModel.Work,
+                    IsActive = sessionModel.IsActive
+                };
+
+                context.Sessions.Add(session);
+                await context.SaveChangesAsync();
+            }
+
+            await LoadSessions();
+            CloseModal();
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de l'enregistrement: {ex.Message}";
+        }
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedImageFile = null;
+    }
+
+    // Modèle pour le formulaire des sessions
+    private class SessionModel
+    {
+        [Required(ErrorMessage = "Le titre est requis")]
+        [StringLength(200, ErrorMessage = "Le titre ne doit pas dépasser 200 caractères")]
+        public string Title { get; set; } = string.Empty;
+
+        public string Image { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La description est requise")]
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La date de début est requise")]
+        public DateTime StartDate { get; set; } = DateTime.Today;
+
+        [Required(ErrorMessage = "La date de fin est requise")]
+        public DateTime? EndDate { get; set; } = DateTime.Today.AddDays(30);
+
+        [Required(ErrorMessage = "Le temps de travail est requis")]
+        [Range(1, 1000, ErrorMessage = "Le temps de travail doit être entre 1 et 1000 heures")]
+        public int Work { get; set; } = 10;
+
+        public bool IsActive { get; set; } = false;
+    }
+}

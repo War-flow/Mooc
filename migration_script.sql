@@ -199,6 +199,7 @@ BEGIN
         [StartDate] date NOT NULL,
         [EndDate] date NULL,
         [Work] int NOT NULL,
+        [IsActive] boolean NOT NULL,
         [UserId] nvarchar(450) NULL,
         CONSTRAINT [PK_Session] PRIMARY KEY ([Id]),
         CONSTRAINT [FK_Session_AspNetUsers_UserId] FOREIGN KEY ([UserId]) REFERENCES [AspNetUsers] ([Id]) ON DELETE SET NULL

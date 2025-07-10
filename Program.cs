@@ -37,6 +37,9 @@ namespace Mooc
             // Ajout du service IdentityDataInitializer
             builder.Services.AddScoped<IdentityDataInitializer>();
 
+            // Ajout du service FileUploadService
+            builder.Services.AddScoped<FileUploadService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
@@ -85,15 +88,6 @@ namespace Mooc
             {
                 options.AddPolicy("GérerUtilisateurs", policy =>
                     policy.RequireClaim("Permission", "GérerUtilisateurs"));
-
-                options.AddPolicy("GérerCours", policy =>
-                   policy.RequireClaim("Permission", "GérerCours"));
-
-                options.AddPolicy("GérerSessions", policy =>
-                   policy.RequireClaim("Permission", "GérerSessions"));
-
-                options.AddPolicy("GérerQuiz", policy =>
-                    policy.RequireClaim("Permission", "GérerQuiz"));
 
                 options.AddPolicy("VoirCours", policy =>
                     policy.RequireClaim("Permission", "VoirCours"));

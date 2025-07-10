@@ -1,0 +1,113 @@
+﻿@page "/Account/Manage"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using Mooc.Data
+
+@inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
+@inject IdentityUserAccessor UserAccessor
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Profil</PageTitle>
+
+<h3>Profil</h3>
+<StatusMessage />
+
+<div class="row">
+    <div class="col-xl-6">
+        <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" role="alert" />
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FirstName" id="firstName" class="form-control" placeholder="Votre prénom" />
+                <label for="firstName" class="form-label">Prénom</label>
+                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+            </div>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.LastName" id="lastName" class="form-control" placeholder="Votre nom" />
+                <label for="lastName" class="form-label">Nom</label>
+                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">Valider</button>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private ApplicationUser user = default!;
+    private string? username;
+    private string? phoneNumber;
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private InputModel Input { get; set; } = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserAccessor.GetRequiredUserAsync(HttpContext);
+        username = await UserManager.GetUserNameAsync(user);
+        phoneNumber = await UserManager.GetPhoneNumberAsync(user);
+
+        Input.PhoneNumber ??= phoneNumber;
+        Input.FirstName ??= user.FirstName;
+        Input.LastName ??= user.LastName;
+    }
+
+    private async Task OnValidSubmitAsync()
+    {
+        bool needRefresh = false;
+
+        if (Input.PhoneNumber != phoneNumber)
+        {
+            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
+            if (!setPhoneResult.Succeeded)
+            {
+                RedirectManager.RedirectToCurrentPageWithStatus("Erreur : échec de définition du numéro de téléphone.", HttpContext);
+                return;
+            }
+            needRefresh = true;
+        }
+
+        if (Input.FirstName != user.FirstName || Input.LastName != user.LastName)
+        {
+            user.FirstName = Input.FirstName!;
+            user.LastName = Input.LastName!;
+            var updateResult = await UserManager.UpdateAsync(user);
+            if (!updateResult.Succeeded)
+            {
+                RedirectManager.RedirectToCurrentPageWithStatus("Erreur : échec de la mise à jour des informations personnelles.", HttpContext);
+                return;
+            }
+            needRefresh = true;
+        }
+
+        if (needRefresh)
+        {
+            await SignInManager.RefreshSignInAsync(user);
+        }
+        
+        RedirectManager.RedirectToCurrentPageWithStatus("Votre profil a été mis à jour", HttpContext);
+    }
+
+    private sealed class InputModel
+    {
+        [Phone]
+        [Display(Name = "Numéro de téléphone")]
+        public string? PhoneNumber { get; set; }
+
+        [Required(ErrorMessage = "Le prénom est obligatoire")]
+        [StringLength(100, ErrorMessage = "Le prénom ne peut pas dépasser {1} caractères")]
+        [RegularExpression(@"^[a-zA-ZÀ-ÿ\s\-']+$", ErrorMessage = "Le prénom ne peut contenir que des lettres, espaces, tirets et apostrophes")]
+        [Display(Name = "Prénom")]
+        public string? FirstName { get; set; }
+
+        [Required(ErrorMessage = "Le nom est obligatoire")]
+        [StringLength(100, ErrorMessage = "Le nom ne peut pas dépasser {1} caractères")]
+        [RegularExpression(@"^[a-zA-ZÀ-ÿ\s\-']+$", ErrorMessage = "Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes")]
+        [Display(Name = "Nom")]
+        public string? LastName { get; set; }
+    }
+}

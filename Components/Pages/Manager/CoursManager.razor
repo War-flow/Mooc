@@ -1,0 +1,55 @@
+﻿@page "/Manager/Cours"
+
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using Microsoft.AspNetCore.WebUtilities
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Policy = "GestionFormation")]
+@attribute [StreamRendering]
+
+
+<PageTitle>Liste des modules</PageTitle>
+
+
+
+@if (session != null)
+{
+    <h1>Session : @session.Title</h1>
+    <h2>Liste des Modules</h2>
+}
+else if (sessionId != null)
+{
+    <div>Chargement de la session...</div>
+}
+
+@code {
+    private int? sessionId;
+    private Session? session;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Récupération de l'ID depuis l'URL
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("sessionId", out var id))
+        {
+            if (int.TryParse(id, out var parsedId))
+            {
+                sessionId = parsedId;
+
+                // Charger la session depuis la base de données
+                using var context = await DbContextFactory.CreateDbContextAsync();
+                session = await context.Sessions
+                    .Include(s => s.Courses)
+                    .FirstOrDefaultAsync(s => s.Id == sessionId);
+            }
+        }
+    }
+}
+

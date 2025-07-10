@@ -70,6 +70,14 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Check if the user is already signed in, if so redirect to home page
+        if (SignInManager.IsSignedIn(HttpContext.User))
+        {
+            // Utilisez RedirectManager au lieu de NavigationManager.NavigateTo
+            RedirectManager.RedirectTo("/");
+            return;
+        }
+
         if (HttpMethods.IsGet(HttpContext.Request.Method))
         {
             // Clear the existing external cookie to ensure a clean login process
