@@ -1,5 +1,192 @@
-﻿<h3>VideoBlock</h3>
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using System.IO
+@inject FileUploadService FileUploadService
+@inject IJSRuntime JSRuntime
+
+<div class="video-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="video-title">
+        @if (IsEditing)
+        {
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => Block.Title)" />
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+    </h4>
+    <div class="video-content">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputFile OnChange="OnFileSelected" accept="video/*" class="form-control" />
+                <small class="form-text text-muted">Formats acceptés : MP4, AVI, MKV (max 100 MB)</small>
+                <ValidationMessage For="@(() => Block.VideoUrl)" />
+            </div>
+            @if (isUploading)
+            {
+                <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: @uploadProgress%" aria-valuenow="@uploadProgress" aria-valuemin="0" aria-valuemax="100">@uploadProgress%</div>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(uploadError))
+            {
+                <div class="alert alert-danger">@uploadError</div>
+            }
+            @if (!string.IsNullOrEmpty(Block.VideoUrl))
+            {
+                <div class="d-flex align-items-center mb-2">
+                    <span class="me-2">Vidéo actuelle :</span>
+                    <video controls class="video-preview" style="max-width: 200px; max-height: 150px;">
+                        <source src="@Block.VideoUrl" type="video/mp4" />
+                        Votre navigateur ne prend pas en charge l'élément vidéo.
+                    </video>
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-2" @onclick="RemoveVideo">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            }
+        }
+        else if (!string.IsNullOrEmpty(Block.VideoUrl))
+        {
+            <video controls class="w-100">
+                <source src="@Block.VideoUrl" type="video/mp4" />
+                Votre navigateur ne prend pas en charge l'élément vidéo.
+            </video>
+        }
+    </div>
+    <div class="video-controls">
+        @if (IsEditing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="SaveChanges">Enregistrer</button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Annuler</button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-outline-secondary" @onclick="Edit">Modifier</button>
+            <button type="button" class="btn btn-outline-danger" @onclick="RequestDelete">Supprimer</button>
+        }
+    </div>
+</div>
 
 @code {
+    [Parameter] public CoursBlock Block { get; set; } = default!;
+    [Parameter] public bool IsEditing { get; set; }
+    [Parameter] public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+    [Parameter] public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    [Parameter] public IDictionary<string, object> AdditionalAttributes { get; set; } = new Dictionary<string, object>();
+    
+    private bool isUploading;
+    private double uploadProgress;
+    private string uploadError;
+    private string originalTitle;
+    private string originalVideoUrl;
+    
+    protected override void OnInitialized()
+    {
+        // Initialiser les valeurs si nécessaires
+        if (string.IsNullOrEmpty(Block.VideoUrl))
+        {
+            Block.VideoUrl = string.Empty;
+        }
+    }
 
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        isUploading = true;
+        uploadProgress = 0;
+        uploadError = null;
+        
+        try
+        {
+            var file = e.File;
+            if (file.Size > 100 * 1024 * 1024) // 100 MB
+            {
+                uploadError = "Le fichier ne doit pas dépasser 100 Mo.";
+                return;
+            }
+            
+            if (!file.ContentType.StartsWith("video/"))
+            {
+                uploadError = "Le fichier doit être une vidéo.";
+                return;
+            }
+            
+            // Créer un objet Progress pour suivre la progression
+            var progressHandler = new Progress<double>(progress => 
+            {
+                uploadProgress = progress;
+                StateHasChanged();
+            });
+            
+            // Utiliser un Stream pour suivre la progression
+            using var stream = file.OpenReadStream(100 * 1024 * 1024);
+            var fileUrl = await FileUploadService.UploadFileAsync(stream, file.ContentType, progressHandler);
+            Block.VideoUrl = fileUrl;
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur lors du téléchargement : {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+            StateHasChanged();
+        }
+    }
+    
+    private void RemoveVideo()
+    {
+        Block.VideoUrl = null;
+    }
+    
+    private async Task Edit()
+    {
+        // Sauvegarder l'état original pour permettre d'annuler
+        originalTitle = Block.Title;
+        originalVideoUrl = Block.VideoUrl;
+        IsEditing = true;
+    }
+    
+    private async Task SaveChanges()
+    {
+        IsEditing = false;
+        await OnBlockChanged.InvokeAsync(Block);
+    }
+    
+    private void CancelEdit()
+    {
+        // Restaurer le contenu original
+        Block.Title = originalTitle;
+        Block.VideoUrl = originalVideoUrl;
+        uploadError = null;
+        IsEditing = false;
+    }
+    
+    private async Task RequestDelete()
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc vidéo?");
+        if (confirmed)
+        {
+            await OnDeleteRequested.InvokeAsync(Block);
+        }
+    }
+    
+    private string GetTypeClass()
+    {
+        var classList = new List<string>();
+        
+        if (IsEditing)
+        {
+            classList.Add("editing");
+        }
+        
+        if (string.IsNullOrEmpty(Block.VideoUrl))
+        {
+            classList.Add("empty");
+        }
+        
+        return string.Join(" ", classList);
+    }
 }

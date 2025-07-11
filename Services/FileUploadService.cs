@@ -52,6 +52,52 @@ namespace Mooc.Services
             }
         }
 
+        // Méthode pour télécharger un fichier avec rapport de progression
+        public async Task<string> UploadFileAsync(Stream fileStream, string contentType, IProgress<double> progress)
+        {
+            try
+            {
+                // Déterminer le dossier cible en fonction du type de contenu
+                string subfolder = contentType.StartsWith("image/") ? "images" : "files";
+                
+                // Crée le dossier s'il n'existe pas
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", subfolder);
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                // Crée un nom de fichier unique
+                var uniqueFileName = $"{Guid.NewGuid()}.{GetFileExtensionFromContentType(contentType)}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                // Créer un buffer pour la lecture
+                var buffer = new byte[4096];
+                var totalRead = 0L;
+                var fileLength = fileStream.Length;
+                
+                // Créer un nouveau fichier pour écrire
+                await using var fileWriteStream = new FileStream(filePath, FileMode.Create);
+                
+                // Lire et écrire par blocs avec rapport de progression
+                int bytesRead;
+                while ((bytesRead = await fileStream.ReadAsync(buffer)) > 0)
+                {
+                    await fileWriteStream.WriteAsync(buffer.AsMemory(0, bytesRead));
+                    totalRead += bytesRead;
+                    progress?.Report((double)totalRead / fileLength * 100);
+                }
+
+                // Retourne le chemin relatif pour l'utilisation dans l'application
+                return $"/uploads/{subfolder}/{uniqueFileName}";
+            }
+            catch (Exception ex)
+            {
+                // Log error or handle accordingly
+                throw new InvalidOperationException($"Erreur lors de l'upload du fichier : {ex.Message}", ex);
+            }
+        }
+
         public async Task<(bool Success, string? FileUrl, string? ErrorMessage)> UploadFileAsync(Stream fileStream, string fileName)
         {
             try
@@ -91,8 +137,11 @@ namespace Mooc.Services
                 // Extraire le nom du fichier du chemin relatif
                 string fileName = Path.GetFileName(imagePath);
                 
+                // Déterminer le dossier en fonction du chemin
+                string subfolder = imagePath.Contains("/images/") ? "images" : "sessions";
+                
                 // Construire le chemin absolu
-                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", "sessions", fileName);
+                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", subfolder, fileName);
                 
                 // Vérifier si le fichier existe avant de le supprimer
                 if (File.Exists(fullPath))
@@ -131,6 +180,22 @@ namespace Mooc.Services
                 // Log error or handle accordingly
                 throw new InvalidOperationException($"Erreur lors de la suppression du fichier : {ex.Message}", ex);
             }
+        }
+        
+        // Méthode utilitaire pour obtenir l'extension de fichier à partir du type de contenu
+        private string GetFileExtensionFromContentType(string contentType)
+        {
+            return contentType switch
+            {
+                "image/jpeg" => "jpg",
+                "image/png" => "png",
+                "image/gif" => "gif",
+                "image/svg+xml" => "svg",
+                "image/webp" => "webp",
+                "image/bmp" => "bmp",
+                "image/tiff" => "tiff",
+                _ => "bin"
+            };
         }
     }
 }

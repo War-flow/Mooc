@@ -1,5 +1,157 @@
-﻿<h3>LienBlock</h3>
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@implements IDisposable
+
+<div class="link-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="link-title">
+        @if (IsEditing)
+        {
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => Block.Title)" />
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+        else
+        {
+            <span class="text-muted">Sans titre</span>
+        }
+    </h4>
+    <div class="link-content">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputText class="form-control" @bind-Value="Block.Url" placeholder="URL du lien" />
+                <ValidationMessage For="@(() => Block.Url)" />
+                @if (urlError)
+                {
+                    <small class="text-danger">Veuillez saisir une URL valide (commence par http:// ou https://)</small>
+                }
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(Block.Url))
+        {
+            <a href="@Block.Url" target="_blank" rel="noopener noreferrer" class="link-display">@Block.Url</a>
+        }
+    </div>
+    <div class="block-controls mt-3">
+        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
+            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        </button>
+        @if (IsEditing)
+        {
+            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+                <i class="bi bi-x-lg"></i> Annuler
+            </button>
+        }
+        else
+        {
+            <button class="btn btn-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i>
+            </button>
+        }
+    </div>
+</div>
 
 @code {
+    [Parameter]
+    public CoursBlock Block { get; set; } = default!;
+    
+    [Parameter]
+    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
 
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object>? AdditionalAttributes { get; set; }
+
+    [Inject]
+    private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private bool IsEditing { get; set; } = false;
+    private bool urlError { get; set; } = false;
+    private string originalUrl = string.Empty;
+    private string originalTitle = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        // Initialiser les valeurs si nécessaires
+        if (string.IsNullOrEmpty(Block.Url))
+        {
+            Block.Url = string.Empty;
+        }
+    }
+
+    private async Task ToggleEdit()
+    {
+        if (IsEditing)
+        {
+            // Validation avant de sauvegarder
+            if (!string.IsNullOrEmpty(Block.Url) && !IsValidUrl(Block.Url))
+            {
+                urlError = true;
+                return;
+            }
+
+            // Notifier le parent que le bloc a changé
+            await OnBlockChanged.InvokeAsync(Block);
+            urlError = false;
+            IsEditing = false;
+        }
+        else
+        {
+            // Sauvegarder l'état original pour permettre d'annuler
+            originalUrl = Block.Url ?? string.Empty;
+            originalTitle = Block.Title ?? string.Empty;
+            urlError = false;
+            IsEditing = true;
+        }
+    }
+
+    private void CancelEdit()
+    {
+        // Restaurer le contenu original
+        Block.Url = originalUrl;
+        Block.Title = originalTitle;
+        urlError = false;
+        IsEditing = false;
+    }
+
+    private async Task RequestDelete()
+    {
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc?");
+        if (confirmed)
+        {
+            await OnDeleteRequested.InvokeAsync(Block);
+        }
+    }
+
+    private string GetTypeClass()
+    {
+        var classList = new List<string>();
+        
+        if (IsEditing)
+        {
+            classList.Add("editing");
+        }
+        
+        if (string.IsNullOrEmpty(Block.Url))
+        {
+            classList.Add("empty");
+        }
+        
+        return string.Join(" ", classList);
+    }
+
+    private bool IsValidUrl(string url)
+    {
+        return url.StartsWith("http://") || url.StartsWith("https://");
+    }
+
+    public void Dispose()
+    {
+        // Nettoyer les ressources si nécessaire
+    }
 }

@@ -1,5 +1,364 @@
-﻿<h3>ImageBlock</h3>
+﻿@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using System.IO
+@inject FileUploadService FileUploadService
+@inject IJSRuntime JSRuntime
+
+<div class="image-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="image-title">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+                @if (!string.IsNullOrEmpty(titleError))
+                {
+                    <div class="invalid-feedback d-block">@titleError</div>
+                }
+                <ValidationMessage For="@(() => Block.Title)" />
+            </div>
+        }
+        else if (!string.IsNullOrEmpty(Block.Title))
+        {
+            @Block.Title
+        }
+    </h4>
+    <div class="image-content">
+        @if (IsEditing)
+        {
+            <div class="mb-3">
+                <InputFile OnChange="OnFileSelected" accept="image/*" class="form-control" />
+                <small class="form-text text-muted">Formats acceptés : JPG, PNG, GIF (max 5 MB)</small>
+                <ValidationMessage For="@(() => Block.ImageUrl)" />
+            </div>
+            @if (isUploading)
+            {
+                <div class="progress mb-2">
+                    <div class="progress-bar" role="progressbar" style="width: @uploadProgress%" aria-valuenow="@uploadProgress" aria-valuemin="0" aria-valuemax="100">@uploadProgress%</div>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(uploadError))
+            {
+                <div class="alert alert-danger">@uploadError</div>
+            }
+            @if (!string.IsNullOrEmpty(Block.ImageUrl))
+            {
+                <div class="d-flex align-items-center mb-2">
+                    <span class="me-2">Image actuelle :</span>
+                    <img src="@Block.ImageUrl" alt="@Block.Title" class="img-thumbnail image-preview" />
+                    <button type="button" class="btn btn-outline-danger btn-sm ms-2" @onclick="RemoveImage">
+                        <i class="bi bi-trash"></i> Supprimer
+                    </button>
+                </div>
+            }
+            @if (!string.IsNullOrEmpty(_imagePreviewDataUrl))
+            {
+                <div class="mt-2">
+                    <p>Aperçu avant téléchargement:</p>
+                    <div class="position-relative">
+                        <img src="@_imagePreviewDataUrl" class="img-thumbnail image-preview" alt="Aperçu" />
+                        <button type="button" class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1" 
+                                @onclick="ClearPreview">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+            }
+        }
+        else if (!string.IsNullOrEmpty(Block.ImageUrl))
+        {
+            <div class="text-center">
+                <img src="@Block.ImageUrl" alt="@Block.Title" class="img-fluid rounded max-width-100" 
+                     @onclick="ShowImageFullscreen" style="cursor: pointer;" />
+            </div>
+        }
+        else
+        {
+            <div class="alert alert-info">
+                Aucune image disponible. Cliquez sur "Modifier" pour ajouter une image.
+            </div>
+        }
+    </div>
+
+    <div class="block-controls mt-3">
+        @if (IsEditing)
+        {
+            <button type="button" class="btn btn-primary" @onclick="SaveChanges" disabled="@isUploading">
+                <i class="bi bi-save"></i> Enregistrer
+            </button>
+            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
+                <i class="bi bi-x"></i> Annuler
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn btn-warning" @onclick="StartEditing">
+                <i class="bi bi-pencil"></i> Modifier
+            </button>
+        }
+        <button type="button" class="btn btn-danger" @onclick="DeleteBlock">
+            <i class="bi bi-trash"></i> Supprimer
+        </button>
+    </div>
+</div>
 
 @code {
+    [Parameter]
+    public CoursBlock Block { get; set; } = default!;
 
+    [Parameter]
+    public EventCallback<CoursBlock> OnDelete { get; set; }
+
+    [Parameter]
+    public EventCallback<CoursBlock> OnSave { get; set; }
+
+    [Parameter(CaptureUnmatchedValues = true)]
+    public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
+
+    private bool IsEditing { get; set; } = false;
+    private bool isUploading { get; set; } = false;
+    private string uploadError = string.Empty;
+    private string titleError = string.Empty;
+    private double uploadProgress = 0;
+    private IBrowserFile? currentFile;
+    private string? _imagePreviewDataUrl;
+    private string? originalImageUrl;
+    private string? originalTitle;
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e.FileCount == 0)
+            return;
+            
+        isUploading = true;
+        uploadError = string.Empty;
+        uploadProgress = 0;
+        
+        try
+        {
+            var file = e.File;
+            currentFile = file;
+
+            if (file.Size > 5 * 1024 * 1024) // 5 MB
+            {
+                uploadError = "Le fichier est trop volumineux. Taille maximale : 5 MB.";
+                return;
+            }
+            
+            if (!file.ContentType.StartsWith("image/"))
+            {
+                uploadError = "Le format du fichier n'est pas supporté. Seules les images sont acceptées.";
+                return;
+            }
+
+            // Générer l'aperçu immédiatement
+            await GeneratePreviewImage(file);
+
+            // Message utilisateur
+            StateHasChanged();
+
+            // Convertir le fichier en flux
+            using var stream = file.OpenReadStream(5 * 1024 * 1024);
+
+            // Télécharger l'image avec rapport de progression
+            var imageUrl = await FileUploadService.UploadFileAsync(stream, file.ContentType, 
+                new Progress<double>(p =>
+                {
+                    uploadProgress = p;
+                    InvokeAsync(StateHasChanged);
+                })
+            );
+
+            Block.ImageUrl = imageUrl;
+            uploadProgress = 100;
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur lors du téléchargement : {ex.Message}";
+        }
+        finally
+        {
+            isUploading = false;
+            currentFile = null;
+            StateHasChanged();
+        }
+    }
+
+    private async Task GeneratePreviewImage(IBrowserFile file)
+    {
+        try
+        {
+            // Générer l'aperçu
+            var format = file.ContentType;
+            var maxWidth = 300;
+            var maxHeight = 300;
+            
+            var resizedImageFile = await file.RequestImageFileAsync(format, maxWidth, maxHeight);
+            var buffer = new byte[resizedImageFile.Size];
+            
+            await using var stream = resizedImageFile.OpenReadStream();
+            await stream.ReadAsync(buffer);
+            
+            _imagePreviewDataUrl = $"data:{format};base64,{Convert.ToBase64String(buffer)}";
+        }
+        catch (Exception ex)
+        {
+            uploadError = $"Erreur lors de la génération de l'aperçu : {ex.Message}";
+        }
+    }
+    
+    private void ClearPreview()
+    {
+        _imagePreviewDataUrl = null;
+        currentFile = null;
+    }
+    
+    private async Task RemoveImage()
+    {
+        if (!string.IsNullOrEmpty(Block.ImageUrl))
+        {
+            var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer cette image ?");
+            if (confirmed)
+            {
+                try
+                {
+                    // Supprimer le fichier physiquement du serveur
+                    FileUploadService.DeleteImage(Block.ImageUrl);
+                    Block.ImageUrl = string.Empty;
+                    StateHasChanged();
+                }
+                catch (Exception ex)
+                {
+                    uploadError = $"Erreur lors de la suppression de l'image : {ex.Message}";
+                }
+            }
+        }
+    }
+    
+    private void StartEditing()
+    {
+        originalImageUrl = Block.ImageUrl;
+        originalTitle = Block.Title;
+        IsEditing = true;
+    }
+    
+    private void CancelEdit()
+    {
+        // Restaurer les valeurs originales
+        Block.ImageUrl = originalImageUrl ?? string.Empty;
+        Block.Title = originalTitle ?? string.Empty;
+        
+        // Réinitialiser les variables
+        IsEditing = false;
+        uploadError = string.Empty;
+        uploadProgress = 0;
+        _imagePreviewDataUrl = null;
+        titleError = string.Empty;
+    }
+    
+    private async Task SaveChanges()
+    {
+        // Validation
+        if (Block.Title?.Length > 100)
+        {
+            titleError = "Le titre ne peut pas dépasser 100 caractères.";
+            return;
+        }
+        
+        titleError = string.Empty;
+        IsEditing = false;
+        await OnSave.InvokeAsync(Block);
+    }
+    
+    private async Task DeleteBlock()
+    {
+        var confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc d'image ?");
+        if (confirmed)
+        {
+            // Si le bloc contient une image, supprimer le fichier
+            if (!string.IsNullOrEmpty(Block.ImageUrl))
+            {
+                try
+                {
+                    FileUploadService.DeleteImage(Block.ImageUrl);
+                }
+                catch (Exception)
+                {
+                    // Continuer même si la suppression du fichier échoue
+                    // On peut envisager de logger cette erreur
+                }
+            }
+            
+            await OnDelete.InvokeAsync(Block);
+        }
+    }
+    
+    private async Task ShowImageFullscreen()
+    {
+        if (!string.IsNullOrEmpty(Block.ImageUrl))
+        {
+            await JSRuntime.InvokeVoidAsync("showImageInLightbox", Block.ImageUrl, Block.Title ?? "Image");
+        }
+    }
+
+    private string GetTypeClass()
+    {
+        var classes = new List<string>();
+        
+        if (!string.IsNullOrEmpty(Block.Type))
+        {
+            classes.Add($"block-type-{Block.Type.ToLowerInvariant()}");
+        }
+        else
+        {
+            classes.Add("block-type-image");
+        }
+        
+        if (IsEditing)
+        {
+            classes.Add("is-editing");
+        }
+        
+        if (string.IsNullOrEmpty(Block.ImageUrl))
+        {
+            classes.Add("no-image");
+        }
+        
+        return string.Join(" ", classes);
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Injecter le script pour la visualisation en plein écran si nécessaire
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                window.showImageInLightbox = function(url, title) {
+                    if (!document.getElementById('lightbox-modal')) {
+                        var modal = document.createElement('div');
+                        modal.id = 'lightbox-modal';
+                        modal.className = 'modal fade';
+                        modal.innerHTML = `
+                            <div class='modal-dialog modal-lg modal-dialog-centered'>
+                                <div class='modal-content'>
+                                    <div class='modal-header'>
+                                        <h5 class='modal-title'></h5>
+                                        <button type='button' class='btn-close' data-bs-dismiss='modal'></button>
+                                    </div>
+                                    <div class='modal-body text-center'>
+                                        <img src='' class='img-fluid' style='max-height: 80vh;' />
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                        document.body.appendChild(modal);
+                    }
+                    
+                    var lightbox = new bootstrap.Modal(document.getElementById('lightbox-modal'));
+                    document.querySelector('#lightbox-modal .modal-title').textContent = title;
+                    document.querySelector('#lightbox-modal img').src = url;
+                    lightbox.show();
+                }
+            ");
+        }
+    }
 }
