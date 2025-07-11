@@ -221,7 +221,18 @@ BEGIN
     CREATE TABLE [Cours] (
         [Id] int NOT NULL IDENTITY,
         [Title] nvarchar(100) NOT NULL,
+        [Description] nvarchar(300) NULL,
+        [Content] nvarchar(max) NULL,
+        [Duration] int NOT NULL,
+        [Order] int NOT NULL,
+        [IsPublished] boolean NOT NULL,
+        [IsRequired] boolean NOT NULL,
+        [DateCreated] datetime NOT NULL DEFAULT GETDATE(),
+        [DateUpdated] datetime NULL,
+        [SessionId] int NULL,
         CONSTRAINT [PK_Cours] PRIMARY KEY ([Id])
+        , CONSTRAINT [FK_Cours_Session] FOREIGN KEY ([SessionId]) REFERENCES [Session] ([Id]) ON DELETE SET NULL
+        , CONSTRAINT [FK_Cours_Quiz] FOREIGN KEY ([Id]) REFERENCES [Quiz] ([CoursId]) ON DELETE CASCADE
     );
     
     -- Ajouter cette migration à l'historique si nécessaire

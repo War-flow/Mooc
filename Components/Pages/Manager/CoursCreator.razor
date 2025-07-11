@@ -1,0 +1,343 @@
+﻿@page "/Manager/Cours/Edit"
+@page "/Manager/Cours/Edit/{CoursId:int}"
+
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using Microsoft.AspNetCore.WebUtilities
+@using Mooc.Components.Pages.Manager.CMS
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@inject FileUploadService FileUploadService
+@attribute [Authorize(Policy = "GestionFormation")]
+@attribute [StreamRendering]
+
+<PageTitle>@(isEditing ? "Modifier un cours" : "Créer un cours")</PageTitle>
+
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between mb-4">
+        <h2>@(isEditing ? "Modifier un cours" : "Créer un cours")</h2>
+        <button class="btn btn-secondary" @onclick="RetourVersListe">Retour à la liste</button>
+    </div>
+
+    @if (showError)
+    {
+        <div class="alert alert-danger">
+            @errorMessage
+        </div>
+    }
+
+    <EditForm Model="@coursModel" OnValidSubmit="HandleValidSubmit" Context="formContext">
+        <DataAnnotationsValidator />
+
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Informations générales</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Titre du cours</label>
+                            <InputText @bind-Value="coursModel.Title" class="form-control" />
+                            <ValidationMessage For="@(() => coursModel.Title)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea @bind-Value="coursModel.Description" class="form-control" rows="3" />
+                            <ValidationMessage For="@(() => coursModel.Description)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Durée estimée (minutes)</label>
+                            <InputNumber @bind-Value="coursModel.Duration" class="form-control" />
+                            <ValidationMessage For="@(() => coursModel.Duration)" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h4>Paramètres</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Session</label>
+                            @if (sessions != null)
+                            {
+                                <InputSelect @bind-Value="coursModel.SessionId" class="form-select">
+                                    <option value="0">-- Sélectionner une session --</option>
+                                    @foreach (var session in sessions)
+                                    {
+                                        <option value="@session.Id">@session.Title</option>
+                                    }
+                                </InputSelect>
+                                <ValidationMessage For="@(() => coursModel.SessionId)" />
+                            }
+                            else
+                            {
+                                <div>Chargement des sessions...</div>
+                            }
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <InputCheckbox @bind-Value="coursModel.IsPublished" class="form-check-input" id="isPublishedCheck" />
+                            <label class="form-check-label" for="isPublishedCheck">
+                                Cours publié
+                            </label>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <InputCheckbox @bind-Value="coursModel.IsRequired" class="form-check-input" id="isRequiredCheck" />
+                            <label class="form-check-label" for="isRequiredCheck">
+                                Cours obligatoire
+                            </label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Ordre d'affichage</label>
+                            <InputNumber @bind-Value="coursModel.Order" class="form-control" />
+                            <ValidationMessage For="@(() => coursModel.Order)" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4>Contenu du cours</h4>
+            </div>
+            <div class="card-body">
+                <CourBuilder @ref="coursBuilder" />
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end mb-5">
+            <button type="button" class="btn btn-secondary me-2" @onclick="RetourVersListe">Annuler</button>
+            <button type="submit" class="btn btn-primary">@(isEditing ? "Mettre à jour" : "Créer le cours")</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public int? CoursId { get; set; }
+
+    private CoursModel coursModel = new();
+    private List<Session>? sessions;
+    private bool isEditing = false;
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+    private CourBuilder coursBuilder = null!;
+    private int? sessionIdFromUrl;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSessions();
+
+        // Récupérer le sessionId depuis l'URL si présent
+        var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+        if (QueryHelpers.ParseQuery(uri.Query).TryGetValue("sessionId", out var sessionIdParam))
+        {
+            if (int.TryParse(sessionIdParam, out var parsedSessionId))
+            {
+                sessionIdFromUrl = parsedSessionId;
+                coursModel.SessionId = parsedSessionId;
+            }
+        }
+
+        // Si on est en mode édition (CoursId est présent)
+        if (CoursId.HasValue && CoursId.Value > 0)
+        {
+            isEditing = true;
+            await LoadCoursData(CoursId.Value);
+        }
+        else
+        {
+            // Pour un nouveau cours, initialiser avec des valeurs par défaut
+            coursModel = new CoursModel
+            {
+                SessionId = sessionIdFromUrl ?? 0,
+                IsPublished = false,
+                IsRequired = false,
+                Order = 1,
+                Duration = 30
+            };
+        }
+    }
+
+    private async Task LoadSessions()
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            sessions = await context.Sessions.OrderByDescending(s => s.StartDate).ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors du chargement des sessions : {ex.Message}";
+        }
+    }
+
+    private async Task LoadCoursData(int coursId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses
+                .FirstOrDefaultAsync(c => c.Id == coursId);
+
+            if (cours != null)
+            {
+                coursModel = new CoursModel
+                {
+                    Title = cours.Title,
+                    Description = cours.Description ?? string.Empty,
+                    SessionId = cours.SessionId,
+                    IsPublished = cours.IsPublished,
+                    IsRequired = cours.IsRequired,
+                    Order = cours.Order,
+                    Duration = cours.Duration
+                };
+
+                // Charger les blocs de contenu
+                if (cours.Content != null)
+                {
+                    await Task.Delay(100); // Attendre que le composant CourBuilder soit initialisé
+
+                    // Désérialiser le contenu JSON et l'assigner au CourBuilder
+                    // Cette partie dépend de comment vous stockez le contenu dans la base de données
+                    // Par exemple, si vous stockez une liste de blocs au format JSON:
+                    try
+                    {
+                        var blocksFromDb = System.Text.Json.JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content);
+                        if (blocksFromDb != null && coursBuilder != null)
+                        {
+                            coursBuilder.SetBlocks(blocksFromDb);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        // Gérer l'erreur de désérialisation
+                        Console.WriteLine($"Erreur lors de la désérialisation du contenu: {ex.Message}");
+                    }
+                }
+            }
+            else
+            {
+                showError = true;
+                errorMessage = "Le cours demandé n'a pas été trouvé.";
+                NavigationManager.NavigateTo("/Manager/Cours");
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors du chargement du cours : {ex.Message}";
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+
+            // Sérialiser les blocs du CourBuilder
+            var blocksJson = string.Empty;
+            if (coursBuilder != null)
+            {
+                var blocks = coursBuilder.GetBlocks();
+                blocksJson = System.Text.Json.JsonSerializer.Serialize(blocks);
+            }
+
+            if (isEditing && CoursId.HasValue)
+            {
+                // Mode édition
+                var cours = await context.Courses.FindAsync(CoursId.Value);
+                if (cours != null)
+                {
+                    cours.Title = coursModel.Title;
+                    cours.Description = coursModel.Description;
+                    cours.SessionId = coursModel.SessionId;
+                    cours.IsPublished = coursModel.IsPublished;
+                    cours.IsRequired = coursModel.IsRequired;
+                    cours.Order = coursModel.Order;
+                    cours.Duration = coursModel.Duration;
+                    cours.Content = blocksJson;
+                    cours.UpdatedAt = DateTime.UtcNow;
+
+                    await context.SaveChangesAsync();
+                    NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
+                }
+            }
+            else
+            {
+                // Mode création
+                var cours = new Cours
+                {
+                    Title = coursModel.Title,
+                    Description = coursModel.Description,
+                    SessionId = coursModel.SessionId,
+                    IsPublished = coursModel.IsPublished,
+                    IsRequired = coursModel.IsRequired,
+                    Order = coursModel.Order,
+                    Duration = coursModel.Duration,
+                    Content = blocksJson,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                };
+
+                context.Courses.Add(cours);
+                await context.SaveChangesAsync();
+                NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de l'enregistrement : {ex.Message}";
+        }
+    }
+
+    private void RetourVersListe()
+    {
+        if (sessionIdFromUrl.HasValue)
+            NavigationManager.NavigateTo($"/Manager/Cours?sessionId={sessionIdFromUrl.Value}");
+        else
+            NavigationManager.NavigateTo("/Manager/Cours");
+    }
+
+    // Modèle pour le formulaire du cours
+    private class CoursModel
+    {
+        [Required(ErrorMessage = "Le titre est requis")]
+        [StringLength(200, ErrorMessage = "Le titre ne doit pas dépasser 200 caractères")]
+        public string Title { get; set; } = string.Empty;
+
+        public string Description { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Veuillez sélectionner une session")]
+        [Range(1, int.MaxValue, ErrorMessage = "Veuillez sélectionner une session valide")]
+        public int SessionId { get; set; }
+
+        [Range(1, int.MaxValue, ErrorMessage = "L'ordre doit être supérieur à 0")]
+        public int Order { get; set; } = 1;
+
+        [Range(1, int.MaxValue, ErrorMessage = "La durée doit être supérieure à 0")]
+        public int Duration { get; set; } = 30;
+
+        public bool IsPublished { get; set; }
+
+        public bool IsRequired { get; set; }
+    }
+}

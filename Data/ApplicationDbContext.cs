@@ -6,8 +6,8 @@ namespace Mooc.Data
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
         public DbSet<Session> Sessions { get; set; } = null!;
-        public DbSet<Cours> Cours { get; set; } = null!;
         public DbSet<Quiz> Quizzes { get; set; } = null!;
+        public DbSet<Cours> Courses { get; set; }
 
         // Vous pouvez également configurer des détails supplémentaires si nécessaire
         protected override void OnModelCreating(ModelBuilder builder)
