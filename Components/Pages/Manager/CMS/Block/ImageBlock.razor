@@ -58,7 +58,7 @@
                         <img src="@_imagePreviewDataUrl" class="img-thumbnail image-preview" alt="Aperçu" />
                         <button type="button" class="btn btn-sm btn-outline-danger position-absolute top-0 end-0 m-1" 
                                 @onclick="ClearPreview">
-                            <i class="bi bi-x"></i>
+                            <i class="bi bi-x-lg"></i> Annuler
                         </button>
                     </div>
                 </div>
@@ -83,10 +83,10 @@
         @if (IsEditing)
         {
             <button type="button" class="btn-block btn-valid" @onclick="SaveChanges" disabled="@isUploading">
-                <i class="bi bi-floppy"></i>Enregistrer
+                <i class="bi bi-floppy"></i> Enregistrer
             </button>
             <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
-                <i class="bi bi-x-octagon-fill"></i>Annuler
+                <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
         else

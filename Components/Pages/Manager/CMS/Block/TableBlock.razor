@@ -22,46 +22,140 @@
         }
         else
         {
-            <span class="text-muted">Sans titre</span>
+            <span class="text-muted">Bloc Tableau (vide)</span>
         }
     </h4>
     <div class="quiz-content">
         @if (IsEditing)
         {
-            @if (useRichEditor)
-            {
-                <div id="editor-@Block.Order" class="rich-editor" style="height: 200px;"></div>
-            }
-            else
-            {
-                <textarea class="form-control" @bind="TableContent" rows="5" placeholder="Contenu du tableau"></textarea>
-            }
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="useRichEditor-@Block.Order" 
-                       @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                <label class="form-check-label" for="useRichEditor-@Block.Order">
-                    Utiliser l'éditeur riche
-                </label>
+            <div class="mb-3">
+                <div class="d-flex align-items-center mb-2">
+                    <label class="me-2 mb-0">Mode d'édition:</label>
+                    <div class="btn-group" role="group">
+                        <button type="button" class="btn @(editMode == "visual" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => SwitchEditMode("visual")'>
+                            <i class="bi bi-grid-3x3"></i> Visuel
+                        </button>
+                        <button type="button" class="btn @(editMode == "rich" ? "btn-primary" : "btn-outline-secondary")"
+                                @onclick='() => SwitchEditMode("rich")'>
+                            <i class="bi bi-pencil-square"></i> Éditeur riche
+                        </button>
+                        <button type="button" class="btn @(editMode == "html" ? "btn-primary" : "btn-outline-secondary")"
+                            @onclick='() =>SwitchEditMode("html")'>
+                            <i class="bi bi-code-slash"></i> HTML
+                        </button>
+                    </div>
+                </div>
+
+                @if (editMode == "visual")
+                {
+                    <div class="table-editor">
+                        <div class="table-controls mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddRow">
+                                <i class="bi bi-plus-circle"></i> Ligne
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddColumn">
+                                <i class="bi bi-plus-circle"></i> Colonne
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddHeader"
+                                    title="Ajouter/Supprimer l'en-tête">
+                                <i class="bi bi-list-ol"></i> En-tête
+                            </button>
+                            <div class="dropdown d-inline-block">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                        id="tableStyleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                    Style
+                                </button>
+                                <ul class="dropdown-menu" aria-labelledby="tableStyleDropdown">
+                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table")'>Standard</button></li>
+                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-striped")'>Rayé</button></li>
+                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-bordered")'>Bordé</button></li>
+                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-hover")'>Survol</button></li>
+                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-sm")'>Compact</button></li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="table-responsive">
+                            <table class="@tableStyle">
+                                @if (hasHeader)
+                                {
+                                    <thead>
+                                        <tr>
+                                            @for (int i = 0; i < tableColumns; i++)
+                                            {
+                                                int colIndex = i;
+                                                <th>
+                                                    <div class="d-flex align-items-center">
+                                                        <input type="text" class="form-control form-control-sm"
+                                                               @bind="headerCells[colIndex]" />
+                                                        <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                                                @onclick="() => RemoveColumn(colIndex)" title="Supprimer colonne">
+                                                            <i class="bi bi-trash"></i>
+                                                        </button>
+                                                    </div>
+                                                </th>
+                                            }
+                                        </tr>
+                                    </thead>
+                                }
+                                <tbody>
+                                    @for (int r = 0; r < tableRows; r++)
+                                    {
+                                        int rowIndex = r;
+                                        <tr>
+                                            @for (int c = 0; c < tableColumns; c++)
+                                            {
+                                                int colIndex = c;
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <input type="text" class="form-control form-control-sm"
+                                                               @bind="tableCells[rowIndex][colIndex]" />
+                                                        @if (c == 0)
+                                                        {
+                                                            <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                                                    @onclick="() => RemoveRow(rowIndex)" title="Supprimer ligne">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                </td>
+                                            }
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+                else if (editMode == "rich")
+                {
+                    <div id="editor-@Block.Order" class="rich-editor" style="height: 300px;"></div>
+                }
+                else
+                {
+                    <textarea class="form-control" @bind="TableContent" rows="10" placeholder="Contenu HTML du tableau"></textarea>
+                }
             </div>
         }
         else if (!string.IsNullOrEmpty(TableContent))
         {
-            <div class="content-display">@((MarkupString)TableContent)</div>
+            <div class="content-display table-responsive">@((MarkupString)TableContent)</div>
         }
     </div>
     <div class="block-controls mt-3">
-        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (!IsEditing)
         {
-            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i> Supprimer
             </button>
         }
         else
         {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
@@ -70,30 +164,41 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
-    
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
-    
+
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
-    
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+
     [Parameter]
-    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
-    
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
+
     [CascadingParameter]
     private EditContext? EditContext { get; set; }
-    
+
     private bool IsEditing { get; set; } = false;
-    private bool useRichEditor { get; set; } = true;
+    private string editMode = "visual"; // visual, rich, html
     private bool titleError { get; set; } = false;
     private string originalContent = string.Empty;
     private string originalTitle = string.Empty;
     private string editorId => $"editor-{Block.Order}";
 
+    // Table visual editor properties
+    private int tableRows = 2;
+    private int tableColumns = 2;
+    private bool hasHeader = true;
+    private string tableStyle = "table table-bordered";
+    private List<string> headerCells = new List<string> { "Colonne 1", "Colonne 2" };
+    private List<List<string>> tableCells = new List<List<string>> {
+        new List<string> { "Cellule 1,1", "Cellule 1,2" },
+        new List<string> { "Cellule 2,1", "Cellule 2,2" }
+    };
+
     // Property to handle content as string, using Block.Content
-    private string TableContent 
-    { 
+    private string TableContent
+    {
         get => Block.Content?.ToString() ?? string.Empty;
         set => Block.Content = value;
     }
@@ -104,18 +209,61 @@
         if (Block.Content == null)
         {
             Block.Content = string.Empty;
+            GenerateTableFromVisual(); // Génère le tableau initial
+        }
+        else if (!string.IsNullOrEmpty(TableContent))
+        {
+            // Essayer de parser le HTML du tableau existant
+            ParseExistingTable();
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (IsEditing && useRichEditor)
+        if (IsEditing && editMode == "rich")
         {
             // Initialiser l'éditeur riche
             await EditorService.InitializeEditorAsync(editorId, TableContent);
-            
+
             // S'abonner aux changements de contenu
             EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+        }
+    }
+
+    // Parse le contenu HTML existant pour le mode visuel
+    private void ParseExistingTable()
+    {
+        try
+        {
+            // Cette fonction est simplifiée et pourrait être améliorée avec une vraie analyse HTML
+            // Pour un véritable déploiement, utilisez une bibliothèque d'analyse HTML comme HtmlAgilityPack
+
+            // Recherche basique des lignes et colonnes
+            var content = TableContent.ToLower();
+
+            // Vérifie si le tableau a un en-tête
+            hasHeader = content.Contains("<thead>");
+
+            // Extraire le style du tableau
+            if (content.Contains("table-striped"))
+                tableStyle = "table table-striped";
+            else if (content.Contains("table-bordered"))
+                tableStyle = "table table-bordered";
+            else if (content.Contains("table-hover"))
+                tableStyle = "table table-hover";
+            else if (content.Contains("table-sm"))
+                tableStyle = "table table-sm";
+            else
+                tableStyle = "table";
+
+            // Dans une implémentation réelle, on analyserait le contenu pour extraire
+            // les lignes, les colonnes et le contenu des cellules
+            // Cette partie est simplifiée pour la démonstration
+        }
+        catch
+        {
+            // En cas d'erreur d'analyse, utiliser la structure par défaut
+            ResetTableStructure();
         }
     }
 
@@ -126,28 +274,159 @@
         TableContent = content;
     }
 
+    private void SwitchEditMode(string mode)
+    {
+        if (editMode == mode) return;
+
+        if (editMode == "visual" && mode != "visual")
+        {
+            // Convertir du mode visuel vers HTML ou éditeur riche
+            GenerateTableFromVisual();
+        }
+        else if (mode == "visual" && editMode != "visual")
+        {
+            // Convertir de HTML ou éditeur riche vers le mode visuel
+            // Cette fonction pourrait être améliorée pour analyser le HTML
+            ParseExistingTable();
+        }
+
+        editMode = mode;
+        StateHasChanged();
+    }
+
     private string GetTypeClass()
     {
         var classList = new List<string>();
-        
+
         // Ajouter la classe basée sur le type
         classList.Add(Block.Type switch
         {
             "table" => "table-block",
             _ => "default-block"
         });
-        
+
         if (IsEditing)
         {
             classList.Add("editing");
         }
-        
+
         if (string.IsNullOrEmpty(TableContent))
         {
             classList.Add("empty");
         }
-        
+
         return string.Join(" ", classList);
+    }
+
+    private void AddRow()
+    {
+        List<string> newRow = new List<string>();
+        for (int i = 0; i < tableColumns; i++)
+        {
+            newRow.Add($"Cellule {tableRows + 1},{i + 1}");
+        }
+        tableCells.Add(newRow);
+        tableRows++;
+    }
+
+    private void RemoveRow(int rowIndex)
+    {
+        if (tableRows > 1)
+        {
+            tableCells.RemoveAt(rowIndex);
+            tableRows--;
+        }
+    }
+
+    private void AddColumn()
+    {
+        // Ajouter une cellule à chaque ligne
+        for (int i = 0; i < tableRows; i++)
+        {
+            tableCells[i].Add($"Cellule {i + 1},{tableColumns + 1}");
+        }
+
+        // Ajouter une cellule d'en-tête
+        headerCells.Add($"Colonne {tableColumns + 1}");
+        tableColumns++;
+    }
+
+    private void RemoveColumn(int colIndex)
+    {
+        if (tableColumns > 1)
+        {
+            // Supprimer la cellule de chaque ligne
+            for (int i = 0; i < tableRows; i++)
+            {
+                tableCells[i].RemoveAt(colIndex);
+            }
+
+            // Supprimer la cellule d'en-tête
+            headerCells.RemoveAt(colIndex);
+            tableColumns--;
+        }
+    }
+
+    private void AddHeader()
+    {
+        hasHeader = !hasHeader;
+    }
+
+    private void ApplyTableStyle(string style)
+    {
+        tableStyle = style;
+    }
+
+    private void GenerateTableFromVisual()
+    {
+        var tableHtml = new System.Text.StringBuilder();
+        tableHtml.AppendLine("<div class=\"table-responsive\">");
+        tableHtml.AppendLine($"<table class=\"{tableStyle}\">");
+
+        // Ajouter l'en-tête si nécessaire
+        if (hasHeader)
+        {
+            tableHtml.AppendLine("<thead>");
+            tableHtml.AppendLine("<tr>");
+            foreach (var header in headerCells)
+            {
+                tableHtml.AppendLine($"<th>{header}</th>");
+            }
+            tableHtml.AppendLine("</tr>");
+            tableHtml.AppendLine("</thead>");
+        }
+
+        // Ajouter le corps du tableau
+        tableHtml.AppendLine("<tbody>");
+        for (int r = 0; r < tableRows; r++)
+        {
+            tableHtml.AppendLine("<tr>");
+            for (int c = 0; c < tableColumns; c++)
+            {
+                tableHtml.AppendLine($"<td>{tableCells[r][c]}</td>");
+            }
+            tableHtml.AppendLine("</tr>");
+        }
+        tableHtml.AppendLine("</tbody>");
+        tableHtml.AppendLine("</table>");
+        tableHtml.AppendLine("</div>");
+
+        TableContent = tableHtml.ToString();
+    }
+
+    private void ResetTableStructure()
+    {
+        // Structure de tableau par défaut
+        tableRows = 2;
+        tableColumns = 2;
+        hasHeader = true;
+        tableStyle = "table table-bordered";
+
+        headerCells = new List<string> { "Colonne 1", "Colonne 2" };
+        tableCells = new List<List<string>> {
+            new List<string> { "Cellule 1,1", "Cellule 1,2" },
+            new List<string> { "Cellule 2,1", "Cellule 2,2" }
+        };
     }
 
     private async Task ToggleEdit()
@@ -161,10 +440,15 @@
                 return;
             }
 
-            // Si on utilise l'éditeur riche, récupérer le contenu depuis JS
-            if (useRichEditor)
+            // Si on est en mode éditeur riche, récupérer le contenu depuis JS
+            if (editMode == "rich")
             {
                 TableContent = await EditorService.GetEditorContentAsync(editorId);
+            }
+            // Si on est en mode visuel, générer le HTML
+            else if (editMode == "visual")
+            {
+                GenerateTableFromVisual();
             }
 
             // Notifier le parent que le bloc a changé
@@ -172,11 +456,11 @@
             {
                 await OnBlockChanged.InvokeAsync(Block);
             }
-            
+
             // Notifier le contexte d'édition si nécessaire
             EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
             EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
-            
+
             IsEditing = false;
         }
         else
@@ -184,35 +468,11 @@
             // Sauvegarder l'état original pour permettre d'annuler
             originalContent = TableContent;
             originalTitle = Block.Title ?? string.Empty;
-            
+
             IsEditing = true;
         }
 
         titleError = false;
-    }
-    
-    private async Task ToggleRichEditor()
-    {
-        useRichEditor = !useRichEditor;
-        
-        if (IsEditing)
-        {
-            if (useRichEditor)
-            {
-                // Transférer le contenu du textarea à l'éditeur riche
-                await EditorService.InitializeEditorAsync(editorId, TableContent);
-                EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-            }
-            else
-            {
-                // Transférer le contenu de l'éditeur riche au textarea
-                TableContent = await EditorService.GetEditorContentAsync(editorId);
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
-            }
-        }
-        
-        StateHasChanged();
     }
 
     private async Task CancelEdit()
@@ -220,16 +480,19 @@
         // Restaurer le contenu original
         TableContent = originalContent;
         Block.Title = originalTitle;
-        
+
         // Nettoyer l'éditeur si nécessaire
-        if (useRichEditor)
+        if (editMode == "rich")
         {
             await EditorService.DestroyEditorAsync(editorId);
             EditorInterop.UnsubscribeFromContentChanges(editorId);
         }
-        
+
+        // Re-parser le tableau existant pour le mode visuel
+        ParseExistingTable();
+
         IsEditing = false;
-        
+
         // Notifier le contexte d'édition
         EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
         EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
@@ -247,7 +510,7 @@
     public async ValueTask DisposeAsync()
     {
         // Nettoyer les ressources lors de la suppression du composant
-        if (useRichEditor && IsEditing)
+        if (editMode == "rich" && IsEditing)
         {
             await EditorService.DestroyEditorAsync(editorId);
             EditorInterop.UnsubscribeFromContentChanges(editorId);

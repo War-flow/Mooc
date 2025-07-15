@@ -43,7 +43,7 @@
                         Votre navigateur ne prend pas en charge l'élément vidéo.
                     </video>
                     <button type="button" class="btn btn-outline-danger btn-sm ms-2" @onclick="RemoveVideo">
-                        <i class="bi bi-trash"></i>
+                        <i class="bi bi-trash"></i> Supprimer
                     </button>
                 </div>
             }
@@ -66,21 +66,21 @@
         @if (IsEditing)
         {
             <button type="button" class="btn-block btn-valid" @onclick="SaveChanges">
-                <i class="bi bi-floppy"></i>Enregistrer
+                <i class="bi bi-floppy"></i> Enregistrer
                 </button>
 
             <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
-                <i class="bi bi-x-octagon-fill"></i>Annuler
+                <i class="bi bi-x-lg"></i> Annuler
                 </button>
         }
         else
         {
             <button type="button" class="btn-block btn-valid" @onclick="Edit">
-                <i class="bi bi-pencil"></i>Modifier
+                <i class="bi bi-pencil"></i> Modifier
                 </button>
 
             <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete">
-                <i class="bi bi-trash"></i>Supprimer
+                <i class="bi bi-trash"></i> Supprimer
                 </button>
 
             

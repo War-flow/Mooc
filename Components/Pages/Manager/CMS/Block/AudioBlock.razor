@@ -73,14 +73,14 @@
             @if (IsEditing)
             {
                 <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
-                    <i class="bi bi-x-octagon-fill"></i>Annuler
+                    <i class="bi bi-x-lg"></i> Annuler
                 </button>
             }
         </div>
         @if (!IsEditing)
         {
             <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>Supprimer
+                <i class="bi bi-trash"></i> Supprimer
             </button>
         }
     </div>
