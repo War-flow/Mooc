@@ -57,6 +57,12 @@
                 Votre navigateur ne prend pas en charge l'élément audio.
             </audio>
         }
+        else
+        {
+            <div class="alert alert-info">
+                Aucun audio disponible. Cliquez sur "Modifier" pour ajouter.
+            </div>
+        }
     </div>
     <div class="block-controls mt-2 d-flex justify-content-between">
         <div>
@@ -73,7 +79,7 @@
         </div>
         @if (!IsEditing)
         {
-            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
                 <i class="bi bi-trash"></i>
             </button>
         }
@@ -82,16 +88,16 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
 
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
 
     [Parameter]
-    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
     private bool IsEditing { get; set; }
     private string? originalTitle;
