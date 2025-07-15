@@ -3,16 +3,16 @@
 <h3>Créateur de cours</h3>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-    <button class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un texte</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("image")'>Ajouter une image</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("video")'>Ajouter une vidéo</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("lien")'>Ajouter un lien</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("fichier")'>Ajouter un fichier</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("separateur")'>Ajouter un séparateur</button>
-    <button class="btn btn-secondary" @onclick='() => AddBlock("info")'>Ajouter une info</button>
+    <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un texte</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("image")'>Ajouter une image</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("video")'>Ajouter une vidéo</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("lien")'>Ajouter un lien</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("fichier")'>Ajouter un fichier</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("separateur")'>Ajouter un séparateur</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("info")'>Ajouter une info</button>
 </div>
 
 <div class="cours-container">
@@ -28,39 +28,25 @@
     {
         <div class="mb-3 cours-block">
             <DynamicComponent Type="@GetBlockComponent(block.Type)" Parameters="@(new Dictionary<string, object>
-                                                                    {
-                                                                        ["Block"] = block,
-                                                                        ["OnBlockChanged"] = EventCallback.Factory.Create<CoursBlock>(this, () => StateHasChanged())
-                                                                    })" />
-        <div class="cours-block-actions">
-            @if (block != Blocks.FirstOrDefault())
-                {
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => MoveBlockUp(block)" title="Déplacer vers le haut">
-                        <i class="bi bi-arrow-up"></i>
-                    </button>
-                }
-                @if (block != Blocks.LastOrDefault())
-                {
-                    <button class="btn btn-outline-secondary btn-sm" @onclick="() => MoveBlockDown(block)" title="Déplacer vers le bas">
-                        <i class="bi bi-arrow-down"></i>
-                    </button>
-                }
-                <button class="btn btn-danger btn-sm" @onclick="() => RemoveBlock(block)" title="Supprimer ce bloc">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </div>
+                                                            {
+                                                                ["Block"] = block,
+                                                                ["OnBlockChanged"] = EventCallback.Factory.Create<CoursBlock>(this, () => StateHasChanged()),
+                                                                ["OnDeleteRequested"] = EventCallback.Factory.Create<CoursBlock>(this, (b) => RemoveBlock(b))
+                                                            })" />
         </div>
     }
 </div>
 
 @code {
+    // Modifiez la définition de CoursBlock pour garantir que les propriétés sont initialisées
     public class CoursBlock
     {
         public Guid Id { get; set; } = Guid.NewGuid();
         public string Type { get; set; } = string.Empty;
         public object? Content { get; set; }
         public int Order { get; set; }
-        public string? Title { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
     }
 
     private List<CoursBlock> Blocks { get; set; } = new();
@@ -69,8 +55,15 @@
     public void AddBlock(string type)
     {
         int order = Blocks.Count > 0 ? Blocks.Max(b => b.Order) + 1 : 1;
-        Blocks.Add(new CoursBlock { Type = type, Order = order });
-        StateHasChanged();
+        Blocks.Add(new CoursBlock { 
+            Type = type, 
+            Order = order, 
+            Title = string.Empty,  // Initialiser Title avec une chaîne vide
+            Text = string.Empty    // Initialiser Text avec une chaîne vide
+        });
+        
+        // Utilisez InvokeAsync pour éviter les problèmes de rendu
+        InvokeAsync(() => StateHasChanged());
     }
 
     // Méthode pour supprimer un bloc
@@ -122,8 +115,32 @@
     // Méthode pour définir les blocs (lors du chargement depuis la base de données)
     public void SetBlocks(List<CoursBlock> blocks)
     {
-        Blocks = blocks;
-        StateHasChanged();
+        if (blocks == null)
+        {
+            Console.WriteLine("SetBlocks: blocks est null");
+            return;
+        }
+        
+        Console.WriteLine($"SetBlocks: Chargement de {blocks.Count} blocs");
+        
+        try
+        {
+            // Videz d'abord la liste existante
+            Blocks.Clear();
+            
+            // Ensuite ajoutez tous les blocs dans l'ordre
+            foreach (var block in blocks.OrderBy(b => b.Order))
+            {
+                Blocks.Add(block);
+            }
+            
+            Console.WriteLine($"SetBlocks: {Blocks.Count} blocs chargés");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"SetBlocks: Erreur - {ex.Message}");
+        }
     }
 
     Type GetBlockComponent(string type) => type switch

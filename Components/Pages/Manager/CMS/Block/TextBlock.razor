@@ -2,148 +2,274 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using Mooc.Services
+@using Mooc.Components.Pages.Manager.CMS.Block
 @inject IJSRuntime JSRuntime
 @inject RichEditorService EditorService
 @implements IAsyncDisposable
 
-<div class="text-block @GetTypeClass()" id="block-@Block.Order">
-    <h4 class="text-title @(string.IsNullOrEmpty(Block.Title) ? "text-muted" : "")">
-        @if (IsEditing)
-        {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
-            @if (titleError)
+
+@if (Block != null)
+{
+    <div class="text-block @GetTypeClass()" id="block-@Block.Order">
+        <h4 class="text-title @(string.IsNullOrEmpty(GetBlockTitle()) ? "text-muted" : "")">
+            @if (IsEditing)
             {
-                <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
+                <input type="text" class="form-control" value="@GetBlockTitle()" @oninput="OnTitleChanged" />
+                @if (titleError)
+                {
+                    <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
+                }   
             }
-        }
-        else if (!string.IsNullOrEmpty(Block.Title))
-        {
-            @Block.Title
-        }
-        else
-        {
-            <span class="text-muted">Sans titre</span>
-        }
-    </h4>
-    <div class="text-content">
-        @if (IsEditing)
-        {
-            @if (useRichEditor)
+            else if (!string.IsNullOrEmpty(GetBlockTitle()))
             {
-                <div id="editor-@Block.Order" class="rich-editor" style="height: 200px;"></div>
+                @GetBlockTitle()
             }
             else
             {
-                <InputTextArea class="form-control" @bind-Value="Block.Text" rows="5" placeholder="Contenu du texte" />
+                <span class="text-muted">Sans titre</span>
             }
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="useRichEditor-@Block.Order" 
-                       @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                <label class="form-check-label" for="useRichEditor-@Block.Order">
-                    Utiliser l'éditeur riche
-                </label>
+        </h4>
+        <div class="text-content">
+            @if (IsEditing)
+            {
+                @if (useRichEditor)
+                {
+                    <div id="editor-@Block.Order" class="rich-editor" style="height: @(EditorHeight)px;"></div>
+                }
+                else
+                {
+                    <textarea class="form-control" value="@GetBlockText()" @oninput="OnTextChanged" rows="5"></textarea>
+                }
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="useRichEditor-@Block.Order"
+                           @onchange="ToggleRichEditor" checked="@useRichEditor" />
+                    <label class="form-check-label" for="useRichEditor-@Block.Order">
+                        Utiliser l'éditeur riche
+                    </label>
+                </div>
+            }
+            else
+            {
+                <div class="content-display">@((MarkupString)GetBlockText())</div>
+            }
+        </div>
+        <div class="block-controls mt-3">
+            <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
+                <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+            </button>
+            
+            @* Bouton de suppression (affiché uniquement en mode lecture) *@
+            @if (!IsEditing)
+            {
+                <button id="delete-btn-@(Block.Id)" type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
+                    <i class="bi bi-trash"></i>
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+                    <i class="bi bi-x-lg"></i> Annuler
+                </button>
+            }
+        </div>
+
+        <!-- Indicateur de sauvegarde -->
+        @if (isSaving)
+        {
+            <div class="save-indicator">
+                <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+                <span class="ms-1">Sauvegarde en cours...</span>
             </div>
         }
-        else
+
+        <!-- Message de succès temporaire -->
+        @if (showSaveSuccess)
         {
-            <div class="content-display">@((MarkupString)Block.Text)</div>
+            <div class="alert alert-success mt-2 p-2 fade-out">
+                Modifications enregistrées avec succès
+            </div>
         }
     </div>
-    <div class="block-controls mt-3">
-        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
-        </button>
-        @if (!IsEditing)
-        {
-            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
-            </button>
-        }
-        else
-        {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
-                <i class="bi bi-x-lg"></i> Annuler
-            </button>
-        }
+}
+else
+{
+    <div class="alert alert-warning">
+        Chargement du bloc de texte en cours...
     </div>
-</div>
+}
 
 @code {
     [Parameter]
     public int BlockId { get; set; }
-    
+
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
-    
+    public dynamic Block { get; set; }
+
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
-    
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+
     [Parameter]
-    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
     private bool IsEditing { get; set; } = false;
     private bool useRichEditor { get; set; } = true;
     private bool titleError { get; set; } = false;
     private string originalContent = string.Empty;
     private string originalTitle = string.Empty;
-    private string editorId => $"editor-{Block.Order}";
+    private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
+    private bool isSaving { get; set; } = false;
+    private bool showSaveSuccess { get; set; } = false;
+
+    // Ajouter propriété pour la hauteur de l'éditeur
+    [Parameter]
+    public int EditorHeight { get; set; } = 200;
 
     protected override void OnInitialized()
     {
-        // Initialiser le contenu si nécessaire
-        if (Block.Text == null)
+        // S'assurer que Block n'est pas null
+        if (Block == null)
         {
-            Block.Text = string.Empty;
+            // Créer un objet CoursBlock avec les propriétés minimales requises
+            var newBlock = new CoursBlock
+            {
+                Type = "texte",
+                Title = string.Empty,
+                Order = 0
+            };
+            Block = newBlock;
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (IsEditing && useRichEditor)
+        if (Block != null && IsEditing && useRichEditor)
         {
-            // Initialiser l'éditeur riche
-            await EditorService.InitializeEditorAsync(editorId, Block.Text?.ToString() ?? string.Empty);
+            await InitializeRichEditor();
+        }
+    }
+
+    // Méthode améliorée pour initialiser l'éditeur
+    private async Task InitializeRichEditor()
+    {
+        if (Block == null || !IsEditing || !useRichEditor) return;
+        
+        try
+        {
+            string content = GetBlockText();
+            // Initialiser l'éditeur riche avec la hauteur configurable
+            await EditorService.InitializeEditorAsync(editorId, content);
             
             // S'abonner aux changements de contenu
             EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de l'initialisation de l'éditeur: {ex.Message}");
         }
     }
 
     // Cette méthode sera appelée lorsque le contenu de l'éditeur change
     private void OnContentChanged(string elementId, string content)
     {
-        // Mettre à jour le contenu du bloc
-        Block.Text = content;
-        
-        // Optionnel : appeler StateHasChanged pour mettre à jour l'interface si nécessaire
-        // StateHasChanged();
+        if (Block != null)
+        {
+            try
+            {
+                UpdateBlockText(content);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la mise à jour du contenu: {ex.Message}");
+            }
+        }
     }
 
-    private async Task ToggleEdit()
+    // Méthode pour gérer le changement de texte dans le textarea
+    private void OnTextChanged(ChangeEventArgs e)
     {
-        if (IsEditing)
+        if (Block != null && e.Value != null)
+        {
+            string value = e.Value.ToString() ?? string.Empty;
+            UpdateBlockText(value);
+        }
+    }
+
+    // Méthode pour gérer le changement de titre
+    private void OnTitleChanged(ChangeEventArgs e)
+    {
+        if (Block != null && e.Value != null)
+        {
+            string value = e.Value.ToString() ?? string.Empty;
+            
+            if (value.Length > 100)
+            {
+                titleError = true;
+                return;
+            }
+            titleError = false;
+            UpdateBlockTitle(value);
+        }
+    }
+
+    // Méthode améliorée pour sauvegarder les modifications
+    private async Task SaveChanges()
+    {
+        if (Block == null) return;
+        
+        try
         {
             // Validation avant de sauvegarder
-            if (Block.Title?.Length > 100)
+            if (GetBlockTitle().Length > 100)
             {
                 titleError = true;
                 return;
             }
 
+            isSaving = true;
+            StateHasChanged();
+
             // Si on utilise l'éditeur riche, récupérer le contenu depuis JS
             if (useRichEditor)
             {
-                Block.Text = await EditorService.GetEditorContentAsync(editorId);
+                string editorContent = await EditorService.GetEditorContentAsync(editorId);
+                UpdateBlockText(editorContent);
             }
 
             // Notifier le parent que le bloc a changé
             await OnBlockChanged.InvokeAsync(Block);
+            
+            // Afficher le message de succès temporairement
+            showSaveSuccess = true;
+            StateHasChanged();
+            
+            await Task.Delay(2000);
+            showSaveSuccess = false;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la sauvegarde des modifications: {ex.Message}");
+            // Afficher un message d'erreur à l'utilisateur serait pertinent ici
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ToggleEdit()
+    {
+        if (Block == null) return;
+        
+        if (IsEditing)
+        {
+            await SaveChanges();
         }
         else
         {
             // Sauvegarder l'état original pour permettre d'annuler
-            originalContent = Block.Text?.ToString() ?? string.Empty;
-            originalTitle = Block.Title ?? string.Empty;
+            originalContent = GetBlockText();
+            originalTitle = GetBlockTitle();
         }
 
         titleError = false;
@@ -152,22 +278,32 @@
     
     private async Task ToggleRichEditor()
     {
+        if (Block == null) return;
+        
         useRichEditor = !useRichEditor;
         
         if (IsEditing)
         {
-            if (useRichEditor)
+            try
             {
-                // Transférer le contenu du textarea à l'éditeur riche
-                await EditorService.InitializeEditorAsync(editorId, Block.Text?.ToString() ?? string.Empty);
-                EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+                if (useRichEditor)
+                {
+                    // Transférer le contenu du textarea à l'éditeur riche
+                    await EditorService.InitializeEditorAsync(editorId, GetBlockText());
+                    EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+                }
+                else
+                {
+                    // Transférer le contenu de l'éditeur riche au textarea
+                    string editorContent = await EditorService.GetEditorContentAsync(editorId);
+                    UpdateBlockText(editorContent);
+                    await EditorService.DestroyEditorAsync(editorId);
+                    EditorInterop.UnsubscribeFromContentChanges(editorId);
+                }
             }
-            else
+            catch (Exception ex)
             {
-                // Transférer le contenu de l'éditeur riche au textarea
-                Block.Text = await EditorService.GetEditorContentAsync(editorId);
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
+                Console.WriteLine($"Erreur lors du basculement de l'éditeur: {ex.Message}");
             }
         }
         
@@ -176,21 +312,32 @@
 
     private async Task CancelEdit()
     {
-        // Restaurer le contenu original
-        Block.Text = originalContent;
-        Block.Title = originalTitle;
-        IsEditing = false;
+        if (Block == null) return;
         
-        if (useRichEditor)
+        try
         {
-            // Nettoyer l'éditeur
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
+            // Restaurer le contenu original
+            UpdateBlockText(originalContent);
+            UpdateBlockTitle(originalTitle);
+            IsEditing = false;
+            
+            if (useRichEditor)
+            {
+                // Nettoyer l'éditeur
+                await EditorService.DestroyEditorAsync(editorId);
+                EditorInterop.UnsubscribeFromContentChanges(editorId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de l'annulation des modifications: {ex.Message}");
         }
     }
 
     private async Task RequestDelete()
     {
+        if (Block == null) return;
+        
         bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc?");
         if (confirmed)
         {
@@ -207,7 +354,7 @@
             classList.Add("editing");
         }
         
-        if (string.IsNullOrEmpty(Block.Text?.ToString()))
+        if (string.IsNullOrEmpty(GetBlockText()))
         {
             classList.Add("empty");
         }
@@ -215,13 +362,70 @@
         return string.Join(" ", classList);
     }
 
+    // Méthodes helper pour accéder aux propriétés de Block de façon sécurisée
+    private string GetBlockText()
+    {
+        try
+        {
+            return Block?.Text?.ToString() ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private string GetBlockTitle()
+    {
+        try
+        {
+            return Block?.Title?.ToString() ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    // Méthodes helper pour mettre à jour les propriétés de Block de façon sécurisée
+    private void UpdateBlockText(string value)
+    {
+        try
+        {
+            Block.Text = value;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la mise à jour du texte: {ex.Message}");
+        }
+    }
+
+    private void UpdateBlockTitle(string value)
+    {
+        try
+        {
+            Block.Title = value;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la mise à jour du titre: {ex.Message}");
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
-        // Nettoyer les ressources lors de la suppression du composant
-        if (useRichEditor)
+        try
         {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
+            // Nettoyer les ressources lors de la suppression du composant
+            if (Block != null && useRichEditor)
+            {
+                await EditorService.DestroyEditorAsync(editorId);
+                EditorInterop.UnsubscribeFromContentChanges(editorId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la libération des ressources: {ex.Message}");
         }
     }
 }

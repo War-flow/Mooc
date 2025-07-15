@@ -55,7 +55,7 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Durée estimée (minutes)</label>
+                            <label class="form-label">Durée estimée (heures)</label>
                             <InputNumber @bind-Value="coursModel.Duration" class="form-control" />
                             <ValidationMessage For="@(() => coursModel.Duration)" />
                         </div>
@@ -139,6 +139,9 @@
     private CourBuilder coursBuilder = null!;
     private int? sessionIdFromUrl;
 
+    private List<CourBuilder.CoursBlock>? blocksToLoad; // Pour stocker temporairement les blocs
+    private bool blocksLoaded = false; // Pour suivre si les blocs ont été chargés
+
     protected override async Task OnInitializedAsync()
     {
         await LoadSessions();
@@ -212,23 +215,40 @@
                 // Charger les blocs de contenu
                 if (cours.Content != null)
                 {
-                    await Task.Delay(100); // Attendre que le composant CourBuilder soit initialisé
-
-                    // Désérialiser le contenu JSON et l'assigner au CourBuilder
-                    // Cette partie dépend de comment vous stockez le contenu dans la base de données
-                    // Par exemple, si vous stockez une liste de blocs au format JSON:
                     try
                     {
-                        var blocksFromDb = System.Text.Json.JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content);
-                        if (blocksFromDb != null && coursBuilder != null)
+                        var blocksFromDb = System.Text.Json.JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(
+                            cours.Content,
+                            new System.Text.Json.JsonSerializerOptions
+                            {
+                                PropertyNameCaseInsensitive = true,
+                                WriteIndented = true
+                            });
+
+                        if (blocksFromDb != null)
                         {
-                            coursBuilder.SetBlocks(blocksFromDb);
+                            // Normaliser les blocs pour éviter les erreurs
+                            foreach (var block in blocksFromDb)
+                            {
+                                if (block.Title == null)
+                                    block.Title = string.Empty;
+                                if (block.Text == null)
+                                    block.Text = string.Empty;
+                                    
+                                // S'assurer que les ID sont uniques et valides
+                                if (block.Id == Guid.Empty)
+                                    block.Id = Guid.NewGuid();
+                            }
+                            
+                            // Stocker les blocs pour les charger plus tard
+                            blocksToLoad = blocksFromDb;
                         }
                     }
                     catch (Exception ex)
                     {
-                        // Gérer l'erreur de désérialisation
                         Console.WriteLine($"Erreur lors de la désérialisation du contenu: {ex.Message}");
+                        showError = true;
+                        errorMessage = $"Erreur lors du chargement des blocs de contenu: {ex.Message}";
                     }
                 }
             }
@@ -243,6 +263,36 @@
         {
             showError = true;
             errorMessage = $"Erreur lors du chargement du cours : {ex.Message}";
+        }
+    }
+
+    // Ajouter cette méthode pour appliquer les blocs lorsque le composant est rendu
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (blocksToLoad != null && coursBuilder != null && !blocksLoaded)
+        {
+            try
+            {
+                // Marquer comme chargé pour éviter les chargements multiples
+                blocksLoaded = true;
+                
+                // Ajouter un court délai pour s'assurer que le composant est complètement initialisé
+                await Task.Delay(100);
+                
+                // Appliquer les blocs au CourBuilder
+                coursBuilder.SetBlocks(blocksToLoad);
+                
+                // Force un nouveau rendu pour afficher les blocs
+                await InvokeAsync(StateHasChanged);
+                
+                Console.WriteLine($"Chargement de {blocksToLoad.Count} blocs réussi");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de l'application des blocs: {ex.Message}");
+                showError = true;
+                errorMessage = $"Erreur lors de l'initialisation des blocs: {ex.Message}";
+            }
         }
     }
 
