@@ -103,13 +103,17 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
 
     [Parameter]
-    public EventCallback<CoursBlock> OnDelete { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDelete { get; set; }
 
     [Parameter]
-    public EventCallback<CoursBlock> OnSave { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnSave { get; set; }
+    
+    // Ajouter ce paramètre pour la suppression du bloc
+    [Parameter]
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object> AdditionalAttributes { get; set; } = new();
@@ -288,7 +292,8 @@
                 }
             }
             
-            await OnDelete.InvokeAsync(Block);
+            // Utiliser OnDeleteRequested au lieu de OnDelete
+            await OnDeleteRequested.InvokeAsync(Block);
         }
     }
     
