@@ -52,18 +52,18 @@
         }
     </div>
     <div class="block-controls mt-3">
-        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
+        <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
             <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (!IsEditing)
         {
-            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
+            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
                 <i class="bi bi-trash"></i>
             </button>
         }
         else
         {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
@@ -72,16 +72,16 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
     
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
     
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
     
     [Parameter]
-    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
     
     [CascadingParameter]
     private EditContext? EditContext { get; set; }

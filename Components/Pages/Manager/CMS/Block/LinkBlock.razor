@@ -1,5 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
+@using System.Collections.Generic
 @implements IDisposable
 
 <div class="link-block @GetTypeClass()" @attributes="AdditionalAttributes">
@@ -15,40 +16,68 @@
         }
         else
         {
-            <span class="text-muted">Sans titre</span>
+            <span class="text-muted">Bloc Liens (vide)</span>
         }
     </h4>
     <div class="link-content">
         @if (IsEditing)
         {
             <div class="mb-3">
-                <InputText class="form-control" @bind-Value="Block.Url" placeholder="URL du lien" />
-                <ValidationMessage For="@(() => Block.Url)" />
-                @if (urlError)
+                @foreach (var (url, index) in Links.Select((url, i) => (url, i)))
                 {
-                    <small class="text-danger">Veuillez saisir une URL valide (commence par http:// ou https://)</small>
+                    <div class="d-flex mb-2">
+                        <input type="text" class="form-control" value="@url" 
+                               @oninput="@(e => UpdateLink(index, e.Value?.ToString() ?? string.Empty))" 
+                               placeholder="URL du lien" />
+                        <button type="button" class="btn btn-sm btn-danger ms-2" @onclick="@(() => RemoveLink(index))">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                    @if (!IsValidUrl(url) && !string.IsNullOrEmpty(url))
+                    {
+                        <small class="text-danger d-block mb-2">Veuillez saisir une URL valide (commence par http:// ou https://)</small>
+                    }
+                }
+                <button type="button" class="btn btn-sm btn-success mt-2" @onclick="AddLink">
+                    <i class="bi bi-plus-circle"></i> Ajouter un lien
+                </button>
+            </div>
+        }
+        else
+        {
+            <div class="links-display">
+                @if (Links.Any())
+                {
+                    <ul class="list-group">
+                        @foreach (var url in Links)
+                        {
+                            <li class="list-group-item">
+                                <a href="@url" target="_blank" rel="noopener noreferrer" class="link-display">@url</a>
+                            </li>
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <div class="text-muted">Aucun lien ajouté</div>
                 }
             </div>
         }
-        else if (!string.IsNullOrEmpty(Block.Url))
-        {
-            <a href="@Block.Url" target="_blank" rel="noopener noreferrer" class="link-display">@Block.Url</a>
-        }
     </div>
-    <div class="block-controls mt-3">
-        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+    <div class="block-controls">
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (IsEditing)
         {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
-                <i class="bi bi-x-lg"></i> Annuler
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
+                <i class="bi bi-x-octagon-fill"></i>Annuler
             </button>
         }
         else
         {
-            <button class="btn btn-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i>Supprimer
             </button>
         }
     </div>
@@ -56,13 +85,13 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
     
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
     
     [Parameter]
-    public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
@@ -71,16 +100,71 @@
     private IJSRuntime JSRuntime { get; set; } = default!;
 
     private bool IsEditing { get; set; } = false;
-    private bool urlError { get; set; } = false;
-    private string originalUrl = string.Empty;
+    private List<string> Links { get; set; } = new();
+    private List<string> OriginalLinks { get; set; } = new();
     private string originalTitle = string.Empty;
 
     protected override void OnInitialized()
     {
-        // Initialiser les valeurs si nécessaires
-        if (string.IsNullOrEmpty(Block.Url))
+        // Initialiser les liens à partir du bloc existant
+        DeserializeLinks();
+    }
+
+    private void DeserializeLinks()
+    {
+        Links.Clear();
+        
+        if (!string.IsNullOrEmpty(Block.Url))
         {
-            Block.Url = string.Empty;
+            // Si le Url contient plusieurs liens séparés par '|'
+            if (Block.Url.Contains("|"))
+            {
+                Links.AddRange(Block.Url.Split('|', StringSplitOptions.RemoveEmptyEntries));
+            }
+            else
+            {
+                // Cas d'un seul lien
+                Links.Add(Block.Url);
+            }
+        }
+        
+        // Assurez-vous qu'il y a au moins un champ vide si la liste est vide
+        if (!Links.Any())
+        {
+            Links.Add(string.Empty);
+        }
+    }
+
+    private void SerializeLinks()
+    {
+        // Filtrer les liens vides et joindre avec '|'
+        Block.Url = string.Join("|", Links.Where(l => !string.IsNullOrWhiteSpace(l)));
+    }
+
+    private void AddLink()
+    {
+        Links.Add(string.Empty);
+    }
+
+    private void RemoveLink(int index)
+    {
+        if (index >= 0 && index < Links.Count)
+        {
+            Links.RemoveAt(index);
+            
+            // Assurez-vous qu'il y a au moins un champ vide
+            if (!Links.Any())
+            {
+                Links.Add(string.Empty);
+            }
+        }
+    }
+
+    private void UpdateLink(int index, string value)
+    {
+        if (index >= 0 && index < Links.Count)
+        {
+            Links[index] = value;
         }
     }
 
@@ -89,23 +173,34 @@
         if (IsEditing)
         {
             // Validation avant de sauvegarder
-            if (!string.IsNullOrEmpty(Block.Url) && !IsValidUrl(Block.Url))
+            bool isValid = true;
+            foreach (var url in Links.Where(l => !string.IsNullOrWhiteSpace(l)))
             {
-                urlError = true;
+                if (!IsValidUrl(url))
+                {
+                    isValid = false;
+                    break;
+                }
+            }
+
+            if (!isValid)
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Certains liens ne sont pas valides. Veuillez corriger les erreurs.");
                 return;
             }
 
+            // Sérialiser les liens dans Block.Url
+            SerializeLinks();
+            
             // Notifier le parent que le bloc a changé
             await OnBlockChanged.InvokeAsync(Block);
-            urlError = false;
             IsEditing = false;
         }
         else
         {
             // Sauvegarder l'état original pour permettre d'annuler
-            originalUrl = Block.Url ?? string.Empty;
+            OriginalLinks = new List<string>(Links);
             originalTitle = Block.Title ?? string.Empty;
-            urlError = false;
             IsEditing = true;
         }
     }
@@ -113,9 +208,8 @@
     private void CancelEdit()
     {
         // Restaurer le contenu original
-        Block.Url = originalUrl;
+        Links = new List<string>(OriginalLinks);
         Block.Title = originalTitle;
-        urlError = false;
         IsEditing = false;
     }
 
@@ -137,7 +231,7 @@
             classList.Add("editing");
         }
         
-        if (string.IsNullOrEmpty(Block.Url))
+        if (!Links.Any(l => !string.IsNullOrWhiteSpace(l)))
         {
             classList.Add("empty");
         }
@@ -147,7 +241,7 @@
 
     private bool IsValidUrl(string url)
     {
-        return url.StartsWith("http://") || url.StartsWith("https://");
+        return string.IsNullOrEmpty(url) || url.StartsWith("http://") || url.StartsWith("https://");
     }
 
     public void Dispose()
