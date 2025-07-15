@@ -53,24 +53,15 @@
                 <div class="content-display">@((MarkupString)GetBlockText())</div>
             }
         </div>
-        <div class="block-controls mt-3">
-            <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-                <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <div class="block-controls">
+
+            <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+                <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
             </button>
-            
-            @* Bouton de suppression (affiché uniquement en mode lecture) *@
-            @if (!IsEditing)
-            {
-                <button id="delete-btn-@(Block.Id)" type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                    <i class="bi bi-trash"></i>
-                </button>
-            }
-            else
-            {
-                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
-                    <i class="bi bi-x-lg"></i> Annuler
-                </button>
-            }
+
+            <button id="delete-btn-@(Block.Id)" type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash">Supprimer</i>
+            </button>
         </div>
 
         <!-- Indicateur de sauvegarde -->

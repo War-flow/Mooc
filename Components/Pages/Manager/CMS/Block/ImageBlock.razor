@@ -79,25 +79,27 @@
         }
     </div>
 
-    <div class="block-controls mt-3">
+    <div class="block-controls">
         @if (IsEditing)
         {
-            <button type="button" class="btn btn-primary" @onclick="SaveChanges" disabled="@isUploading">
-                <i class="bi bi-save"></i> Enregistrer
+            <button type="button" class="btn-block btn-valid" @onclick="SaveChanges" disabled="@isUploading">
+                <i class="bi bi-floppy"></i>Enregistrer
             </button>
-            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">
-                <i class="bi bi-x"></i> Annuler
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
+                <i class="bi bi-x-octagon-fill"></i> Annuler
             </button>
         }
         else
         {
-            <button type="button" class="btn btn-warning" @onclick="StartEditing">
+            <button type="button" class="btn-block btn-valid" @onclick="StartEditing">
                 <i class="bi bi-pencil"></i> Modifier
             </button>
+
+            <button type="button" class="btn-block btn-cancel" @onclick="DeleteBlock">
+                <i class="bi bi-trash"></i> Supprimer
+            </button>
         }
-        <button type="button" class="btn btn-danger" @onclick="DeleteBlock">
-            <i class="bi bi-trash"></i> Supprimer
-        </button>
+
     </div>
 </div>
 

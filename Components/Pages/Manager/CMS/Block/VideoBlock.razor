@@ -62,16 +62,28 @@
             </div>
         }
     </div>
-    <div class="video-controls">
+    <div class="block-controls">
         @if (IsEditing)
         {
-            <button type="button" class="btn btn-primary" @onclick="SaveChanges">Enregistrer</button>
-            <button type="button" class="btn btn-secondary" @onclick="CancelEdit">Annuler</button>
+            <button type="button" class="btn-block btn-valid" @onclick="SaveChanges">
+                <i class="bi bi-floppy"></i>Enregistrer
+                </button>
+
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
+                <i class="bi bi-x-octagon-fill"></i>Annuler
+                </button>
         }
         else
         {
-            <button type="button" class="btn btn-outline-secondary" @onclick="Edit">Modifier</button>
-            <button type="button" class="btn btn-outline-danger" @onclick="RequestDelete">Supprimer</button>
+            <button type="button" class="btn-block btn-valid" @onclick="Edit">
+                <i class="bi bi-pencil"></i>Modifier
+                </button>
+
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete">
+                <i class="bi bi-trash"></i>Supprimer
+                </button>
+
+            
         }
     </div>
 </div>

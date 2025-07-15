@@ -26,7 +26,7 @@
 
     @foreach (var block in Blocks)
     {
-        <div class="mb-3 cours-block">
+        <div class="mb-3 cours-block @(block == SelectedBlock ? "block-selected" : "")" @onclick="() => SelectBlock(block)">
             <DynamicComponent Type="@GetBlockComponent(block.Type)" Parameters="@(new Dictionary<string, object>
                                                             {
                                                                 ["Block"] = block,
@@ -53,17 +53,37 @@
     }
 
     private List<CoursBlock> Blocks { get; set; } = new();
+    
+    // Ajouter la propriété SelectedBlock et son événement
+    [Parameter]
+    public CoursBlock? SelectedBlock { get; set; }
+
+    [Parameter]
+    public EventCallback<CoursBlock?> SelectedBlockChanged { get; set; }
+
+    // Méthode pour sélectionner un bloc
+    private async Task SelectBlock(CoursBlock block)
+    {
+        SelectedBlock = block;
+        await SelectedBlockChanged.InvokeAsync(block);
+    }
 
     // Méthode pour ajouter un bloc
     public void AddBlock(string type)
     {
         int order = Blocks.Count > 0 ? Blocks.Max(b => b.Order) + 1 : 1;
-        Blocks.Add(new CoursBlock { 
+        var newBlock = new CoursBlock { 
             Type = type, 
             Order = order, 
             Title = string.Empty,  // Initialiser Title avec une chaîne vide
             Text = string.Empty    // Initialiser Text avec une chaîne vide
-        });
+        };
+        
+        Blocks.Add(newBlock);
+        
+        // Sélectionner automatiquement le nouveau bloc
+        SelectedBlock = newBlock;
+        SelectedBlockChanged.InvokeAsync(newBlock);
         
         // Utilisez InvokeAsync pour éviter les problèmes de rendu
         InvokeAsync(() => StateHasChanged());
@@ -72,6 +92,13 @@
     // Méthode pour supprimer un bloc
     public void RemoveBlock(CoursBlock block)
     {
+        // Si le bloc supprimé est sélectionné, désélectionnez-le
+        if (block == SelectedBlock)
+        {
+            SelectedBlock = null;
+            SelectedBlockChanged.InvokeAsync(null);
+        }
+        
         Blocks.Remove(block);
         // Réordonner les blocs restants
         for (int i = 0; i < Blocks.Count; i++)

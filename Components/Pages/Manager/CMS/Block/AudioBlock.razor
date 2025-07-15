@@ -64,23 +64,23 @@
             </div>
         }
     </div>
-    <div class="block-controls mt-2 d-flex justify-content-between">
+    <div class="block-controls">
         <div>
-            <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm" @onclick="ToggleEdit">
-                <i class="bi @(IsEditing ? "bi-check-lg" : "bi-pencil")"></i>
+            <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+                <i class="bi @(IsEditing ? "floppy" : "bi-pencil")"></i>
                 @(IsEditing ? "Enregistrer" : "Modifier")
             </button>
             @if (IsEditing)
             {
-                <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="CancelEdit">
+                <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit">
                     <i class="bi bi-x-lg"></i> Annuler
                 </button>
             }
         </div>
         @if (!IsEditing)
         {
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i>Supprimer
             </button>
         }
     </div>
