@@ -55,6 +55,12 @@
                 Votre navigateur ne prend pas en charge l'élément vidéo.
             </video>
         }
+                else
+        {
+            <div class="alert alert-info">
+                Aucune vidéo disponible. Cliquez sur "Modifier" pour ajouter.
+            </div>
+        }
     </div>
     <div class="video-controls">
         @if (IsEditing)
@@ -71,10 +77,10 @@
 </div>
 
 @code {
-    [Parameter] public CoursBlock Block { get; set; } = default!;
+    [Parameter] public CourBuilder.CoursBlock Block { get; set; } = default!;
     [Parameter] public bool IsEditing { get; set; }
-    [Parameter] public EventCallback<CoursBlock> OnDeleteRequested { get; set; }
-    [Parameter] public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
+[Parameter] public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
     [Parameter] public IDictionary<string, object> AdditionalAttributes { get; set; } = new Dictionary<string, object>();
     
     private bool isUploading;
