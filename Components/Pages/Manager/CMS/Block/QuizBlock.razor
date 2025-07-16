@@ -9,7 +9,7 @@
     <h4 class="quiz-title">
         @if (IsEditing)
         {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre du quiz" />
             @if (titleError)
             {
                 <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
@@ -22,35 +22,287 @@
         }
         else
         {
-            <span class="text-muted">Sans titre</span>
-        }   
+            <span class="text-muted">Quiz sans titre</span>
+        }
     </h4>
-    <div class="quiz-content">
-        @if (IsEditing)
-        {
-            @if (useRichEditor)
+
+    @if (IsEditing)
+    {
+        <!-- Mode édition du quiz -->
+        <div class="quiz-editor">
+            <div class="mb-3">
+                <label class="form-label">Question</label>
+                @if (useRichEditor)
+                {
+                    <div id="editor-@Block.Order" class="rich-editor" style="height: 150px;"></div>
+                }
+                else
+                {
+                    <InputTextArea class="form-control" @bind-Value="QuizData.Question" rows="3"
+                                   placeholder="Saisissez votre question..." />
+                }
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" id="@useRichEditorId"
+                           @onchange="ToggleRichEditor" checked="@useRichEditor" />
+                    <label class="form-check-label" for="@useRichEditorId">
+                        Utiliser l'éditeur riche
+                    </label>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Type de quiz</label>
+                <InputSelect class="form-select" @bind-Value="QuizData.Type" @onchange="OnQuizTypeChanged">
+                    <option value="multiple-choice">Choix multiple (une seule réponse)</option>
+                    <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
+                    <option value="true-false">Vrai/Faux</option>
+                    <option value="text">Réponse libre</option>
+                </InputSelect>
+            </div>
+
+            @if (QuizData.Type != "text")
             {
-                <div id="editor-@Block.Order" class="rich-editor" style="height: 200px;"></div>
+                <div class="mb-3">
+                    <label class="form-label">
+                        Réponses
+                        @if (QuizData.Type == "multiple-select")
+                        {
+                            <small class="text-muted">(Cochez les bonnes réponses)</small>
+                        }
+                        else
+                        {
+                            <small class="text-muted">(Sélectionnez la bonne réponse)</small>
+                        }
+                    </label>
+
+                    @for (int i = 0; i < QuizData.Options.Count; i++)
+                    {
+                        var index = i;
+                        <div class="input-group mb-2">
+                            @if (QuizData.Type == "multiple-select")
+                            {
+                                <div class="input-group-text">
+                                    <input class="form-check-input" type="checkbox"
+                                           checked="@QuizData.Options[index].IsCorrect"
+                                           @onchange="@(e => QuizData.Options[index].IsCorrect = (bool)e.Value!)" />
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="input-group-text">
+                                    <input class="form-check-input" type="radio" name="correct-answer-@Block.Order"
+                                           checked="@QuizData.Options[index].IsCorrect"
+                                           @onchange="@(e => SetSingleCorrectAnswer(index))" />
+                                </div>
+                            }
+                            <InputText class="form-control" @bind-Value="QuizData.Options[index].Text"
+                                       placeholder="@($"Option {index + 1}")" />
+                            <button type="button" class="btn btn-outline-danger"
+                                    @onclick="() => RemoveOption(index)"
+                                    disabled="@(QuizData.Options.Count <= GetMinimumOptions())">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    }
+
+                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddOption"
+                            disabled="@(QuizData.Options.Count >= 6)">
+                        <i class="bi bi-plus"></i> Ajouter une option
+                    </button>
+                </div>
+            }
+
+            @if (QuizData.Type == "text")
+            {
+                <div class="mb-3">
+                    <label class="form-label">Mode de validation</label>
+                    <InputSelect class="form-select" @bind-Value="QuizData.TextValidationMode">
+                        <option value="none">Aucune validation automatique</option>
+                        <option value="exact">Correspondance exacte</option>
+                        <option value="contains">Contient les mots-clés</option>
+                        <option value="regex">Expression régulière</option>
+                        <option value="multiple">Plusieurs réponses possibles</option>
+                    </InputSelect>
+                </div>
+
+                @if (QuizData.TextValidationMode != "none")
+                {
+                    <div class="mb-3">
+                        <label class="form-label">
+                            @GetValidationLabel()
+                        </label>
+                        @if (QuizData.TextValidationMode == "multiple")
+                        {
+                            <div class="mb-2">
+                                @for (int i = 0; i < QuizData.AcceptableAnswers.Count; i++)
+                                {
+                                    var index = i;
+                                    <div class="input-group mb-2">
+                                        <InputText class="form-control" @bind-Value="QuizData.AcceptableAnswers[index]"
+                                                   placeholder="@($"Réponse acceptable {index + 1}")" />
+                                        <button type="button" class="btn btn-outline-danger"
+                                                @onclick="() => RemoveAcceptableAnswer(index)"
+                                                disabled="@(QuizData.AcceptableAnswers.Count <= 1)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                }
+                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAcceptableAnswer"
+                                        disabled="@(QuizData.AcceptableAnswers.Count >= 10)">
+                                    <i class="bi bi-plus"></i> Ajouter une réponse
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <InputTextArea class="form-control" @bind-Value="QuizData.ExpectedAnswer" rows="2"
+                                           placeholder="@GetValidationPlaceholder()" />
+                        }
+
+                        @if (QuizData.TextValidationMode == "regex")
+                        {
+                            <small class="form-text text-muted">
+                                Exemple: <code>^(oui|yes|si)$</code> pour accepter "oui", "yes" ou "si"
+                            </small>
+                        }
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.CaseSensitive" id="@caseSensitiveId" />
+                        <label class="form-check-label" for="@caseSensitiveId">
+                            Respecter la casse (majuscules/minuscules)
+                        </label>
+                    </div>
+                </div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Explication (optionnel)</label>
+                <InputTextArea class="form-control" @bind-Value="QuizData.Explanation" rows="2"
+                               placeholder="Explication affichée après la réponse..." />
+            </div>
+
+            <!-- Paramètres avancés -->
+            <div class="mb-3">
+                <div class="form-check">
+                    <InputCheckbox class="form-check-input" @bind-Value="QuizData.ShowValidationFeedback" id="@showFeedbackId" />
+                    <label class="form-check-label" for="@showFeedbackId">
+                        Afficher un retour détaillé sur les erreurs
+                    </label>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <!-- Mode affichage du quiz -->
+        <div class="quiz-display">
+            @if (!string.IsNullOrEmpty(QuizData.Question))
+            {
+                <div class="question mb-3">
+                    <strong>@((MarkupString)QuizData.Question)</strong>
+                </div>
+
+                @if (QuizData.Type != "text")
+                {
+                    <div class="options mb-3">
+                        @for (int i = 0; i < QuizData.Options.Count; i++)
+                        {
+                            var index = i;
+                            <div class="form-check">
+                                @if (QuizData.Type == "multiple-select")
+                                {
+                                    <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
+                                           disabled="@IsAnswered" @bind="UserAnswers[index]" />
+                                }
+                                else
+                                {
+                                    <input class="form-check-input" type="radio" name="quiz-@Block.Order"
+                                           id="option-@Block.Order-@index" value="@index"
+                                           disabled="@IsAnswered" @onchange="@(e => SetUserAnswer(index))" />
+                                }
+                                <label class="form-check-label @GetOptionClass(index)" for="option-@Block.Order-@index">
+                                    @QuizData.Options[index].Text
+                                    @if (IsAnswered && QuizData.Options[index].IsCorrect)
+                                    {
+                                        <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                                    }
+                                    else if (IsAnswered && UserAnswers[index] && !QuizData.Options[index].IsCorrect)
+                                    {
+                                        <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+                                    }
+                                </label>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <InputTextArea class="form-control" @bind-Value="UserTextAnswer" rows="3"
+                                       disabled="@IsAnswered" placeholder="Votre réponse..." />
+                    </div>
+                }
+
+                <div class="quiz-actions mb-3">
+                    @if (!IsAnswered)
+                    {
+                        <button type="button" class="btn btn-primary" @onclick="SubmitAnswer"
+                                disabled="@(!HasUserAnswer())">
+                            Valider la réponse
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="button" class="btn btn-outline-secondary" @onclick="ResetQuiz">
+                            Recommencer
+                        </button>
+
+                        @if (IsCorrect.HasValue)
+                        {
+                            <span class="ms-3 badge @(IsCorrect.Value ? "bg-success" : "bg-danger")">
+                                @if (IsCorrect.Value)
+                                {
+                                    <i class="bi bi-check-lg me-1"></i>
+                                    @:Correct!
+                                }
+                                else
+                                {
+                                    <i class="bi bi-x-lg me-1"></i>
+                                    @:Incorrect
+                                }
+                            </span>
+                        }
+                    }
+                </div>
+
+                <!-- Feedback détaillé pour les réponses incorrectes -->
+                @if (IsAnswered && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback && !string.IsNullOrEmpty(ValidationMessage))
+                {
+                    <div class="alert alert-warning">
+                        <strong>Feedback :</strong> @ValidationMessage
+                    </div>
+                }
+
+                @if (IsAnswered && !string.IsNullOrEmpty(QuizData.Explanation))
+                {
+                    <div class="alert alert-info">
+                        <strong>Explication :</strong> @QuizData.Explanation
+                    </div>
+                }
             }
             else
             {
-                <div class="mb-3">
-                    <InputTextArea class="form-control" @bind-Value="QuizContent" rows="5" placeholder="Contenu du quiz" />
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Ce quiz n'a pas encore été configuré.
                 </div>
             }
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="useRichEditor-@Block.Order" 
-                       @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                <label class="form-check-label" for="useRichEditor-@Block.Order">
-                    Utiliser l'éditeur riche
-                </label>
-            </div>
-        }
-        else if (!string.IsNullOrEmpty(QuizContent))
-        {
-            <div class="content-display">@((MarkupString)QuizContent)</div>
-        }
-    </div>
+        </div>
+    }
+
     <div class="block-controls mt-3">
         <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
             <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
@@ -73,168 +325,290 @@
 @code {
     [Parameter]
     public CourBuilder.CoursBlock Block { get; set; } = default!;
-    
+
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
-    
+
     [Parameter]
     public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
-    
+
     [Parameter]
     public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
-    
+
     [CascadingParameter]
     private EditContext? EditContext { get; set; }
-    
+
+    // État du composant
     private bool IsEditing { get; set; } = false;
-    private bool useRichEditor { get; set; } = true;
+    private bool useRichEditor { get; set; } = false;
     private bool titleError { get; set; } = false;
     private string originalContent = string.Empty;
     private string originalTitle = string.Empty;
     private string editorId => $"editor-{Block.Order}";
 
-    // Property to handle content as string, using Block.Content
-    private string QuizContent 
-    { 
-        get => Block.Content?.ToString() ?? string.Empty;
-        set => Block.Content = value;
+    // Propriétés calculées pour les IDs
+    private string showFeedbackId => $"showFeedback-{Block.Order}";
+    private string caseSensitiveId => $"caseSensitive-{Block.Order}";
+    private string useRichEditorId => $"useRichEditor-{Block.Order}";
+
+    // État du quiz
+    private bool IsAnswered { get; set; } = false;
+    private bool? IsCorrect { get; set; } = null;
+    private List<bool> UserAnswers { get; set; } = new();
+    private string UserTextAnswer { get; set; } = string.Empty;
+    private string ValidationMessage { get; set; } = string.Empty;
+
+    // Structure des données du quiz
+    private QuizStructure QuizData { get; set; } = new();
+
+    // Classes pour représenter la structure du quiz
+    public class QuizStructure
+    {
+        public string Question { get; set; } = string.Empty;
+        public string Type { get; set; } = "multiple-choice";
+        public List<QuizOption> Options { get; set; } = new();
+        public string ExpectedAnswer { get; set; } = string.Empty;
+        public string Explanation { get; set; } = string.Empty;
+        public string TextValidationMode { get; set; } = "none";
+        public List<string> AcceptableAnswers { get; set; } = new();
+        public bool CaseSensitive { get; set; } = false;
+        public bool ShowValidationFeedback { get; set; } = true;
+
+        public QuizStructure()
+        {
+            // Initialiser avec 2 options par défaut
+            Options.Add(new QuizOption { Text = "", IsCorrect = false });
+            Options.Add(new QuizOption { Text = "", IsCorrect = false });
+            AcceptableAnswers.Add("");
+        }
+    }
+
+    public class QuizOption
+    {
+        public string Text { get; set; } = string.Empty;
+        public bool IsCorrect { get; set; } = false;
+    }
+
+    // Classe pour représenter les blocs de cours
+    public class CoursBlock
+    {
+        public Guid Id { get; set; } = Guid.NewGuid();
+        public string Type { get; set; } = string.Empty;
+        public int Order { get; set; }
+        public string? Title { get; set; }
+        public string? Text { get; set; }
+        public object? Content { get; set; }
+        public string? Url { get; set; }
+        public List<string> FileUrls { get; set; } = new();
     }
 
     protected override void OnInitialized()
     {
-        // Initialiser le contenu si nécessaire
-        if (Block.Content == null)
+        LoadQuizData();
+        InitializeUserAnswers();
+    }
+
+    private void LoadQuizData()
+    {
+        try
         {
-            Block.Content = string.Empty;
+            if (!string.IsNullOrEmpty(Block.Content?.ToString()))
+            {
+                QuizData = System.Text.Json.JsonSerializer.Deserialize<QuizStructure>(Block.Content.ToString()) ?? new QuizStructure();
+
+                // Assurer la compatibilité avec les anciens quizzes
+                if (QuizData.AcceptableAnswers == null || !QuizData.AcceptableAnswers.Any())
+                {
+                    QuizData.AcceptableAnswers = new List<string> { QuizData.ExpectedAnswer ?? "" };
+                }
+            }
         }
+        catch
+        {
+            // Si la désérialisation échoue, garder la structure par défaut
+            QuizData = new QuizStructure();
+        }
+    }
+
+    private void InitializeUserAnswers()
+    {
+        UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (IsEditing && useRichEditor)
         {
-            // Initialiser l'éditeur riche
-            await EditorService.InitializeEditorAsync(editorId, QuizContent);
-            
-            // S'abonner aux changements de contenu
+            await EditorService.InitializeEditorAsync(editorId, QuizData.Question);
             EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
         }
     }
 
-    // Cette méthode sera appelée lorsque le contenu de l'éditeur change
     private void OnContentChanged(string elementId, string content)
     {
-        // Mettre à jour le contenu du bloc
-        QuizContent = content;
+        QuizData.Question = content;
     }
 
     private string GetTypeClass()
     {
-        var classList = new List<string>();
-        
-        // Ajouter la classe basée sur le type
-        classList.Add(Block.Type switch
-        {
-            "info" => "info-block",
-            "warning" => "warning-block",
-            "success" => "success-block",
-            "danger" => "danger-block",
-            _ => "default-block"
-        });
-        
-        if (IsEditing)
-        {
-            classList.Add("editing");
-        }
-        
-        if (string.IsNullOrEmpty(QuizContent))
-        {
-            classList.Add("empty");
-        }
-        
+        var classList = new List<string> { "quiz-block" };
+
+        if (IsEditing) classList.Add("editing");
+        if (string.IsNullOrEmpty(QuizData.Question)) classList.Add("empty");
+        if (IsAnswered) classList.Add("answered");
+
         return string.Join(" ", classList);
+    }
+
+    private string GetOptionClass(int index)
+    {
+        if (!IsAnswered) return string.Empty;
+
+        var classes = new List<string>();
+
+        if (QuizData.Options[index].IsCorrect)
+            classes.Add("text-success fw-bold");
+        else if (UserAnswers[index])
+            classes.Add("text-danger");
+
+        return string.Join(" ", classes);
+    }
+
+    private int GetMinimumOptions()
+    {
+        return QuizData.Type == "true-false" ? 2 : 2;
+    }
+
+    private string GetValidationLabel()
+    {
+        return QuizData.TextValidationMode switch
+        {
+            "exact" => "Réponse exacte attendue",
+            "contains" => "Mots-clés requis (séparés par des virgules)",
+            "regex" => "Expression régulière",
+            "multiple" => "Réponses acceptables",
+            _ => "Réponse attendue"
+        };
+    }
+
+    private string GetValidationPlaceholder()
+    {
+        return QuizData.TextValidationMode switch
+        {
+            "exact" => "Réponse exacte...",
+            "contains" => "mot1, mot2, mot3...",
+            "regex" => "^(réponse1|réponse2)$",
+            _ => "Réponse type..."
+        };
+    }
+
+    private void OnQuizTypeChanged(ChangeEventArgs e)
+    {
+        QuizData.Type = e.Value?.ToString() ?? "multiple-choice";
+
+        // Ajuster les options pour Vrai/Faux
+        if (QuizData.Type == "true-false")
+        {
+            QuizData.Options.Clear();
+            QuizData.Options.Add(new QuizOption { Text = "Vrai", IsCorrect = false });
+            QuizData.Options.Add(new QuizOption { Text = "Faux", IsCorrect = false });
+        }
+
+        InitializeUserAnswers();
     }
 
     private async Task ToggleEdit()
     {
         if (IsEditing)
         {
-            // Validation avant de sauvegarder
+            // Validation
             if (Block.Title?.Length > 100)
             {
                 titleError = true;
                 return;
             }
 
-            // Si on utilise l'éditeur riche, récupérer le contenu depuis JS
-            if (useRichEditor)
+            // Validation des options pour s'assurer qu'au moins une réponse correcte existe
+            if (QuizData.Type != "text" && !QuizData.Options.Any(o => o.IsCorrect))
             {
-                QuizContent = await EditorService.GetEditorContentAsync(editorId);
+                await JSRuntime.InvokeVoidAsync("alert", "Veuillez sélectionner au moins une réponse correcte.");
+                return;
             }
 
-            // Notifier le parent que le bloc a changé
+            // Récupérer le contenu de l'éditeur riche si utilisé
+            if (useRichEditor)
+            {
+                QuizData.Question = await EditorService.GetEditorContentAsync(editorId);
+            }
+
+            // Sauvegarder les données du quiz
+            Block.Content = System.Text.Json.JsonSerializer.Serialize(QuizData);
+
             if (OnBlockChanged.HasDelegate)
             {
                 await OnBlockChanged.InvokeAsync(Block);
             }
-            
-            // Notifier le contexte d'édition si nécessaire
+
             EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
             EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
         }
         else
         {
-            // Sauvegarder l'état original pour permettre d'annuler
-            originalContent = QuizContent;
+            originalContent = Block.Content?.ToString() ?? string.Empty;
             originalTitle = Block.Title ?? string.Empty;
         }
 
         titleError = false;
         IsEditing = !IsEditing;
     }
-    
+
     private async Task ToggleRichEditor()
     {
         useRichEditor = !useRichEditor;
-        
+
         if (IsEditing)
         {
             if (useRichEditor)
             {
-                // Transférer le contenu du textarea à l'éditeur riche
-                await EditorService.InitializeEditorAsync(editorId, QuizContent);
+                await EditorService.InitializeEditorAsync(editorId, QuizData.Question);
                 EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
             }
             else
             {
-                // Transférer le contenu de l'éditeur riche au textarea
-                QuizContent = await EditorService.GetEditorContentAsync(editorId);
+                QuizData.Question = await EditorService.GetEditorContentAsync(editorId);
                 await EditorService.DestroyEditorAsync(editorId);
                 EditorInterop.UnsubscribeFromContentChanges(editorId);
             }
         }
-        
+
         StateHasChanged();
     }
 
     private async Task CancelEdit()
     {
-        // Restaurer le contenu original
-        QuizContent = originalContent;
+        // Restaurer les données originales
+        if (!string.IsNullOrEmpty(originalContent))
+        {
+            try
+            {
+                QuizData = System.Text.Json.JsonSerializer.Deserialize<QuizStructure>(originalContent) ?? new QuizStructure();
+            }
+            catch
+            {
+                QuizData = new QuizStructure();
+            }
+        }
+
         Block.Title = originalTitle;
-        
-        // Nettoyer l'éditeur si nécessaire
+
         if (useRichEditor)
         {
             await EditorService.DestroyEditorAsync(editorId);
             EditorInterop.UnsubscribeFromContentChanges(editorId);
         }
-        
+
         IsEditing = false;
-        
-        // Notifier le contexte d'édition
-        EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
-        EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
+        StateHasChanged();
     }
 
     private async Task RequestDelete()
@@ -246,13 +620,164 @@
         }
     }
 
+    // Méthodes pour gérer les options du quiz
+    private void AddOption()
+    {
+        if (QuizData.Options.Count < 6)
+        {
+            QuizData.Options.Add(new QuizOption());
+            UserAnswers.Add(false);
+        }
+    }
+
+    private void RemoveOption(int index)
+    {
+        if (QuizData.Options.Count > GetMinimumOptions())
+        {
+            QuizData.Options.RemoveAt(index);
+            if (UserAnswers.Count > index)
+            {
+                UserAnswers.RemoveAt(index);
+            }
+        }
+    }
+
+    private void SetSingleCorrectAnswer(int correctIndex)
+    {
+        for (int i = 0; i < QuizData.Options.Count; i++)
+        {
+            QuizData.Options[i].IsCorrect = (i == correctIndex);
+        }
+    }
+
+    // Méthodes pour gérer les réponses acceptables (texte libre)
+    private void AddAcceptableAnswer()
+    {
+        if (QuizData.AcceptableAnswers.Count < 10)
+        {
+            QuizData.AcceptableAnswers.Add("");
+        }
+    }
+
+    private void RemoveAcceptableAnswer(int index)
+    {
+        if (QuizData.AcceptableAnswers.Count > 1)
+        {
+            QuizData.AcceptableAnswers.RemoveAt(index);
+        }
+    }
+
+    // Méthodes pour gérer les réponses utilisateur
+    private void SetUserAnswer(int index)
+    {
+        for (int i = 0; i < UserAnswers.Count; i++)
+        {
+            UserAnswers[i] = (i == index) && !UserAnswers[i];
+        }
+
+        IsAnswered = UserAnswers.Any();
+    }
+
+    private void SubmitAnswer()
+    {
+        // Validation pour les réponses texte
+        if (QuizData.Type == "text" && QuizData.TextValidationMode != "none")
+        {
+            string userResponse = UserTextAnswer.Trim();
+            ValidationMessage = string.Empty;
+
+            // Correspondance exacte
+            if (QuizData.TextValidationMode == "exact" && userResponse.Equals(QuizData.ExpectedAnswer.Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                IsCorrect = true;
+                return;
+            }
+
+            // Expressions régulières
+            if (QuizData.TextValidationMode == "regex")
+            {
+                try
+                {
+                    var regex = new System.Text.RegularExpressions.Regex(QuizData.AcceptableAnswers.First());
+                    if (regex.IsMatch(userResponse))
+                    {
+                        IsCorrect = true;
+                        return;
+                    }
+                }
+                catch
+                {
+                    ValidationMessage = "Expression régulière invalide.";
+                }
+            }
+
+            // Vérification des mots-clés
+            if (QuizData.TextValidationMode == "contains")
+            {
+                var keywords = QuizData.AcceptableAnswers.First().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                if (keywords.All(kw => userResponse.Contains(kw.Trim(), StringComparison.OrdinalIgnoreCase)))
+                {
+                    IsCorrect = true;
+                    return;
+                }
+            }
+
+            // Réponses multiples (texte libre)
+            if (QuizData.TextValidationMode == "multiple")
+            {
+                if (QuizData.AcceptableAnswers.Any(answer => answer.Trim().Equals(userResponse, StringComparison.OrdinalIgnoreCase)))
+                {
+                    IsCorrect = true;
+                    return;
+                }
+            }
+
+            IsCorrect = false;
+        }
+        else
+        {
+            IsCorrect = QuizData.Options.Any(o => o.IsCorrect && UserAnswers[QuizData.Options.IndexOf(o)]);
+        }
+
+        // Afficher le message de validation si l'option est activée
+        if (QuizData.ShowValidationFeedback)
+        {
+            ValidationMessage = IsCorrect.GetValueOrDefault() ? "Bonne réponse !" : "Mauvaise réponse. Essayez encore.";
+        }
+
+        IsAnswered = true;
+    }
+
+    private void ResetQuiz()
+    {
+        IsAnswered = false;
+        IsCorrect = null;
+        UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
+
+        if (QuizData.Type == "text" && QuizData.TextValidationMode != "none")
+        {
+            UserTextAnswer = string.Empty;
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
-        // Nettoyer les ressources lors de la suppression du composant
-        if (useRichEditor && IsEditing)
+        if (IsEditing && useRichEditor)
         {
             await EditorService.DestroyEditorAsync(editorId);
             EditorInterop.UnsubscribeFromContentChanges(editorId);
+        }
+    }
+
+    private bool HasUserAnswer()
+    {
+        if (QuizData.Type == "text")
+        {
+            return !string.IsNullOrWhiteSpace(UserTextAnswer);
+        }
+        else
+        {
+            return UserAnswers != null && UserAnswers.Any(a => a);
         }
     }
 }
