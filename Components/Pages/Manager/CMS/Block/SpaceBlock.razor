@@ -1,15 +1,15 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using Mooc.Services
+@using static Mooc.Components.Pages.Manager.CMS.CourBuilder
 @inject IJSRuntime JSRuntime
-@inject RichEditorService EditorService
 @implements IAsyncDisposable
 
 <div class="space-block @GetTypeClass()" id="block-@Block.Order">
     <h4 class="space-title @(string.IsNullOrEmpty(Block.Title) ? "text-muted" : "")">
         @if (IsEditing)
         {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre du séparateur (optionnel)" />
             @if (titleError)
             {
                 <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
@@ -21,46 +21,80 @@
         }
         else
         {
-            <span class="text-muted">Sans titre</span>
+            <span class="text-muted">Séparateur</span>
         }
     </h4>
-    <div class="space-content">
+    
+    @* Section de prévisualisation du séparateur *@
+    <div class="separator-preview">
         @if (IsEditing)
         {
-            if (useRichEditor)
-            {
-                <div id="@editorId" class="rich-editor" style="height: 200px;"></div>
-            }
-            else
-            {
-                <InputTextArea class="form-control" @bind-Value="Block.Text" rows="5" placeholder="Contenu du texte" />
-            }
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" id="@($"useRichEditor-{Block.Order}")"
-                       @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                <label class="form-check-label" for="@($"useRichEditor-{Block.Order}")">
-                    Utiliser l'éditeur riche
-                </label>
+            <div class="separator-options">
+                <div class="form-group mb-3">
+                    <label class="form-label">Style du séparateur :</label>
+                    <select class="form-select" @bind="separatorStyle">
+                        <option value="line">Ligne simple</option>
+                        <option value="double-line">Ligne double</option>
+                        <option value="dashed">Ligne pointillée</option>
+                        <option value="dotted">Ligne en points</option>
+                        <option value="gradient">Dégradé</option>
+                        <option value="wave">Vague</option>
+                        <option value="zigzag">Zigzag</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label">Épaisseur :</label>
+                    <select class="form-select" @bind="separatorThickness">
+                        <option value="thin">Fine</option>
+                        <option value="medium">Moyenne</option>
+                        <option value="thick">Épaisse</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label">Couleur :</label>
+                    <select class="form-select" @bind="separatorColor">
+                        <option value="default">Par défaut</option>
+                        <option value="primary">Bleu</option>
+                        <option value="secondary">Gris</option>
+                        <option value="success">Vert</option>
+                        <option value="danger">Rouge</option>
+                        <option value="warning">Jaune</option>
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label class="form-label">Espacement :</label>
+                    <select class="form-select" @bind="separatorSpacing">
+                        <option value="small">Petit</option>
+                        <option value="medium">Moyen</option>
+                        <option value="large">Grand</option>
+                        <option value="extra-large">Très grand</option>
+                    </select>
+                </div>
             </div>
         }
-        else
-        {
-            <div class="content-display">@((MarkupString)Block.Text)</div>
-        }
+        
+        @* Affichage du séparateur avec les styles appliqués *@
+        <div class="separator-display @GetSeparatorClasses()">
+            <div class="separator-line"></div>
+        </div>
     </div>
+    
     <div class="block-controls mt-3">
-        <button class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (!IsEditing)
         {
-            <button class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i> Supprimer
             </button>
         }
         else
         {
-            <button class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
@@ -69,13 +103,13 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
     
     [Parameter]
-    public EventCallback<CoursBlock> OnDelete { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
     
     [Parameter]
-    public EventCallback<CoursBlock> OnBlockChanged { get; set; }
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
     
     [Parameter]
     public bool IsEditing { get; set; } = false;
@@ -83,62 +117,94 @@
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
     
-    private bool useRichEditor = true;
-    private string editorId => $"editor-{Block.Order}";
     private bool titleError = false;
-    private string originalContent = string.Empty;
     private string originalTitle = string.Empty;
+    
+    // Propriétés du séparateur
+    private string separatorStyle = "line";
+    private string separatorThickness = "medium";
+    private string separatorColor = "default";
+    private string separatorSpacing = "medium";
     
     protected override void OnInitialized()
     {
-        // Initialiser le contenu si nécessaire
-        if (Block.Text == null)
-        {
-            Block.Text = string.Empty;
-        }
+        // Initialiser les propriétés du séparateur depuis Block.Text (utilisé comme stockage JSON)
+        LoadSeparatorSettings();
     }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    
+    private void LoadSeparatorSettings()
     {
-        if (IsEditing && useRichEditor)
+        if (!string.IsNullOrEmpty(Block.Text))
         {
-            // Initialiser l'éditeur riche
-            await EditorService.InitializeEditorAsync(editorId, Block.Text);
-            
-            // S'abonner aux changements de contenu
-            EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+            try
+            {
+                var settings = System.Text.Json.JsonSerializer.Deserialize<SeparatorSettings>(Block.Text);
+                if (settings != null)
+                {
+                    separatorStyle = settings.Style ?? "line";
+                    separatorThickness = settings.Thickness ?? "medium";
+                    separatorColor = settings.Color ?? "default";
+                    separatorSpacing = settings.Spacing ?? "medium";
+                }
+            }
+            catch
+            {
+                // Si la désérialisation échoue, utiliser les valeurs par défaut
+                ResetToDefaults();
+            }
+        }
+        else
+        {
+            ResetToDefaults();
         }
     }
     
-    // Cette méthode sera appelée lorsque le contenu de l'éditeur change
-    private void OnContentChanged(string elementId, string content)
+    private void ResetToDefaults()
     {
-        // Mettre à jour le contenu du bloc
-        Block.Text = content;
+        separatorStyle = "line";
+        separatorThickness = "medium";
+        separatorColor = "default";
+        separatorSpacing = "medium";
+    }
+    
+    private void SaveSeparatorSettings()
+    {
+        var settings = new SeparatorSettings
+        {
+            Style = separatorStyle,
+            Thickness = separatorThickness,
+            Color = separatorColor,
+            Spacing = separatorSpacing
+        };
+        
+        Block.Text = System.Text.Json.JsonSerializer.Serialize(settings);
     }
     
     private string GetTypeClass()
     {
         var classList = new List<string>();
         
-        // Ajouter la classe basée sur le type
-        classList.Add(Block.Type switch
-        {
-            "separateur" => "separator-block",
-            _ => "unknown-block"
-        });
+        classList.Add("separator-block");
         
         if (IsEditing)
         {
             classList.Add("editing");
         }
         
-        if (string.IsNullOrEmpty(Block.Text))
-        {
-            classList.Add("empty");
-        }
-        
         return string.Join(" ", classList);
+    }
+    
+    private string GetSeparatorClasses()
+    {
+        var classes = new List<string>
+        {
+            $"separator-{separatorStyle}",
+            $"separator-{separatorThickness}",
+            $"separator-{separatorColor}",
+            $"separator-spacing-{separatorSpacing}"
+        };
+        
+        return string.Join(" ", classes);
     }
     
     private async Task ToggleEdit()
@@ -154,11 +220,8 @@
             
             titleError = false;
             
-            // Si on utilise l'éditeur riche, récupérer le contenu depuis JS
-            if (useRichEditor)
-            {
-                Block.Text = await EditorService.GetEditorContentAsync(editorId);
-            }
+            // Sauvegarder les paramètres du séparateur
+            SaveSeparatorSettings();
             
             // Notifier le parent que le bloc a changé
             await OnBlockChanged.InvokeAsync(Block);
@@ -166,69 +229,45 @@
         else
         {
             // Sauvegarder l'état original pour permettre d'annuler
-            originalContent = Block.Text ?? string.Empty;
             originalTitle = Block.Title ?? string.Empty;
         }
         
         IsEditing = !IsEditing;
     }
     
-    private async Task ToggleRichEditor()
-    {
-        useRichEditor = !useRichEditor;
-        
-        if (IsEditing)
-        {
-            if (useRichEditor)
-            {
-                // Transférer le contenu du textarea à l'éditeur riche
-                await EditorService.InitializeEditorAsync(editorId, Block.Text);
-                EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-            }
-            else
-            {
-                // Transférer le contenu de l'éditeur riche au textarea
-                Block.Text = await EditorService.GetEditorContentAsync(editorId);
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
-            }
-        }
-        
-        StateHasChanged();
-    }
-    
     private async Task CancelEdit()
     {
-        // Restaurer le contenu original
-        Block.Text = originalContent;
+        // Restaurer le titre original
         Block.Title = originalTitle;
         
-        // Nettoyer l'éditeur si nécessaire
-        if (useRichEditor)
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
+        // Recharger les paramètres du séparateur
+        LoadSeparatorSettings();
         
         IsEditing = false;
+        StateHasChanged();
     }
 
     private async Task RequestDelete()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc?");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce séparateur?");
         if (confirmed)
         {
-            await OnDelete.InvokeAsync(Block);
+            await OnDeleteRequested.InvokeAsync(Block);
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        // Nettoyer les ressources lors de la suppression du composant
-        if (useRichEditor && IsEditing)
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
+        // Pas de ressources à nettoyer pour le séparateur
+        await Task.CompletedTask;
+    }
+    
+    // Classe pour stocker les paramètres du séparateur
+    private class SeparatorSettings
+    {
+        public string? Style { get; set; }
+        public string? Thickness { get; set; }
+        public string? Color { get; set; }
+        public string? Spacing { get; set; }
     }
 }

@@ -232,29 +232,11 @@ BEGIN
         [SessionId] int NULL,
         CONSTRAINT [PK_Cours] PRIMARY KEY ([Id])
         , CONSTRAINT [FK_Cours_Session] FOREIGN KEY ([SessionId]) REFERENCES [Session] ([Id]) ON DELETE SET NULL
-        , CONSTRAINT [FK_Cours_Quiz] FOREIGN KEY ([Id]) REFERENCES [Quiz] ([CoursId]) ON DELETE CASCADE
     );
     
     -- Ajouter cette migration à l'historique si nécessaire
     -- INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
     -- VALUES (N'CoursMigrationName', N'9.0.6');
-END;
-
--- Création de la table Quiz
-IF NOT EXISTS (
-    SELECT * FROM sys.tables 
-    WHERE name = 'Quiz'
-)
-BEGIN
-    CREATE TABLE [Quiz] (
-        [Id] int NOT NULL IDENTITY,
-        [Title] nvarchar(100) NOT NULL,
-        CONSTRAINT [PK_Quiz] PRIMARY KEY ([Id])
-    );
-    
-    -- Ajouter cette migration à l'historique si nécessaire
-    -- INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-    -- VALUES (N'QuizMigrationName', N'9.0.6');
 END;
 
 -- 1. Ajout de la clé étrangère pour lier Cours à Session
@@ -267,15 +249,8 @@ FOREIGN KEY (SessionId) REFERENCES Session(Id);
 ALTER TABLE Cours
 DROP COLUMN SessionName;
 
--- 3. Ajout de la relation entre Cours et Quiz (si elle n'existe pas déjà)
--- La clé étrangère dans Quiz vers Cours existe déjà dans le modèle
-ALTER TABLE Quiz
-ADD CONSTRAINT FK_Quiz_Cours
-FOREIGN KEY (CoursId) REFERENCES Cours(Id);
-
--- 4. Vérification d'index pour améliorer les performances
+-- 3. Vérification d'index pour améliorer les performances
 CREATE INDEX IX_Cours_SessionId ON Cours(SessionId);
-CREATE INDEX IX_Quiz_CoursId ON Quiz(CoursId);
 
 COMMIT;
 GO

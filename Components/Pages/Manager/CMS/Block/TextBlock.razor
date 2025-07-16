@@ -2,7 +2,7 @@
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using Mooc.Services
-@using Mooc.Components.Pages.Manager.CMS.Block
+@using static Mooc.Components.Pages.Manager.CMS.CourBuilder
 @inject IJSRuntime JSRuntime
 @inject RichEditorService EditorService
 @implements IAsyncDisposable
@@ -327,9 +327,7 @@ else
 
     private async Task RequestDelete()
     {
-        if (Block == null) return;
-        
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc?");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer le block text ?");
         if (confirmed)
         {
             await OnDeleteRequested.InvokeAsync(Block);

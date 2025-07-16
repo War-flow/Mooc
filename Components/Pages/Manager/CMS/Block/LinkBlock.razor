@@ -215,7 +215,7 @@
 
     private async Task RequestDelete()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc?");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer le bloc lien ?");
         if (confirmed)
         {
             await OnDeleteRequested.InvokeAsync(Block);

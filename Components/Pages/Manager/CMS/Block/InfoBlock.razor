@@ -19,29 +19,35 @@
         {
             <InputSelect class="form-select mb-2" @bind-Value="TypedContent.Type">
                 <option value="info">Information</option>
-                <option value="warning">Avertissement</option>
+                <option value="warning">Attention</option>
                 <option value="success">Succès</option>
                 <option value="danger">Important</option>
             </InputSelect>
 
-            <InputTextArea class="form-control" @bind-Value="Block.Message" rows="3" placeholder="Contenu du message d'information" />
-            <ValidationMessage For="@(() => Block.Message)" />
+            <InputTextArea class="form-control" @bind-Value="TypedContent.Message" rows="3" placeholder="Contenu du message d'information" />
+            <ValidationMessage For="@(() => TypedContent.Message)" />
         }
         else
         {
-            <div class="info-message">@Block.Message</div>
+            <div class="info-message">@TypedContent.Message</div>
         }
     </div>
 
     <div class="block-controls mt-2">
-        <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm" @onclick="ToggleEdit" aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
-            <i class="bi @(IsEditing ? "bi-check-lg" : "bi-pencil")"></i>
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit" aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
             @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (IsEditing)
         {
-            <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="CancelEdit" aria-label="Annuler les modifications">
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" aria-label="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
+            </button>
+        }
+        else
+        {
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"></i> Supprimer
             </button>
         }
     </div>
@@ -49,7 +55,13 @@
 
 @code {
     [Parameter]
-    public CoursBlock Block { get; set; } = default!;
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+
+    [Parameter]
+    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+    
+    [Parameter]
+    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
@@ -59,6 +71,7 @@
 
     private bool IsEditing { get; set; } = false;
     private InfoBlockContent? _originalContent;
+    private string? _originalTitle;
 
     protected override void OnInitialized()
     {
@@ -67,50 +80,75 @@
         {
             Block.Content = new InfoBlockContent
             {
-                Title = Block.Title,
+                Title = Block.Title ?? string.Empty,
+                Message = Block.Message ?? string.Empty,
+                Type = "info"
+            };
+        }
+        
+        // Synchroniser Block.Message avec TypedContent.Message
+        SynchronizeFromContent();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // S'assurer que le contenu est bien initialisé
+        if (Block.Content is not InfoBlockContent)
+        {
+            Block.Content = new InfoBlockContent
+            {
+                Title = Block.Title ?? string.Empty,
                 Message = Block.Message ?? string.Empty,
                 Type = "info"
             };
         }
     }
 
-    protected override void OnParametersSet()
+    private void SynchronizeFromContent()
     {
-        // S'assurer que Title et Message sont synchronisés avec le content
         if (Block.Content is InfoBlockContent content)
         {
-            // Synchroniser les valeurs
-            if (Block.Title != content.Title)
-            {
-                content.Title = Block.Title;
-            }
-
-            if (Block.Message != content.Message)
-            {
-                content.Message = Block.Message ?? string.Empty;
-            }
+            Block.Title = content.Title;
+            Block.Message = content.Message;
         }
     }
 
-    private void ToggleEdit()
+    private void SynchronizeToContent()
+    {
+        if (Block.Content is InfoBlockContent content)
+        {
+            content.Title = Block.Title ?? string.Empty;
+            content.Message = Block.Message ?? string.Empty;
+        }
+    }
+
+    private async Task ToggleEdit()
     {
         if (IsEditing)
         {
-            // Sauvegarde des modifications
-            Block.Title = TypedContent.Title;
-            Block.Message = TypedContent.Message;
+            // Sauvegarder les modifications
+            SynchronizeFromContent();
+            
+            // Nettoyer le backup
             _originalContent = null;
+            _originalTitle = null;
+            
             IsEditing = false;
+            
+            // Notifier le parent que le bloc a changé
+            await OnBlockChanged.InvokeAsync(Block);
         }
         else
         {
-            // Backup pour pouvoir annuler
+            // Créer un backup pour pouvoir annuler
             _originalContent = new InfoBlockContent
             {
                 Title = TypedContent.Title,
-                Message = TypedContent.Message ?? string.Empty,
+                Message = TypedContent.Message,
                 Type = TypedContent.Type
             };
+            _originalTitle = Block.Title;
+            
             IsEditing = true;
         }
     }
@@ -121,10 +159,16 @@
         {
             // Restaurer les valeurs originales
             Block.Content = _originalContent;
-            Block.Title = _originalContent.Title;
-            Block.Message = _originalContent.Message;
+            Block.Title = _originalTitle ?? string.Empty;
+            SynchronizeFromContent();
         }
+        
         IsEditing = false;
+    }
+
+    private async Task RequestDelete()
+    {
+        await OnDeleteRequested.InvokeAsync(Block);
     }
 
     private string GetTypeClass()
@@ -134,7 +178,7 @@
             "warning" => "alert alert-warning",
             "success" => "alert alert-success",
             "danger" => "alert alert-danger",
-            _ => "alert alert-info"
+            _ => "alert alert-primary"
         };
     }
 
@@ -153,5 +197,6 @@
     {
         // Nettoyer les ressources si nécessaire
         _originalContent = null;
+        _originalTitle = null;
     }
 }

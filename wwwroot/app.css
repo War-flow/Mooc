@@ -343,6 +343,7 @@ h1:focus {
     width: 1rem;
     height: 1rem;
 }
+
 /* Boutons flottants pour le CourBuilder */
 .floating-buttons {
     position: sticky;
@@ -375,4 +376,321 @@ h1:focus {
             margin: 0.25rem;
             width: calc(50% - 0.5rem);
         }
+}
+
+/* === STYLES POUR LE BLOC SÉPARATEUR === */
+.separator-block {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    background-color: #ffffff;
+    transition: all 0.2s ease;
+}
+
+.separator-block.editing {
+    background-color: #f8f9ff;
+    border-color: #007bff;
+}
+
+.separator-preview {
+    margin: 1rem 0;
+}
+
+.separator-options {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.separator-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    position: relative;
+}
+
+/* Espacements */
+.separator-spacing-small { padding: 0.5rem 0; }
+.separator-spacing-medium { padding: 1rem 0; }
+.separator-spacing-large { padding: 1.5rem 0; }
+.separator-spacing-extra-large { padding: 2.5rem 0; }
+
+/* Ligne de base */
+.separator-line {
+    width: 100%;
+    height: 2px;
+    background-color: #dee2e6;
+    border-radius: 1px;
+}
+
+/* Styles de ligne */
+.separator-line {
+    background-color: #dee2e6;
+}
+
+.separator-double-line .separator-line {
+    position: relative;
+    height: 1px;
+}
+
+.separator-double-line .separator-line::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background-color: inherit;
+}
+
+.separator-dashed .separator-line {
+    background: none;
+    border-top: 2px dashed #dee2e6;
+    height: 0;
+}
+
+.separator-dotted .separator-line {
+    background: none;
+    border-top: 2px dotted #dee2e6;
+    height: 0;
+}
+
+.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
+}
+
+.separator-wave .separator-line {
+    background: none;
+    height: 8px;
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #dee2e6 13px, #dee2e6 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #dee2e6 13px, #dee2e6 20px, transparent 21px);
+    background-size: 40px 20px;
+    background-repeat: repeat-x;
+}
+
+.separator-zigzag .separator-line {
+    background: none;
+    height: 8px;
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #dee2e6 35%, #dee2e6 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #dee2e6 35%, #dee2e6 65%, transparent 65%);
+    background-size: 20px 8px;
+    background-repeat: repeat-x;
+}
+
+/* Épaisseurs */
+.separator-thin .separator-line { 
+    height: 1px; 
+}
+
+.separator-thin.separator-dashed .separator-line,
+.separator-thin.separator-dotted .separator-line { 
+    border-width: 1px; 
+}
+
+.separator-medium .separator-line { 
+    height: 2px; 
+}
+
+.separator-medium.separator-dashed .separator-line,
+.separator-medium.separator-dotted .separator-line { 
+    border-width: 2px; 
+}
+
+.separator-thick .separator-line { 
+    height: 4px; 
+}
+
+.separator-thick.separator-dashed .separator-line,
+.separator-thick.separator-dotted .separator-line { 
+    border-width: 4px; 
+}
+
+.separator-thick.separator-wave .separator-line { 
+    height: 12px; 
+    background-size: 40px 24px; 
+}
+
+.separator-thick.separator-zigzag .separator-line { 
+    height: 12px; 
+    background-size: 30px 12px; 
+}
+
+/* Couleurs */
+.separator-primary .separator-line { 
+    background-color: #007bff; 
+    border-color: #007bff; 
+}
+
+.separator-primary.separator-dashed .separator-line,
+.separator-primary.separator-dotted .separator-line { 
+    border-color: #007bff; 
+}
+
+.separator-primary.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #007bff 50%, transparent 100%);
+}
+
+.separator-primary.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #007bff 13px, #007bff 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #007bff 13px, #007bff 20px, transparent 21px);
+}
+
+.separator-primary.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #007bff 35%, #007bff 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #007bff 35%, #007bff 65%, transparent 65%);
+}
+
+.separator-secondary .separator-line { 
+    background-color: #6c757d; 
+    border-color: #6c757d; 
+}
+
+.separator-secondary.separator-dashed .separator-line,
+.separator-secondary.separator-dotted .separator-line { 
+    border-color: #6c757d; 
+}
+
+.separator-secondary.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #6c757d 50%, transparent 100%);
+}
+
+.separator-secondary.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #6c757d 13px, #6c757d 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #6c757d 13px, #6c757d 20px, transparent 21px);
+}
+
+.separator-secondary.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #6c757d 35%, #6c757d 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #6c757d 35%, #6c757d 65%, transparent 65%);
+}
+
+.separator-success .separator-line { 
+    background-color: #28a745; 
+    border-color: #28a745; 
+}
+
+.separator-success.separator-dashed .separator-line,
+.separator-success.separator-dotted .separator-line { 
+    border-color: #28a745; 
+}
+
+.separator-success.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #28a745 50%, transparent 100%);
+}
+
+.separator-success.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #28a745 13px, #28a745 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #28a745 13px, #28a745 20px, transparent 21px);
+}
+
+.separator-success.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #28a745 35%, #28a745 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #28a745 35%, #28a745 65%, transparent 65%);
+}
+
+.separator-danger .separator-line { 
+    background-color: #dc3545; 
+    border-color: #dc3545; 
+}
+
+.separator-danger.separator-dashed .separator-line,
+.separator-danger.separator-dotted .separator-line { 
+    border-color: #dc3545; 
+}
+
+.separator-danger.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #dc3545 50%, transparent 100%);
+}
+
+.separator-danger.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #dc3545 13px, #dc3545 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #dc3545 13px, #dc3545 20px, transparent 21px);
+}
+
+.separator-danger.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #dc3545 35%, #dc3545 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #dc3545 35%, #dc3545 65%, transparent 65%);
+}
+
+.separator-warning .separator-line { 
+    background-color: #ffc107; 
+    border-color: #ffc107; 
+}
+
+.separator-warning.separator-dashed .separator-line,
+.separator-warning.separator-dotted .separator-line { 
+    border-color: #ffc107; 
+}
+
+.separator-warning.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #ffc107 50%, transparent 100%);
+}
+
+.separator-warning.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #ffc107 13px, #ffc107 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #ffc107 13px, #ffc107 20px, transparent 21px);
+}
+
+.separator-warning.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #ffc107 35%, #ffc107 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #ffc107 35%, #ffc107 65%, transparent 65%);
+}
+
+.separator-info .separator-line { 
+    background-color: #17a2b8; 
+    border-color: #17a2b8; 
+}
+
+.separator-info.separator-dashed .separator-line,
+.separator-info.separator-dotted .separator-line { 
+    border-color: #17a2b8; 
+}
+
+.separator-info.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #17a2b8 50%, transparent 100%);
+}
+
+.separator-info.separator-wave .separator-line {
+    background-image: 
+        radial-gradient(circle at 10px -5px, transparent 12px, #17a2b8 13px, #17a2b8 20px, transparent 21px),
+        radial-gradient(circle at 30px 25px, transparent 12px, #17a2b8 13px, #17a2b8 20px, transparent 21px);
+}
+
+.separator-info.separator-zigzag .separator-line {
+    background-image: 
+        linear-gradient(135deg, transparent 0%, transparent 35%, #17a2b8 35%, #17a2b8 65%, transparent 65%),
+        linear-gradient(45deg, transparent 0%, transparent 35%, #17a2b8 35%, #17a2b8 65%, transparent 65%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .separator-options {
+        padding: 0.75rem;
+    }
+    
+    .separator-spacing-large { 
+        padding: 1rem 0; 
+    }
+    
+    .separator-spacing-extra-large { 
+        padding: 1.5rem 0; 
+    }
+}
+
+.bl-info {
+    color: #0092ff ;
 }
