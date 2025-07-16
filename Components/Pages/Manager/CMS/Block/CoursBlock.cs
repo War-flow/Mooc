@@ -13,7 +13,8 @@
         public string? QuizId { get; set; } // ID du quiz, utilisé si le type est "quiz"
         public string? VideoUrl { get; set; } // URL de la vidéo, utilisé si le type est "video"
         public string? AudioUrl { get; set; } // URL de l'audio, utilisé si le type est "audio"
-        public string? FileUrl { get; set; } // URL du fichier, utilisé si le type est "fichier"
+        public string? FileUrl { get; set; } // URL du fichier principal (pour rétrocompatibilité)
+        public List<string> FileUrls { get; set; } = new(); // Collection d'URLs de fichiers
 
         // Ajoutez d'autres propriétés selon le type
     }

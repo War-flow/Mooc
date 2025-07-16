@@ -14,7 +14,7 @@
         <h4 class="text-title @(string.IsNullOrEmpty(GetBlockTitle()) ? "text-muted" : "")">
             @if (IsEditing)
             {
-                <input type="text" class="form-control" value="@GetBlockTitle()" @oninput="OnTitleChanged" />
+                <input type="text" class="form-control" value="@GetBlockTitle()" @oninput="OnTitleChanged" placeholder="Titre (optionnel)"/>
                 @if (titleError)
                 {
                     <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>

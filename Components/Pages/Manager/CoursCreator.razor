@@ -112,18 +112,20 @@
         </div>
 
         <div class="card mb-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
+            <div class="card-header">
                 <h4>Contenu du cours</h4>
-                <div>
+            </div>
+            <div class="card-body">
+                <!-- Boutons flottants -->
+                <div class="floating-buttons">
                     <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MoveSelectedBlockUp" title="Déplacer le bloc sélectionné vers le haut">
                         <i class="bi bi-arrow-up"></i> Monter le bloc
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" @onclick="MoveSelectedBlockDown" title="Déplacer le bloc sélectionné vers le bas">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MoveSelectedBlockDown" title="Déplacer le bloc sélectionné vers le bas">
                         <i class="bi bi-arrow-down"></i> Descendre le bloc
                     </button>
                 </div>
-            </div>
-            <div class="card-body">
+
                 <CourBuilder @ref="coursBuilder" @bind-SelectedBlock="selectedBlock" />
             </div>
         </div>
