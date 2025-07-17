@@ -2,15 +2,15 @@
 @implements IDisposable
 
 <div class="info-block @GetTypeClass()" @attributes="AdditionalAttributes">
-    <h4 class="info-title">
+    <h4 class="info-title @(string.IsNullOrEmpty(TypedContent.Title) ? "text-muted" : "")">
         @if (IsEditing)
         {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
-            <ValidationMessage For="@(() => Block.Title)" />
+            <InputText class="form-control" @bind-Value="TypedContent.Title" placeholder="Titre (optionnel)" />
+            <ValidationMessage For="@(() => TypedContent.Title)" />
         }
-        else if (!string.IsNullOrEmpty(Block.Title))
+        else if (!string.IsNullOrEmpty(TypedContent.Title))
         {
-            @Block.Title
+            @TypedContent.Title
         }
     </h4>
 
@@ -24,7 +24,8 @@
                 <option value="danger">Important</option>
             </InputSelect>
 
-            <InputTextArea class="form-control" @bind-Value="TypedContent.Message" rows="3" placeholder="Contenu du message d'information" />
+            <InputTextArea class="form-control" @bind-Value="TypedContent.Message" 
+                          rows="3" placeholder="Contenu du message d'information" />
             <ValidationMessage For="@(() => TypedContent.Message)" />
         }
         else
@@ -34,20 +35,25 @@
     </div>
 
     <div class="block-controls mt-2">
-        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit" aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
+        <button type="button" class="btn-block btn-valid"
+                @onclick="ToggleEdit" disabled="@(IsEditing && !IsValid())"
+                aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
             <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
             @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
+        
         @if (IsEditing)
         {
-            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" aria-label="Annuler les modifications">
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit"
+                    aria-label="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
         else
         {
-            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i> Supprimer
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete"
+                    title="Supprimer ce bloc">
+                <i class="bi bi-trash"> Supprimer</i>
             </button>
         }
     </div>
@@ -71,28 +77,22 @@
 
     private bool IsEditing { get; set; } = false;
     private InfoBlockContent? _originalContent;
-    private string? _originalTitle;
+
+    // Propriété de commodité pour accéder au contenu typé
+    private InfoBlockContent TypedContent => Block.Content as InfoBlockContent ?? new InfoBlockContent();
 
     protected override void OnInitialized()
     {
-        // Initialiser le contenu si nécessaire
-        if (Block.Content is not InfoBlockContent)
-        {
-            Block.Content = new InfoBlockContent
-            {
-                Title = Block.Title ?? string.Empty,
-                Message = Block.Message ?? string.Empty,
-                Type = "info"
-            };
-        }
-        
-        // Synchroniser Block.Message avec TypedContent.Message
-        SynchronizeFromContent();
+        EnsureContentInitialized();
     }
 
     protected override void OnParametersSet()
     {
-        // S'assurer que le contenu est bien initialisé
+        EnsureContentInitialized();
+    }
+
+    private void EnsureContentInitialized()
+    {
         if (Block.Content is not InfoBlockContent)
         {
             Block.Content = new InfoBlockContent
@@ -104,50 +104,37 @@
         }
     }
 
-    private void SynchronizeFromContent()
+    private bool IsValid()
     {
-        if (Block.Content is InfoBlockContent content)
-        {
-            Block.Title = content.Title;
-            Block.Message = content.Message;
-        }
-    }
-
-    private void SynchronizeToContent()
-    {
-        if (Block.Content is InfoBlockContent content)
-        {
-            content.Title = Block.Title ?? string.Empty;
-            content.Message = Block.Message ?? string.Empty;
-        }
+        return !string.IsNullOrWhiteSpace(TypedContent.Message) && 
+               !string.IsNullOrEmpty(TypedContent.Type);
     }
 
     private async Task ToggleEdit()
     {
         if (IsEditing)
         {
-            // Sauvegarder les modifications
-            SynchronizeFromContent();
+            if (!IsValid())
+                return;
+
+            // Synchroniser vers Block pour compatibilité
+            Block.Title = TypedContent.Title;
+            Block.Message = TypedContent.Message;
             
-            // Nettoyer le backup
             _originalContent = null;
-            _originalTitle = null;
-            
             IsEditing = false;
             
-            // Notifier le parent que le bloc a changé
             await OnBlockChanged.InvokeAsync(Block);
         }
         else
         {
-            // Créer un backup pour pouvoir annuler
+            // Créer un backup
             _originalContent = new InfoBlockContent
             {
                 Title = TypedContent.Title,
                 Message = TypedContent.Message,
                 Type = TypedContent.Type
             };
-            _originalTitle = Block.Title;
             
             IsEditing = true;
         }
@@ -157,10 +144,9 @@
     {
         if (_originalContent != null)
         {
-            // Restaurer les valeurs originales
             Block.Content = _originalContent;
-            Block.Title = _originalTitle ?? string.Empty;
-            SynchronizeFromContent();
+            Block.Title = _originalContent.Title;
+            Block.Message = _originalContent.Message;
         }
         
         IsEditing = false;
@@ -176,10 +162,15 @@
         return TypedContent.Type switch
         {
             "warning" => "alert alert-warning",
-            "success" => "alert alert-success",
+            "success" => "alert alert-success", 
             "danger" => "alert alert-danger",
-            _ => "alert alert-primary"
+            _ => "alert alert-info"
         };
+    }
+
+    public void Dispose()
+    {
+        _originalContent = null;
     }
 
     // Classe pour contenu spécifique à InfoBlock
@@ -188,15 +179,5 @@
         public string Title { get; set; } = string.Empty;
         public string Message { get; set; } = string.Empty;
         public string Type { get; set; } = "info";
-    }
-
-    // Propriété de commodité pour accéder au contenu typé
-    private InfoBlockContent TypedContent => Block.Content as InfoBlockContent ?? new InfoBlockContent();
-
-    public void Dispose()
-    {
-        // Nettoyer les ressources si nécessaire
-        _originalContent = null;
-        _originalTitle = null;
     }
 }

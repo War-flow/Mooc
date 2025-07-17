@@ -304,18 +304,18 @@
     }
 
     <div class="block-controls mt-3">
-        <button type="button" class="btn @(IsEditing ? "btn-success" : "btn-primary") btn-sm me-2" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "check-lg" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
         @if (!IsEditing)
         {
-            <button type="button" class="btn btn-outline-danger btn-sm" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i>
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <i class="bi bi-trash"> Supprimer</i>
             </button>
         }
         else
         {
-            <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="CancelEdit" title="Annuler les modifications">
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
                 <i class="bi bi-x-lg"></i> Annuler
             </button>
         }

@@ -7,7 +7,6 @@
 @inject RichEditorService EditorService
 @implements IAsyncDisposable
 
-
 @if (Block != null)
 {
     <div class="text-block @GetTypeClass()" id="block-@Block.Order">
@@ -18,50 +17,63 @@
                 @if (titleError)
                 {
                     <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
-                }   
+                }
             }
             else if (!string.IsNullOrEmpty(GetBlockTitle()))
             {
                 @GetBlockTitle()
             }
-            else
-            {
-                <span class="text-muted">Bloc Text (vide)</span>
-            }
         </h4>
+
         <div class="text-content">
             @if (IsEditing)
             {
                 @if (useRichEditor)
                 {
-                    <div id="editor-@Block.Order" class="rich-editor" style="height: @(EditorHeight)px;"></div>
+                    <div id="editor-@Block.Order" class="rich-editor" style="height:@(EditorHeight)px;"></div>
                 }
                 else
                 {
                     <textarea class="form-control" value="@GetBlockText()" @oninput="OnTextChanged" rows="5"></textarea>
                 }
-                <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" id="useRichEditor-@Block.Order"
-                           @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                    <label class="form-check-label" for="useRichEditor-@Block.Order">
-                        Utiliser l'éditeur riche
-                    </label>
-                </div>
             }
             else
             {
-                <div class="content-display">@((MarkupString)GetBlockText())</div>
+                <div class="text-message">
+                    @if (useRichEditor)
+                    {
+                        @((MarkupString)GetBlockText())
+                    }
+                    else
+                    {
+                        @GetBlockText()
+                    }
+                </div>
             }
         </div>
-        <div class="block-controls">
 
-            <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
-                <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <div class="block-controls mt-2">
+            <button type="button" class="btn-block btn-valid"
+                    @onclick="ToggleEdit" disabled="@(IsEditing && !IsValid())"
+                    aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
+                <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
+                @(IsEditing ? "Enregistrer" : "Modifier")
             </button>
-
-            <button id="delete-btn-@(Block.Id)" type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"> Supprimer</i>
-            </button>
+            
+            @if (IsEditing)
+            {
+                <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit"
+                        aria-label="Annuler les modifications">
+                    <i class="bi bi-x-lg"></i> Annuler
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete"
+                        title="Supprimer ce bloc">
+                    <i class="bi bi-trash"> Supprimer</i>
+                </button>
+            }
         </div>
 
         <!-- Indicateur de sauvegarde -->
@@ -78,6 +90,14 @@
         {
             <div class="alert alert-success mt-2 p-2 fade-out">
                 Modifications enregistrées avec succès
+            </div>
+        }
+
+        <!-- Message d'erreur -->
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-2 p-2">
+                @errorMessage
             </div>
         }
     </div>
@@ -102,21 +122,39 @@ else
     [Parameter]
     public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
 
-    private bool IsEditing { get; set; } = false;
+    [Parameter]
+    public bool IsEditing { get; set; } = false;
+
     private bool useRichEditor { get; set; } = true;
     private bool titleError { get; set; } = false;
-    private string originalContent = string.Empty;
-    private string originalTitle = string.Empty;
     private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
     private bool isSaving { get; set; } = false;
     private bool showSaveSuccess { get; set; } = false;
+    private bool editorInitialized { get; set; } = false;
 
     // Ajouter propriété pour la hauteur de l'éditeur
     [Parameter]
     public int EditorHeight { get; set; } = 200;
 
+    private Timer? autoSaveTimer;
+    private bool hasUnsavedChanges = false;
+
+    // Ajouter des propriétés pour la validation
+    private string? errorMessage;
+    private bool hasValidationErrors => !string.IsNullOrEmpty(errorMessage) || titleError;
+
+    // Contenu de sauvegarde pour annulation
+    private TextBlockContent? _originalContent;
+
+    // Propriété de commodité pour accéder au contenu typé
+    private TextBlockContent TypedContent => Block.Content as TextBlockContent ?? new TextBlockContent();
+
     protected override void OnInitialized()
     {
+        base.OnInitialized();
+        
+        EnsureContentInitialized();
+        
         // S'assurer que Block n'est pas null
         if (Block == null)
         {
@@ -131,9 +169,26 @@ else
         }
     }
 
+    protected override void OnParametersSet()
+    {
+        EnsureContentInitialized();
+    }
+
+    private void EnsureContentInitialized()
+    {
+        if (Block?.Content is not TextBlockContent)
+        {
+            Block.Content = new TextBlockContent
+            {
+                Title = Block?.Title ?? string.Empty,
+                Text = Block?.Text ?? string.Empty
+            };
+        }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (Block != null && IsEditing && useRichEditor)
+        if (Block != null && useRichEditor && IsEditing && !editorInitialized)
         {
             await InitializeRichEditor();
         }
@@ -142,16 +197,18 @@ else
     // Méthode améliorée pour initialiser l'éditeur
     private async Task InitializeRichEditor()
     {
-        if (Block == null || !IsEditing || !useRichEditor) return;
+        if (Block == null || !useRichEditor || editorInitialized) return;
         
         try
         {
-            string content = GetBlockText();
+            string content = TypedContent.Text;
             // Initialiser l'éditeur riche avec la hauteur configurable
             await EditorService.InitializeEditorAsync(editorId, content);
             
             // S'abonner aux changements de contenu
             EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
+            
+            editorInitialized = true;
         }
         catch (Exception ex)
         {
@@ -164,14 +221,8 @@ else
     {
         if (Block != null)
         {
-            try
-            {
-                UpdateBlockText(content);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erreur lors de la mise à jour du contenu: {ex.Message}");
-            }
+            TypedContent.Text = content;
+            hasUnsavedChanges = true;
         }
     }
 
@@ -180,8 +231,8 @@ else
     {
         if (Block != null && e.Value != null)
         {
-            string value = e.Value.ToString() ?? string.Empty;
-            UpdateBlockText(value);
+            TypedContent.Text = e.Value.ToString() ?? string.Empty;
+            hasUnsavedChanges = true;
         }
     }
 
@@ -197,137 +248,139 @@ else
                 titleError = true;
                 return;
             }
+            
             titleError = false;
-            UpdateBlockTitle(value);
+            TypedContent.Title = value;
+            hasUnsavedChanges = true;
         }
     }
 
-    // Méthode améliorée pour sauvegarder les modifications
-    private async Task SaveChanges()
+    // Méthode de validation similaire à InfoBlock
+    private bool IsValid()
     {
-        if (Block == null) return;
-        
-        try
-        {
-            // Validation avant de sauvegarder
-            if (GetBlockTitle().Length > 100)
-            {
-                titleError = true;
-                return;
-            }
-
-            isSaving = true;
-            StateHasChanged();
-
-            // Si on utilise l'éditeur riche, récupérer le contenu depuis JS
-            if (useRichEditor)
-            {
-                string editorContent = await EditorService.GetEditorContentAsync(editorId);
-                UpdateBlockText(editorContent);
-            }
-
-            // Notifier le parent que le bloc a changé
-            await OnBlockChanged.InvokeAsync(Block);
-            
-            // Afficher le message de succès temporairement
-            showSaveSuccess = true;
-            StateHasChanged();
-            
-            await Task.Delay(2000);
-            showSaveSuccess = false;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de la sauvegarde des modifications: {ex.Message}");
-            // Afficher un message d'erreur à l'utilisateur serait pertinent ici
-        }
-        finally
-        {
-            isSaving = false;
-            StateHasChanged();
-        }
+        return !string.IsNullOrWhiteSpace(TypedContent.Text);
     }
 
+    // Méthode de validation étendue
+    private bool ValidateBlock()
+    {
+        errorMessage = null;
+        titleError = false;
+
+        if (TypedContent.Title.Length > 100)
+        {
+            titleError = true;
+            errorMessage = "Le titre ne peut pas dépasser 100 caractères";
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(TypedContent.Text))
+        {
+            errorMessage = "Le contenu ne peut pas être vide";
+            return false;
+        }
+
+        if (TypedContent.Text.Length > 10000)
+        {
+            errorMessage = "Le contenu ne peut pas dépasser 10 000 caractères";
+            return false;
+        }
+
+        return true;
+    }
+
+    // Nouvelle méthode ToggleEdit similaire à InfoBlock
     private async Task ToggleEdit()
     {
-        if (Block == null) return;
-        
         if (IsEditing)
         {
-            await SaveChanges();
-        }
-        else
-        {
-            // Sauvegarder l'état original pour permettre d'annuler
-            originalContent = GetBlockText();
-            originalTitle = GetBlockTitle();
-        }
+            if (!IsValid())
+                return;
 
-        titleError = false;
-        IsEditing = !IsEditing;
-    }
-    
-    private async Task ToggleRichEditor()
-    {
-        if (Block == null) return;
-        
-        useRichEditor = !useRichEditor;
-        
-        if (IsEditing)
-        {
             try
             {
-                if (useRichEditor)
+                isSaving = true;
+                StateHasChanged();
+
+                // Récupérer le contenu de l'éditeur si nécessaire
+                if (useRichEditor && editorInitialized)
                 {
-                    // Transférer le contenu du textarea à l'éditeur riche
-                    await EditorService.InitializeEditorAsync(editorId, GetBlockText());
-                    EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-                }
-                else
-                {
-                    // Transférer le contenu de l'éditeur riche au textarea
                     string editorContent = await EditorService.GetEditorContentAsync(editorId);
-                    UpdateBlockText(editorContent);
-                    await EditorService.DestroyEditorAsync(editorId);
-                    EditorInterop.UnsubscribeFromContentChanges(editorId);
+                    TypedContent.Text = editorContent;
                 }
+
+                // Synchroniser vers Block pour compatibilité
+                Block.Title = TypedContent.Title;
+                Block.Text = TypedContent.Text;
+                
+                _originalContent = null;
+                IsEditing = false;
+                
+                await OnBlockChanged.InvokeAsync(Block);
+                
+                showSaveSuccess = true;
+                StateHasChanged();
+                
+                await Task.Delay(2000);
+                showSaveSuccess = false;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors du basculement de l'éditeur: {ex.Message}");
+                errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
+                Console.WriteLine($"Erreur lors de la sauvegarde: {ex.Message}");
+            }
+            finally
+            {
+                isSaving = false;
+                StateHasChanged();
             }
         }
-        
-        StateHasChanged();
+        else
+        {
+            // Créer un backup
+            _originalContent = new TextBlockContent
+            {
+                Title = TypedContent.Title,
+                Text = TypedContent.Text
+            };
+            
+            IsEditing = true;
+            
+            // Initialiser l'éditeur après le rendu
+            StateHasChanged();
+        }
     }
 
+    // Nouvelle méthode CancelEdit similaire à InfoBlock
     private async Task CancelEdit()
     {
-        if (Block == null) return;
+        if (_originalContent != null)
+        {
+            Block.Content = _originalContent;
+            Block.Title = _originalContent.Title;
+            Block.Text = _originalContent.Text;
+        }
         
-        try
+        // Nettoyer l'éditeur riche si nécessaire
+        if (useRichEditor && editorInitialized)
         {
-            // Restaurer le contenu original
-            UpdateBlockText(originalContent);
-            UpdateBlockTitle(originalTitle);
-            IsEditing = false;
-            
-            if (useRichEditor)
-            {
-                // Nettoyer l'éditeur
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
-            }
+            await EditorService.DestroyEditorAsync(editorId);
+            editorInitialized = false;
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de l'annulation des modifications: {ex.Message}");
-        }
+        
+        IsEditing = false;
+        hasUnsavedChanges = false;
+    }
+
+    // Méthode SaveChanges conservée pour la compatibilité
+    private async Task SaveChanges()
+    {
+        await ToggleEdit();
     }
 
     private async Task RequestDelete()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer le block text ?");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc de texte ?");
         if (confirmed)
         {
             await OnDeleteRequested.InvokeAsync(Block);
@@ -343,7 +396,7 @@ else
             classList.Add("editing");
         }
         
-        if (string.IsNullOrEmpty(GetBlockText()))
+        if (string.IsNullOrEmpty(TypedContent.Text))
         {
             classList.Add("empty");
         }
@@ -354,59 +407,22 @@ else
     // Méthodes helper pour accéder aux propriétés de Block de façon sécurisée
     private string GetBlockText()
     {
-        try
-        {
-            return Block?.Text?.ToString() ?? string.Empty;
-        }
-        catch
-        {
-            return string.Empty;
-        }
+        return TypedContent.Text;
     }
 
     private string GetBlockTitle()
     {
-        try
-        {
-            return Block?.Title?.ToString() ?? string.Empty;
-        }
-        catch
-        {
-            return string.Empty;
-        }
-    }
-
-    // Méthodes helper pour mettre à jour les propriétés de Block de façon sécurisée
-    private void UpdateBlockText(string value)
-    {
-        try
-        {
-            Block.Text = value;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de la mise à jour du texte: {ex.Message}");
-        }
-    }
-
-    private void UpdateBlockTitle(string value)
-    {
-        try
-        {
-            Block.Title = value;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de la mise à jour du titre: {ex.Message}");
-        }
+        return TypedContent.Title;
     }
 
     public async ValueTask DisposeAsync()
     {
+        autoSaveTimer?.Dispose();
+        
         try
         {
             // Nettoyer les ressources lors de la suppression du composant
-            if (Block != null && useRichEditor)
+            if (Block != null && useRichEditor && editorInitialized)
             {
                 await EditorService.DestroyEditorAsync(editorId);
                 EditorInterop.UnsubscribeFromContentChanges(editorId);
@@ -414,7 +430,16 @@ else
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur lors de la libération des ressources: {ex.Message}");
+            Console.WriteLine($"Erreur disposal: {ex.Message}");
         }
+        
+        _originalContent = null;
+    }
+
+    // Classe pour contenu spécifique à TextBlock
+    public class TextBlockContent
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Text { get; set; } = string.Empty;
     }
 }

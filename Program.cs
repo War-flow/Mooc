@@ -41,6 +41,9 @@ namespace Mooc
             // Ajout du service FileUploadService
             builder.Services.AddScoped<FileUploadService>();
 
+            // Ajout du service BlockService
+            builder.Services.AddScoped<BlockService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>

@@ -8,45 +8,43 @@ window.initRichEditor = function (elementId, content) {
         window.editors[elementId].root.innerHTML = content;
         return;
     }
-    
+
     // Attendre que l'élément DOM soit disponible
     const element = document.getElementById(elementId);
     if (!element) {
         console.error(`Élément #${elementId} non trouvé`);
         return;
     }
-    
+
     // Options de l'éditeur Quill
     const options = {
         theme: 'snow',
         modules: {
             toolbar: [
                 ['bold', 'italic', 'underline', 'strike'],
-                ['blockquote', 'code-block'],
                 [{ 'header': 1 }, { 'header': 2 }],
+                [{ 'size': ['small', false, 'large', 'huge'] }], // Nouvelle ligne pour la taille
                 [{ 'list': 'ordered' }, { 'list': 'bullet' }],
                 [{ 'indent': '-1' }, { 'indent': '+1' }],
                 [{ 'color': [] }, { 'background': [] }],
-                ['link', 'image'],
-                ['clean']
             ]
         },
-        placeholder: 'Composez votre contenu...'
+        placeholder: 'Rédiger votre texte'
     };
-    
+
     // Créer l'instance Quill
     window.editors[elementId] = new Quill(`#${elementId}`, options);
-    
+
     // Définir le contenu initial
     if (content) {
         window.editors[elementId].root.innerHTML = content;
     }
-    
+
     // Attacher l'événement de changement avec debounce pour limiter les appels
     let debounceTimer;
-    window.editors[elementId].on('text-change', function() {
+    window.editors[elementId].on('text-change', function () {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function() {
+        debounceTimer = setTimeout(function () {
             const content = window.getRichEditorContent(elementId);
             // Appeler la méthode .NET avec le contenu mis à jour
             DotNet.invokeMethodAsync('Mooc', 'OnEditorContentChanged', elementId, content);
@@ -74,4 +72,9 @@ window.setRichEditorReadOnly = function (elementId, isReadOnly) {
     if (window.editors && window.editors[elementId]) {
         window.editors[elementId].enable(!isReadOnly);
     }
+};
+
+// Vérifier si un éditeur existe déjà
+window.editorExists = function (elementId) {
+    return window.editors && window.editors[elementId] ? true : false;
 };

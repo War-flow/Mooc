@@ -2,169 +2,182 @@
 @using Microsoft.JSInterop
 @using Mooc.Services
 @inject IJSRuntime JSRuntime
-@inject RichEditorService EditorService
+@inject BlockService BlockService
 @implements IAsyncDisposable
 
-<div class="quiz-block @GetTypeClass()" @attributes="AdditionalAttributes">
-    <h4 class="quiz-title">
+<div class="table-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <h4 class="table-title @(string.IsNullOrEmpty(TypedContent.Title) ? "text-muted" : "")">
         @if (IsEditing)
         {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre (optionnel)" />
+            <InputText class="form-control" @bind-Value="TypedContent.Title" placeholder="Titre (optionnel)" />
             @if (titleError)
             {
                 <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
             }
-            <ValidationMessage For="@(() => Block.Title)" />
+            <ValidationMessage For="@(() => TypedContent.Title)" />
         }
-        else if (!string.IsNullOrEmpty(Block.Title))
+        else if (!string.IsNullOrEmpty(TypedContent.Title))
         {
-            @Block.Title
-        }
-        else
-        {
-            <span class="text-muted">Bloc Tableau (vide)</span>
+            @TypedContent.Title
         }
     </h4>
-    <div class="quiz-content">
+
+    <div class="table-content">
         @if (IsEditing)
         {
             <div class="mb-3">
-                <div class="d-flex align-items-center mb-2">
-                    <label class="me-2 mb-0">Mode d'édition:</label>
-                    <div class="btn-group" role="group">
-                        <button type="button" class="btn @(editMode == "visual" ? "btn-primary" : "btn-outline-secondary")"
-                                @onclick='() => SwitchEditMode("visual")'>
-                            <i class="bi bi-grid-3x3"></i> Visuel
+                <div class="table-editor">
+                    <div class="table-controls mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddRow">
+                            <i class="bi bi-plus-circle"></i> Ligne
                         </button>
-                        <button type="button" class="btn @(editMode == "rich" ? "btn-primary" : "btn-outline-secondary")"
-                                @onclick='() => SwitchEditMode("rich")'>
-                            <i class="bi bi-pencil-square"></i> Éditeur riche
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddColumn">
+                            <i class="bi bi-plus-circle"></i> Colonne
                         </button>
-                        <button type="button" class="btn @(editMode == "html" ? "btn-primary" : "btn-outline-secondary")"
-                            @onclick='() =>SwitchEditMode("html")'>
-                            <i class="bi bi-code-slash"></i> HTML
+                        <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddHeader"
+                                title="Ajouter/Supprimer l'en-tête">
+                            <i class="bi bi-list-ol"></i> En-tête
                         </button>
-                    </div>
-                </div>
-
-                @if (editMode == "visual")
-                {
-                    <div class="table-editor">
-                        <div class="table-controls mb-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddRow">
-                                <i class="bi bi-plus-circle"></i> Ligne
+                        <div class="dropdown d-inline-block">
+                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
+                                    id="tableStyleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                Style
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddColumn">
-                                <i class="bi bi-plus-circle"></i> Colonne
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-secondary me-1" @onclick="AddHeader"
-                                    title="Ajouter/Supprimer l'en-tête">
-                                <i class="bi bi-list-ol"></i> En-tête
-                            </button>
-                            <div class="dropdown d-inline-block">
-                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button"
-                                        id="tableStyleDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                                    Style
-                                </button>
-                                <ul class="dropdown-menu" aria-labelledby="tableStyleDropdown">
-                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table")'>Standard</button></li>
-                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-striped")'>Rayé</button></li>
-                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-bordered")'>Bordé</button></li>
-                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-hover")'>Survol</button></li>
-                                    <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-sm")'>Compact</button></li>
-                                </ul>
-                            </div>
+                            <ul class="dropdown-menu" aria-labelledby="tableStyleDropdown">
+                                <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table")'>Standard</button></li>
+                                <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-striped")'>Rayé</button></li>
+                                <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-bordered")'>Bordé</button></li>
+                                <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-hover")'>Survol</button></li>
+                                <li><button type="button" class="dropdown-item" @onclick='() => ApplyTableStyle("table table-sm")'>Compact</button></li>
+                            </ul>
                         </div>
+                    </div>
 
-                        <div class="table-responsive">
-                            <table class="@tableStyle">
-                                @if (hasHeader)
+                    <div class="table-responsive">
+                        <table class="@TypedContent.TableStyle">
+                            @if (TypedContent.HasHeader)
+                            {
+                                <thead>
+                                    <tr>
+                                        @for (int i = 0; i < TypedContent.TableColumns; i++)
+                                        {
+                                            int colIndex = i;
+                                            <th>
+                                                <div class="d-flex align-items-center">
+                                                    <input type="text" class="form-control form-control-sm"
+                                                           @bind="TypedContent.HeaderCells[colIndex]" @oninput="OnTableContentChanged" />
+                                                    <button type="button" class="btn btn-sm btn-outline-danger ms-1"
+                                                            @onclick="() => RemoveColumn(colIndex)" title="Supprimer colonne">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </div>
+                                            </th>
+                                        }
+                                    </tr>
+                                </thead>
+                            }
+                            <tbody>
+                                @for (int r = 0; r < TypedContent.TableRows; r++)
                                 {
-                                    <thead>
-                                        <tr>
-                                            @for (int i = 0; i < tableColumns; i++)
-                                            {
-                                                int colIndex = i;
-                                                <th>
-                                                    <div class="d-flex align-items-center">
-                                                        <input type="text" class="form-control form-control-sm"
-                                                               @bind="headerCells[colIndex]" />
+                                    int rowIndex = r;
+                                    <tr>
+                                        @for (int c = 0; c < TypedContent.TableColumns; c++)
+                                        {
+                                            int colIndex = c;
+                                            <td>
+                                                <div class="d-flex align-items-center">
+                                                    <input type="text" class="form-control form-control-sm"
+                                                           @bind="TypedContent.TableCells[rowIndex][colIndex]" @oninput="OnTableContentChanged" />
+                                                    @if (c == 0)
+                                                    {
                                                         <button type="button" class="btn btn-sm btn-outline-danger ms-1"
-                                                                @onclick="() => RemoveColumn(colIndex)" title="Supprimer colonne">
+                                                                @onclick="() => RemoveRow(rowIndex)" title="Supprimer ligne">
                                                             <i class="bi bi-trash"></i>
                                                         </button>
-                                                    </div>
-                                                </th>
-                                            }
-                                        </tr>
-                                    </thead>
+                                                    }
+                                                </div>
+                                            </td>
+                                        }
+                                    </tr>
                                 }
-                                <tbody>
-                                    @for (int r = 0; r < tableRows; r++)
-                                    {
-                                        int rowIndex = r;
-                                        <tr>
-                                            @for (int c = 0; c < tableColumns; c++)
-                                            {
-                                                int colIndex = c;
-                                                <td>
-                                                    <div class="d-flex align-items-center">
-                                                        <input type="text" class="form-control form-control-sm"
-                                                               @bind="tableCells[rowIndex][colIndex]" />
-                                                        @if (c == 0)
-                                                        {
-                                                            <button type="button" class="btn btn-sm btn-outline-danger ms-1"
-                                                                    @onclick="() => RemoveRow(rowIndex)" title="Supprimer ligne">
-                                                                <i class="bi bi-trash"></i>
-                                                            </button>
-                                                        }
-                                                    </div>
-                                                </td>
-                                            }
-                                        </tr>
-                                    }
-                                </tbody>
-                            </table>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
-                }
-                else if (editMode == "rich")
+                </div>
+            </div>
+        }
+        else
+        {
+            <!-- Aperçu du tableau -->
+            <div class="table-display table-responsive">
+                @if (!string.IsNullOrEmpty(TypedContent.TableContent))
                 {
-                    <div id="editor-@Block.Order" class="rich-editor" style="height: 300px;"></div>
+                    @((MarkupString)TypedContent.TableContent)
                 }
                 else
                 {
-                    <textarea class="form-control" @bind="TableContent" rows="10" placeholder="Contenu HTML du tableau"></textarea>
+                    <div class="text-muted">Tableau vide</div>
                 }
             </div>
         }
-        else if (!string.IsNullOrEmpty(TableContent))
-        {
-            <div class="content-display table-responsive">@((MarkupString)TableContent)</div>
-        }
     </div>
-    <div class="block-controls mt-3">
-        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+
+    <div class="block-controls mt-2">
+        <button type="button" class="btn-block btn-valid"
+                @onclick="ToggleEdit" disabled="@(IsEditing && !IsValid())"
+                aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
+            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
+            @(IsEditing ? "Enregistrer" : "Modifier")
         </button>
-        @if (!IsEditing)
+        
+        @if (IsEditing)
         {
-            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
-                <i class="bi bi-trash"></i> Supprimer
+            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit"
+                    aria-label="Annuler les modifications">
+                <i class="bi bi-x-lg"></i> Annuler
             </button>
         }
         else
         {
-            <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
-                <i class="bi bi-x-lg"></i> Annuler
+            <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete"
+                    title="Supprimer ce bloc">
+                <i class="bi bi-trash"> Supprimer</i>
             </button>
         }
     </div>
+
+    <!-- Indicateur de sauvegarde -->
+    @if (isSaving)
+    {
+        <div class="save-indicator">
+            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+            <span class="ms-1">Sauvegarde en cours...</span>
+        </div>
+    }
+
+    <!-- Message de succès temporaire -->
+    @if (showSaveSuccess)
+    {
+        <div class="alert alert-success mt-2 p-2 fade-out">
+            Modifications enregistrées avec succès
+        </div>
+    }
+
+    <!-- Message d'erreur -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger mt-2 p-2">
+            @errorMessage
+        </div>
+    }
 </div>
 
 @code {
     [Parameter]
     public CourBuilder.CoursBlock Block { get; set; } = default!;
+
+    [Parameter]
+    public int CoursId { get; set; }
 
     [Parameter(CaptureUnmatchedValues = true)]
     public Dictionary<string, object>? AdditionalAttributes { get; set; }
@@ -179,216 +192,249 @@
     private EditContext? EditContext { get; set; }
 
     private bool IsEditing { get; set; } = false;
-    private string editMode = "visual"; // visual, rich, html
     private bool titleError { get; set; } = false;
-    private string originalContent = string.Empty;
-    private string originalTitle = string.Empty;
-    private string editorId => $"editor-{Block.Order}";
+    private bool isSaving { get; set; } = false;
+    private bool showSaveSuccess { get; set; } = false;
+    private string? errorMessage;
+    private TableBlockContent? _originalContent;
 
-    // Table visual editor properties
-    private int tableRows = 2;
-    private int tableColumns = 2;
-    private bool hasHeader = true;
-    private string tableStyle = "table table-bordered";
-    private List<string> headerCells = new List<string> { "Colonne 1", "Colonne 2" };
-    private List<List<string>> tableCells = new List<List<string>> {
-        new List<string> { "Cellule 1,1", "Cellule 1,2" },
-        new List<string> { "Cellule 2,1", "Cellule 2,2" }
-    };
-
-    // Property to handle content as string, using Block.Content
-    private string TableContent
-    {
-        get => Block.Content?.ToString() ?? string.Empty;
-        set => Block.Content = value;
-    }
+    // Propriété de commodité pour accéder au contenu typé
+    private TableBlockContent TypedContent => Block.Content as TableBlockContent ?? new TableBlockContent();
 
     protected override void OnInitialized()
     {
-        // Initialiser le contenu si nécessaire
-        if (Block.Content == null)
-        {
-            Block.Content = string.Empty;
-            GenerateTableFromVisual(); // Génère le tableau initial
-        }
-        else if (!string.IsNullOrEmpty(TableContent))
-        {
-            // Essayer de parser le HTML du tableau existant
-            ParseExistingTable();
-        }
+        EnsureContentInitialized();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    protected override void OnParametersSet()
     {
-        if (IsEditing && editMode == "rich")
-        {
-            // Initialiser l'éditeur riche
-            await EditorService.InitializeEditorAsync(editorId, TableContent);
-
-            // S'abonner aux changements de contenu
-            EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-        }
+        EnsureContentInitialized();
     }
 
-    // Parse le contenu HTML existant pour le mode visuel
-    private void ParseExistingTable()
+    private void EnsureContentInitialized()
     {
-        try
+        if (Block.Content is not TableBlockContent)
         {
-            // Cette fonction est simplifiée et pourrait être améliorée avec une vraie analyse HTML
-            // Pour un véritable déploiement, utilisez une bibliothèque d'analyse HTML comme HtmlAgilityPack
-
-            // Recherche basique des lignes et colonnes
-            var content = TableContent.ToLower();
-
-            // Vérifie si le tableau a un en-tête
-            hasHeader = content.Contains("<thead>");
-
-            // Extraire le style du tableau
-            if (content.Contains("table-striped"))
-                tableStyle = "table table-striped";
-            else if (content.Contains("table-bordered"))
-                tableStyle = "table table-bordered";
-            else if (content.Contains("table-hover"))
-                tableStyle = "table table-hover";
-            else if (content.Contains("table-sm"))
-                tableStyle = "table table-sm";
-            else
-                tableStyle = "table";
-
-            // Dans une implémentation réelle, on analyserait le contenu pour extraire
-            // les lignes, les colonnes et le contenu des cellules
-            // Cette partie est simplifiée pour la démonstration
-        }
-        catch
-        {
-            // En cas d'erreur d'analyse, utiliser la structure par défaut
-            ResetTableStructure();
-        }
-    }
-
-    // Cette méthode sera appelée lorsque le contenu de l'éditeur change
-    private void OnContentChanged(string elementId, string content)
-    {
-        // Mettre à jour le contenu du bloc
-        TableContent = content;
-    }
-
-    private void SwitchEditMode(string mode)
-    {
-        if (editMode == mode) return;
-
-        if (editMode == "visual" && mode != "visual")
-        {
-            // Convertir du mode visuel vers HTML ou éditeur riche
+            Block.Content = new TableBlockContent
+            {
+                Title = Block.Title ?? string.Empty,
+                TableRows = 2,
+                TableColumns = 2,
+                HasHeader = true,
+                TableStyle = "table table-bordered",
+                HeaderCells = new List<string> { "Colonne 1", "Colonne 2" },
+                TableCells = new List<List<string>> {
+                    new List<string> { "Cellule 1,1", "Cellule 1,2" },
+                    new List<string> { "Cellule 2,1", "Cellule 2,2" }
+                }
+            };
+            
             GenerateTableFromVisual();
         }
-        else if (mode == "visual" && editMode != "visual")
+        else if (!string.IsNullOrEmpty(TypedContent.TableContent))
         {
-            // Convertir de HTML ou éditeur riche vers le mode visuel
-            // Cette fonction pourrait être améliorée pour analyser le HTML
+            // Essayer de parser le HTML du tableau existant si nécessaire
             ParseExistingTable();
         }
-
-        editMode = mode;
-        StateHasChanged();
     }
 
-    private string GetTypeClass()
+    private bool IsValid()
     {
-        var classList = new List<string>();
+        return TypedContent.TableRows > 0 && TypedContent.TableColumns > 0;
+    }
 
-        // Ajouter la classe basée sur le type
-        classList.Add(Block.Type switch
+    private bool ValidateBlock()
+    {
+        errorMessage = null;
+        titleError = false;
+
+        if (TypedContent.Title.Length > 100)
         {
-            "table" => "table-block",
-            _ => "default-block"
-        });
+            titleError = true;
+            errorMessage = "Le titre ne peut pas dépasser 100 caractères";
+            return false;
+        }
 
+        if (TypedContent.TableRows <= 0 || TypedContent.TableColumns <= 0)
+        {
+            errorMessage = "Le tableau doit contenir au moins une ligne et une colonne";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task ToggleEdit()
+    {
         if (IsEditing)
         {
-            classList.Add("editing");
-        }
+            if (!IsValid() || !ValidateBlock())
+                return;
 
-        if (string.IsNullOrEmpty(TableContent))
+            try
+            {
+                isSaving = true;
+                StateHasChanged();
+
+                // Générer le HTML depuis le mode visuel
+                GenerateTableFromVisual();
+
+                // Synchroniser vers Block pour compatibilité
+                Block.Title = TypedContent.Title;
+                Block.Content = TypedContent;
+                
+                _originalContent = null;
+                IsEditing = false;
+                
+                // Sauvegarder en base de données si nécessaire
+                if (CoursId > 0)
+                {
+                    bool success = await BlockService.SaveBlockAsync(Block, CoursId);
+                    if (!success)
+                    {
+                        errorMessage = "Erreur lors de la sauvegarde en base de données";
+                        return;
+                    }
+                }
+                
+                await OnBlockChanged.InvokeAsync(Block);
+                
+                showSaveSuccess = true;
+                StateHasChanged();
+                
+                await Task.Delay(2000);
+                showSaveSuccess = false;
+            }
+            catch (Exception ex)
+            {
+                errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
+                Console.WriteLine($"Erreur lors de la sauvegarde: {ex.Message}");
+            }
+            finally
+            {
+                isSaving = false;
+                StateHasChanged();
+            }
+        }
+        else
         {
-            classList.Add("empty");
+            // Créer un backup
+            _originalContent = new TableBlockContent
+            {
+                Title = TypedContent.Title,
+                TableRows = TypedContent.TableRows,
+                TableColumns = TypedContent.TableColumns,
+                HasHeader = TypedContent.HasHeader,
+                TableStyle = TypedContent.TableStyle,
+                HeaderCells = new List<string>(TypedContent.HeaderCells),
+                TableCells = TypedContent.TableCells.Select(row => new List<string>(row)).ToList(),
+                TableContent = TypedContent.TableContent
+            };
+            
+            IsEditing = true;
         }
+    }
 
-        return string.Join(" ", classList);
+    private void CancelEdit()
+    {
+        if (_originalContent != null)
+        {
+            Block.Content = _originalContent;
+            Block.Title = _originalContent.Title;
+        }
+        
+        IsEditing = false;
+        errorMessage = null;
+        titleError = false;
+    }
+
+    private void OnTableContentChanged()
+    {
+        // Régénérer le HTML à chaque changement
+        GenerateTableFromVisual();
     }
 
     private void AddRow()
     {
         List<string> newRow = new List<string>();
-        for (int i = 0; i < tableColumns; i++)
+        for (int i = 0; i < TypedContent.TableColumns; i++)
         {
-            newRow.Add($"Cellule {tableRows + 1},{i + 1}");
+            newRow.Add($"Cellule {TypedContent.TableRows + 1},{i + 1}");
         }
-        tableCells.Add(newRow);
-        tableRows++;
+        TypedContent.TableCells.Add(newRow);
+        TypedContent.TableRows++;
+        
+        GenerateTableFromVisual();
     }
 
     private void RemoveRow(int rowIndex)
     {
-        if (tableRows > 1)
+        if (TypedContent.TableRows > 1)
         {
-            tableCells.RemoveAt(rowIndex);
-            tableRows--;
+            TypedContent.TableCells.RemoveAt(rowIndex);
+            TypedContent.TableRows--;
+            
+            GenerateTableFromVisual();
         }
     }
 
     private void AddColumn()
     {
         // Ajouter une cellule à chaque ligne
-        for (int i = 0; i < tableRows; i++)
+        for (int i = 0; i < TypedContent.TableRows; i++)
         {
-            tableCells[i].Add($"Cellule {i + 1},{tableColumns + 1}");
+            TypedContent.TableCells[i].Add($"Cellule {i + 1},{TypedContent.TableColumns + 1}");
         }
 
         // Ajouter une cellule d'en-tête
-        headerCells.Add($"Colonne {tableColumns + 1}");
-        tableColumns++;
+        TypedContent.HeaderCells.Add($"Colonne {TypedContent.TableColumns + 1}");
+        TypedContent.TableColumns++;
+        
+        GenerateTableFromVisual();
     }
 
     private void RemoveColumn(int colIndex)
     {
-        if (tableColumns > 1)
+        if (TypedContent.TableColumns > 1)
         {
             // Supprimer la cellule de chaque ligne
-            for (int i = 0; i < tableRows; i++)
+            for (int i = 0; i < TypedContent.TableRows; i++)
             {
-                tableCells[i].RemoveAt(colIndex);
+                TypedContent.TableCells[i].RemoveAt(colIndex);
             }
 
             // Supprimer la cellule d'en-tête
-            headerCells.RemoveAt(colIndex);
-            tableColumns--;
+            TypedContent.HeaderCells.RemoveAt(colIndex);
+            TypedContent.TableColumns--;
+            
+            GenerateTableFromVisual();
         }
     }
 
     private void AddHeader()
     {
-        hasHeader = !hasHeader;
+        TypedContent.HasHeader = !TypedContent.HasHeader;
+        GenerateTableFromVisual();
     }
 
     private void ApplyTableStyle(string style)
     {
-        tableStyle = style;
+        TypedContent.TableStyle = style;
+        GenerateTableFromVisual();
     }
 
     private void GenerateTableFromVisual()
     {
         var tableHtml = new System.Text.StringBuilder();
         tableHtml.AppendLine("<div class=\"table-responsive\">");
-        tableHtml.AppendLine($"<table class=\"{tableStyle}\">");
+        tableHtml.AppendLine($"<table class=\"{TypedContent.TableStyle}\">");
 
         // Ajouter l'en-tête si nécessaire
-        if (hasHeader)
+        if (TypedContent.HasHeader)
         {
             tableHtml.AppendLine("<thead>");
             tableHtml.AppendLine("<tr>");
-            foreach (var header in headerCells)
+            foreach (var header in TypedContent.HeaderCells)
             {
                 tableHtml.AppendLine($"<th>{header}</th>");
             }
@@ -398,12 +444,12 @@
 
         // Ajouter le corps du tableau
         tableHtml.AppendLine("<tbody>");
-        for (int r = 0; r < tableRows; r++)
+        for (int r = 0; r < TypedContent.TableRows; r++)
         {
             tableHtml.AppendLine("<tr>");
-            for (int c = 0; c < tableColumns; c++)
+            for (int c = 0; c < TypedContent.TableColumns; c++)
             {
-                tableHtml.AppendLine($"<td>{tableCells[r][c]}</td>");
+                tableHtml.AppendLine($"<td>{TypedContent.TableCells[r][c]}</td>");
             }
             tableHtml.AppendLine("</tr>");
         }
@@ -411,109 +457,106 @@
         tableHtml.AppendLine("</table>");
         tableHtml.AppendLine("</div>");
 
-        TableContent = tableHtml.ToString();
+        TypedContent.TableContent = tableHtml.ToString();
+    }
+
+    // Parse le contenu HTML existant pour le mode visuel
+    private void ParseExistingTable()
+    {
+        try
+        {
+            // Cette fonction est simplifiée et pourrait être améliorée avec une vraie analyse HTML
+            var content = TypedContent.TableContent.ToLower();
+
+            // Vérifie si le tableau a un en-tête
+            TypedContent.HasHeader = content.Contains("<thead>");
+
+            // Extraire le style du tableau
+            if (content.Contains("table-striped"))
+                TypedContent.TableStyle = "table table-striped";
+            else if (content.Contains("table-bordered"))
+                TypedContent.TableStyle = "table table-bordered";
+            else if (content.Contains("table-hover"))
+                TypedContent.TableStyle = "table table-hover";
+            else if (content.Contains("table-sm"))
+                TypedContent.TableStyle = "table table-sm";
+            else
+                TypedContent.TableStyle = "table";
+        }
+        catch
+        {
+            // En cas d'erreur d'analyse, utiliser la structure par défaut
+            ResetTableStructure();
+        }
     }
 
     private void ResetTableStructure()
     {
-        // Structure de tableau par défaut
-        tableRows = 2;
-        tableColumns = 2;
-        hasHeader = true;
-        tableStyle = "table table-bordered";
-
-        headerCells = new List<string> { "Colonne 1", "Colonne 2" };
-        tableCells = new List<List<string>> {
+        TypedContent.TableRows = 2;
+        TypedContent.TableColumns = 2;
+        TypedContent.HasHeader = true;
+        TypedContent.TableStyle = "table table-bordered";
+        TypedContent.HeaderCells = new List<string> { "Colonne 1", "Colonne 2" };
+        TypedContent.TableCells = new List<List<string>> {
             new List<string> { "Cellule 1,1", "Cellule 1,2" },
             new List<string> { "Cellule 2,1", "Cellule 2,2" }
         };
     }
 
-    private async Task ToggleEdit()
+    private string GetTypeClass()
     {
+        var classList = new List<string>();
+
         if (IsEditing)
         {
-            // Validation avant de sauvegarder
-            if (Block.Title?.Length > 100)
-            {
-                titleError = true;
-                return;
-            }
-
-            // Si on est en mode éditeur riche, récupérer le contenu depuis JS
-            if (editMode == "rich")
-            {
-                TableContent = await EditorService.GetEditorContentAsync(editorId);
-            }
-            // Si on est en mode visuel, générer le HTML
-            else if (editMode == "visual")
-            {
-                GenerateTableFromVisual();
-            }
-
-            // Notifier le parent que le bloc a changé
-            if (OnBlockChanged.HasDelegate)
-            {
-                await OnBlockChanged.InvokeAsync(Block);
-            }
-
-            // Notifier le contexte d'édition si nécessaire
-            EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
-            EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
-
-            IsEditing = false;
+            classList.Add("editing");
         }
-        else
+
+        if (string.IsNullOrEmpty(TypedContent.TableContent))
         {
-            // Sauvegarder l'état original pour permettre d'annuler
-            originalContent = TableContent;
-            originalTitle = Block.Title ?? string.Empty;
-
-            IsEditing = true;
+            classList.Add("empty");
         }
 
-        titleError = false;
-    }
-
-    private async Task CancelEdit()
-    {
-        // Restaurer le contenu original
-        TableContent = originalContent;
-        Block.Title = originalTitle;
-
-        // Nettoyer l'éditeur si nécessaire
-        if (editMode == "rich")
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
-
-        // Re-parser le tableau existant pour le mode visuel
-        ParseExistingTable();
-
-        IsEditing = false;
-
-        // Notifier le contexte d'édition
-        EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
-        EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
+        return string.Join(" ", classList);
     }
 
     private async Task RequestDelete()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer le block tableau ?");
-        if (confirmed && OnDeleteRequested.HasDelegate)
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc tableau ?");
+        if (confirmed)
         {
-            await OnDeleteRequested.InvokeAsync(Block);
+            if (CoursId > 0)
+            {
+                // Supprimer de la base de données
+                bool success = await BlockService.DeleteBlockAsync(Block.Id, CoursId);
+                if (success && OnDeleteRequested.HasDelegate)
+                {
+                    await OnDeleteRequested.InvokeAsync(Block);
+                }
+            }
+            else if (OnDeleteRequested.HasDelegate)
+            {
+                await OnDeleteRequested.InvokeAsync(Block);
+            }
         }
     }
 
     public async ValueTask DisposeAsync()
     {
-        // Nettoyer les ressources lors de la suppression du composant
-        if (editMode == "rich" && IsEditing)
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
+        _originalContent = null;
+        await Task.CompletedTask;
+    }
+
+    // Classe pour contenu spécifique à TableBlock
+    public class TableBlockContent
+    {
+        public string Title { get; set; } = string.Empty;
+        public int TableRows { get; set; } = 2;
+        public int TableColumns { get; set; } = 2;
+        public bool HasHeader { get; set; } = true;
+        public string TableStyle { get; set; } = "table table-bordered";
+        public List<string> HeaderCells { get; set; } = new();
+        public List<List<string>> TableCells { get; set; } = new();
+        public string TableContent { get; set; } = string.Empty;
     }
 }

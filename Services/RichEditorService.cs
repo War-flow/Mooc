@@ -32,5 +32,11 @@ namespace Mooc.Services
         {
             await _jsRuntime.InvokeVoidAsync("setRichEditorReadOnly", elementId, isReadOnly);
         }
+        
+        // Nouvelle méthode pour vérifier si l'éditeur existe
+        public async Task<bool> EditorExistsAsync(string elementId)
+        {
+            return await _jsRuntime.InvokeAsync<bool>("editorExists", elementId);
+        }
     }
 }
