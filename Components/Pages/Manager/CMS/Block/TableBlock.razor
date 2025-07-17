@@ -1,8 +1,14 @@
 ﻿@using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.JSInterop
 @using Mooc.Services
+@using System.Text.RegularExpressions
+@using System.Text.Encodings.Web
+@using System.Text.Json
+@using Microsoft.EntityFrameworkCore
+@using Mooc.Data
 @inject IJSRuntime JSRuntime
 @inject BlockService BlockService
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @implements IAsyncDisposable
 
 <div class="table-block @GetTypeClass()" @attributes="AdditionalAttributes">
@@ -55,11 +61,11 @@
 
                     <div class="table-responsive">
                         <table class="@TypedContent.TableStyle">
-                            @if (TypedContent.HasHeader)
+                            @if (TypedContent.HasHeader && TypedContent.HeaderCells.Count > 0)
                             {
                                 <thead>
                                     <tr>
-                                        @for (int i = 0; i < TypedContent.TableColumns; i++)
+                                        @for (int i = 0; i < TypedContent.TableColumns && i < TypedContent.HeaderCells.Count; i++)
                                         {
                                             int colIndex = i;
                                             <th>
@@ -77,11 +83,11 @@
                                 </thead>
                             }
                             <tbody>
-                                @for (int r = 0; r < TypedContent.TableRows; r++)
+                                @for (int r = 0; r < TypedContent.TableRows && r < TypedContent.TableCells.Count; r++)
                                 {
                                     int rowIndex = r;
                                     <tr>
-                                        @for (int c = 0; c < TypedContent.TableColumns; c++)
+                                        @for (int c = 0; c < TypedContent.TableColumns && c < TypedContent.TableCells[r].Count; c++)
                                         {
                                             int colIndex = c;
                                             <td>
@@ -197,73 +203,152 @@
     private bool showSaveSuccess { get; set; } = false;
     private string? errorMessage;
     private TableBlockContent? _originalContent;
+    private bool _isInitialized = false;
 
     // Propriété de commodité pour accéder au contenu typé
     private TableBlockContent TypedContent => Block.Content as TableBlockContent ?? new TableBlockContent();
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        EnsureContentInitialized();
+        Console.WriteLine($"TableBlock OnInitializedAsync - CoursId: {CoursId}, Block.Id: {Block.Id}");
+        await EnsureContentInitializedAsync();
+        _isInitialized = true;
     }
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
-        EnsureContentInitialized();
+        if (_isInitialized)
+        {
+            Console.WriteLine($"TableBlock OnParametersSetAsync - CoursId: {CoursId}, Block.Id: {Block.Id}");
+            await EnsureContentInitializedAsync();
+        }
     }
 
-    private void EnsureContentInitialized()
+    // Méthode asynchrone pour initialiser le contenu
+    private async Task EnsureContentInitializedAsync()
     {
         if (Block.Content is not TableBlockContent)
         {
-            Block.Content = new TableBlockContent
-            {
-                Title = Block.Title ?? string.Empty,
-                TableRows = 2,
-                TableColumns = 2,
-                HasHeader = true,
-                TableStyle = "table table-bordered",
-                HeaderCells = new List<string> { "Colonne 1", "Colonne 2" },
-                TableCells = new List<List<string>> {
-                    new List<string> { "Cellule 1,1", "Cellule 1,2" },
-                    new List<string> { "Cellule 2,1", "Cellule 2,2" }
-                }
-            };
+            Console.WriteLine("Initialisation d'un nouveau tableau");
             
+            // Vérifier si le bloc existe déjà en base de données
+            if (CoursId > 0)
+            {
+                var existingContent = await LoadBlockContentFromDatabase();
+                if (existingContent != null)
+                {
+                    Console.WriteLine("Contenu trouvé en base de données");
+                    Block.Content = existingContent;
+                    StateHasChanged();
+                    return;
+                }
+            }
+            
+            // Créer un nouveau contenu par défaut
+            Block.Content = CreateDefaultTableContent();
             GenerateTableFromVisual();
         }
-        else if (!string.IsNullOrEmpty(TypedContent.TableContent))
+        else
         {
-            // Essayer de parser le HTML du tableau existant si nécessaire
-            ParseExistingTable();
+            var content = Block.Content as TableBlockContent;
+            if (content != null)
+            {
+                // Vérifier si le contenu HTML existe mais les structures de données sont vides
+                if (!string.IsNullOrEmpty(content.TableContent) && 
+                    (content.TableCells == null || content.TableCells.Count == 0))
+                {
+                    Console.WriteLine("Parse du HTML existant");
+                    ParseExistingTable();
+                }
+                else if (string.IsNullOrEmpty(content.TableContent) && 
+                         (content.TableCells == null || content.TableCells.Count == 0))
+                {
+                    Console.WriteLine("Réinitialisation du tableau");
+                    ResetTableStructure();
+                    GenerateTableFromVisual();
+                }
+                else
+                {
+                    // Vérifier la cohérence des données
+                    ValidateAndFixTableStructure();
+                }
+            }
         }
     }
 
-    private bool IsValid()
+    // Méthode pour charger le contenu du bloc depuis la base de données
+    private async Task<TableBlockContent?> LoadBlockContentFromDatabase()
     {
-        return TypedContent.TableRows > 0 && TypedContent.TableColumns > 0;
+        if (CoursId <= 0) return null;
+
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses.FindAsync(CoursId);
+            
+            if (cours != null && !string.IsNullOrEmpty(cours.Content))
+            {
+                Console.WriteLine($"Contenu trouvé en base: {cours.Content.Substring(0, Math.Min(100, cours.Content.Length))}...");
+                
+                var blocks = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new List<CourBuilder.CoursBlock>();
+                var matchingBlock = blocks.FirstOrDefault(b => b.Id == Block.Id);
+                
+                if (matchingBlock?.Content != null)
+                {
+                    // Convertir le contenu JSON en TableBlockContent
+                    var jsonElement = (JsonElement)matchingBlock.Content;
+                    var tableContent = JsonSerializer.Deserialize<TableBlockContent>(jsonElement.GetRawText());
+                    
+                    Console.WriteLine($"Bloc tableau trouvé - Lignes: {tableContent?.TableRows}, Colonnes: {tableContent?.TableColumns}");
+                    return tableContent;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement depuis la base: {ex.Message}");
+        }
+        
+        return null;
     }
 
-    private bool ValidateBlock()
+    // Méthode pour vérifier la sauvegarde (améliorée)
+    private async Task VerifyDatabaseSave()
     {
-        errorMessage = null;
-        titleError = false;
-
-        if (TypedContent.Title.Length > 100)
+        try
         {
-            titleError = true;
-            errorMessage = "Le titre ne peut pas dépasser 100 caractères";
-            return false;
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses.FindAsync(CoursId);
+            
+            if (cours != null && !string.IsNullOrEmpty(cours.Content))
+            {
+                var blocksFromDb = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new List<CourBuilder.CoursBlock>();
+                var savedBlock = blocksFromDb.FirstOrDefault(b => b.Id == Block.Id);
+                
+                if (savedBlock != null)
+                {
+                    Console.WriteLine($"🔍 VÉRIFICATION: Bloc trouvé en base de données");
+                    Console.WriteLine($"Titre sauvegardé: {savedBlock.Title}");
+                    Console.WriteLine($"Type: {savedBlock.Type}");
+                    Console.WriteLine($"Contenu: {JsonSerializer.Serialize(savedBlock.Content, new JsonSerializerOptions { WriteIndented = true })}");
+                }
+                else
+                {
+                    Console.WriteLine($"⚠️ ATTENTION: Bloc non trouvé en base de données");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"⚠️ ATTENTION: Cours non trouvé ou contenu vide");
+            }
         }
-
-        if (TypedContent.TableRows <= 0 || TypedContent.TableColumns <= 0)
+        catch (Exception ex)
         {
-            errorMessage = "Le tableau doit contenir au moins une ligne et une colonne";
-            return false;
+            Console.WriteLine($"❌ ERREUR lors de la vérification: {ex.Message}");
         }
-
-        return true;
     }
 
+    // Modifier la méthode ToggleEdit pour inclure la vérification
     private async Task ToggleEdit()
     {
         if (IsEditing)
@@ -274,6 +359,7 @@
             try
             {
                 isSaving = true;
+                errorMessage = null;
                 StateHasChanged();
 
                 // Générer le HTML depuis le mode visuel
@@ -283,32 +369,50 @@
                 Block.Title = TypedContent.Title;
                 Block.Content = TypedContent;
                 
-                _originalContent = null;
-                IsEditing = false;
-                
                 // Sauvegarder en base de données si nécessaire
                 if (CoursId > 0)
                 {
+                    Console.WriteLine($"=== DÉBUT SAUVEGARDE ===");
+                    Console.WriteLine($"Bloc ID: {Block.Id}");
+                    Console.WriteLine($"Cours ID: {CoursId}");
+                    Console.WriteLine($"Titre: {TypedContent.Title}");
+                    Console.WriteLine($"Lignes: {TypedContent.TableRows}, Colonnes: {TypedContent.TableColumns}");
+                    Console.WriteLine($"Contenu JSON: {JsonSerializer.Serialize(Block.Content, new JsonSerializerOptions { WriteIndented = true })}");
+                    
                     bool success = await BlockService.SaveBlockAsync(Block, CoursId);
+                    
                     if (!success)
                     {
                         errorMessage = "Erreur lors de la sauvegarde en base de données";
+                        Console.WriteLine("❌ ÉCHEC de la sauvegarde du bloc");
                         return;
                     }
+                    
+                    Console.WriteLine("✅ Bloc sauvegardé avec succès en base de données");
+                    
+                    // Vérifier immédiatement en rechargeant depuis la base
+                    await VerifyDatabaseSave();
+                    Console.WriteLine($"=== FIN SAUVEGARDE ===");
                 }
+                
+                _originalContent = null;
+                IsEditing = false;
                 
                 await OnBlockChanged.InvokeAsync(Block);
                 
                 showSaveSuccess = true;
                 StateHasChanged();
                 
+                // Masquer le message de succès après 2 secondes
                 await Task.Delay(2000);
                 showSaveSuccess = false;
+                StateHasChanged();
             }
             catch (Exception ex)
             {
-                errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
-                Console.WriteLine($"Erreur lors de la sauvegarde: {ex.Message}");
+                errorMessage = $"Erreur lors de la sauvegarde: {ex.Message}";
+                Console.WriteLine($"❌ ERREUR lors de la sauvegarde: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
             }
             finally
             {
@@ -326,8 +430,8 @@
                 TableColumns = TypedContent.TableColumns,
                 HasHeader = TypedContent.HasHeader,
                 TableStyle = TypedContent.TableStyle,
-                HeaderCells = new List<string>(TypedContent.HeaderCells),
-                TableCells = TypedContent.TableCells.Select(row => new List<string>(row)).ToList(),
+                HeaderCells = new List<string>(TypedContent.HeaderCells ?? new List<string>()),
+                TableCells = TypedContent.TableCells?.Select(row => new List<string>(row ?? new List<string>())).ToList() ?? new List<List<string>>(),
                 TableContent = TypedContent.TableContent
             };
             
@@ -369,7 +473,7 @@
 
     private void RemoveRow(int rowIndex)
     {
-        if (TypedContent.TableRows > 1)
+        if (TypedContent.TableRows > 1 && rowIndex < TypedContent.TableCells.Count)
         {
             TypedContent.TableCells.RemoveAt(rowIndex);
             TypedContent.TableRows--;
@@ -381,7 +485,7 @@
     private void AddColumn()
     {
         // Ajouter une cellule à chaque ligne
-        for (int i = 0; i < TypedContent.TableRows; i++)
+        for (int i = 0; i < TypedContent.TableRows && i < TypedContent.TableCells.Count; i++)
         {
             TypedContent.TableCells[i].Add($"Cellule {i + 1},{TypedContent.TableColumns + 1}");
         }
@@ -395,16 +499,22 @@
 
     private void RemoveColumn(int colIndex)
     {
-        if (TypedContent.TableColumns > 1)
+        if (TypedContent.TableColumns > 1 && colIndex < TypedContent.TableColumns)
         {
             // Supprimer la cellule de chaque ligne
-            for (int i = 0; i < TypedContent.TableRows; i++)
+            for (int i = 0; i < TypedContent.TableRows && i < TypedContent.TableCells.Count; i++)
             {
-                TypedContent.TableCells[i].RemoveAt(colIndex);
+                if (colIndex < TypedContent.TableCells[i].Count)
+                {
+                    TypedContent.TableCells[i].RemoveAt(colIndex);
+                }
             }
 
             // Supprimer la cellule d'en-tête
-            TypedContent.HeaderCells.RemoveAt(colIndex);
+            if (colIndex < TypedContent.HeaderCells.Count)
+            {
+                TypedContent.HeaderCells.RemoveAt(colIndex);
+            }
             TypedContent.TableColumns--;
             
             GenerateTableFromVisual();
@@ -414,6 +524,16 @@
     private void AddHeader()
     {
         TypedContent.HasHeader = !TypedContent.HasHeader;
+        
+        // Si on active l'en-tête et qu'il n'y a pas assez de cellules d'en-tête
+        if (TypedContent.HasHeader)
+        {
+            while (TypedContent.HeaderCells.Count < TypedContent.TableColumns)
+            {
+                TypedContent.HeaderCells.Add($"Colonne {TypedContent.HeaderCells.Count + 1}");
+            }
+        }
+        
         GenerateTableFromVisual();
     }
 
@@ -430,13 +550,14 @@
         tableHtml.AppendLine($"<table class=\"{TypedContent.TableStyle}\">");
 
         // Ajouter l'en-tête si nécessaire
-        if (TypedContent.HasHeader)
+        if (TypedContent.HasHeader && TypedContent.HeaderCells?.Count > 0)
         {
             tableHtml.AppendLine("<thead>");
             tableHtml.AppendLine("<tr>");
-            foreach (var header in TypedContent.HeaderCells)
+            for (int i = 0; i < TypedContent.TableColumns && i < TypedContent.HeaderCells.Count; i++)
             {
-                tableHtml.AppendLine($"<th>{header}</th>");
+                var header = TypedContent.HeaderCells[i] ?? string.Empty;
+                tableHtml.AppendLine($"<th>{HtmlEncoder.Default.Encode(header)}</th>");
             }
             tableHtml.AppendLine("</tr>");
             tableHtml.AppendLine("</thead>");
@@ -444,12 +565,13 @@
 
         // Ajouter le corps du tableau
         tableHtml.AppendLine("<tbody>");
-        for (int r = 0; r < TypedContent.TableRows; r++)
+        for (int r = 0; r < TypedContent.TableRows && r < TypedContent.TableCells.Count; r++)
         {
             tableHtml.AppendLine("<tr>");
-            for (int c = 0; c < TypedContent.TableColumns; c++)
+            for (int c = 0; c < TypedContent.TableColumns && c < TypedContent.TableCells[r].Count; c++)
             {
-                tableHtml.AppendLine($"<td>{TypedContent.TableCells[r][c]}</td>");
+                var cellValue = TypedContent.TableCells[r][c] ?? string.Empty;
+                tableHtml.AppendLine($"<td>{HtmlEncoder.Default.Encode(cellValue)}</td>");
             }
             tableHtml.AppendLine("</tr>");
         }
@@ -460,32 +582,114 @@
         TypedContent.TableContent = tableHtml.ToString();
     }
 
-    // Parse le contenu HTML existant pour le mode visuel
+    // Méthode complètement refactorisée pour le parsing HTML
     private void ParseExistingTable()
     {
         try
         {
-            // Cette fonction est simplifiée et pourrait être améliorée avec une vraie analyse HTML
-            var content = TypedContent.TableContent.ToLower();
+            Console.WriteLine($"Parsing HTML: {TypedContent.TableContent?.Substring(0, Math.Min(200, TypedContent.TableContent?.Length ?? 0))}...");
+            
+            if (string.IsNullOrEmpty(TypedContent.TableContent))
+            {
+                ResetTableStructure();
+                return;
+            }
 
-            // Vérifie si le tableau a un en-tête
+            var content = TypedContent.TableContent;
+            
+            // Nettoyer le contenu HTML des retours à la ligne et espaces supplémentaires
+            content = Regex.Replace(content, @"\s+", " ");
+            content = content.Replace("\n", "").Replace("\r", "");
+
+            // Vérifier si le tableau a un en-tête
             TypedContent.HasHeader = content.Contains("<thead>");
 
             // Extraire le style du tableau
-            if (content.Contains("table-striped"))
-                TypedContent.TableStyle = "table table-striped";
-            else if (content.Contains("table-bordered"))
-                TypedContent.TableStyle = "table table-bordered";
-            else if (content.Contains("table-hover"))
-                TypedContent.TableStyle = "table table-hover";
-            else if (content.Contains("table-sm"))
-                TypedContent.TableStyle = "table table-sm";
+            var tableMatch = Regex.Match(content, @"<table[^>]*class=""([^""]*)"">", RegexOptions.IgnoreCase);
+            if (tableMatch.Success)
+            {
+                TypedContent.TableStyle = tableMatch.Groups[1].Value;
+            }
             else
-                TypedContent.TableStyle = "table";
+            {
+                TypedContent.TableStyle = "table table-bordered";
+            }
+
+            // Initialiser les listes
+            TypedContent.HeaderCells = new List<string>();
+            TypedContent.TableCells = new List<List<string>>();
+
+            // Parser les en-têtes si présents
+            if (TypedContent.HasHeader)
+            {
+                var theadMatch = Regex.Match(content, @"<thead[^>]*>(.*?)</thead>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                if (theadMatch.Success)
+                {
+                    var headerMatches = Regex.Matches(theadMatch.Groups[1].Value, @"<th[^>]*>(.*?)</th>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    foreach (Match match in headerMatches)
+                    {
+                        var headerText = System.Net.WebUtility.HtmlDecode(match.Groups[1].Value.Trim());
+                        TypedContent.HeaderCells.Add(headerText);
+                    }
+                }
+            }
+
+            // Parser le corps du tableau
+            var tbodyMatch = Regex.Match(content, @"<tbody[^>]*>(.*?)</tbody>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            string bodyContent = tbodyMatch.Success ? tbodyMatch.Groups[1].Value : content;
+
+            // Parser les lignes
+            var rowMatches = Regex.Matches(bodyContent, @"<tr[^>]*>(.*?)</tr>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            foreach (Match rowMatch in rowMatches)
+            {
+                var row = new List<string>();
+                var cellMatches = Regex.Matches(rowMatch.Groups[1].Value, @"<td[^>]*>(.*?)</td>", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                
+                foreach (Match cellMatch in cellMatches)
+                {
+                    var cellText = System.Net.WebUtility.HtmlDecode(cellMatch.Groups[1].Value.Trim());
+                    row.Add(cellText);
+                }
+                
+                if (row.Count > 0)
+                {
+                    TypedContent.TableCells.Add(row);
+                }
+            }
+
+            // Déterminer les dimensions
+            TypedContent.TableRows = TypedContent.TableCells.Count;
+            if (TypedContent.TableCells.Count > 0)
+            {
+                TypedContent.TableColumns = TypedContent.TableCells.Max(row => row.Count);
+            }
+            else if (TypedContent.HeaderCells.Count > 0)
+            {
+                TypedContent.TableColumns = TypedContent.HeaderCells.Count;
+            }
+            else
+            {
+                TypedContent.TableColumns = 2;
+            }
+
+            // Si pas d'en-tête mais on a des colonnes, créer des en-têtes par défaut
+            if (!TypedContent.HasHeader || TypedContent.HeaderCells.Count == 0)
+            {
+                TypedContent.HeaderCells.Clear();
+                for (int i = 0; i < TypedContent.TableColumns; i++)
+                {
+                    TypedContent.HeaderCells.Add($"Colonne {i + 1}");
+                }
+            }
+
+            // Valider et corriger la structure
+            ValidateAndFixTableStructure();
+
+            Console.WriteLine($"Parsing terminé - Lignes: {TypedContent.TableRows}, Colonnes: {TypedContent.TableColumns}");
         }
-        catch
+        catch (Exception ex)
         {
-            // En cas d'erreur d'analyse, utiliser la structure par défaut
+            Console.WriteLine($"Erreur lors du parsing du tableau: {ex.Message}");
             ResetTableStructure();
         }
     }
@@ -545,6 +749,167 @@
     {
         _originalContent = null;
         await Task.CompletedTask;
+    }
+
+    // **MÉTHODES MANQUANTES AJOUTÉES**
+
+    // Méthode pour valider le bloc avant sauvegarde
+    private bool IsValid()
+    {
+        // Vérifier le titre
+        if (!string.IsNullOrEmpty(TypedContent.Title) && TypedContent.Title.Length > 100)
+        {
+            titleError = true;
+            return false;
+        }
+        
+        titleError = false;
+        
+        // Vérifier la structure du tableau
+        if (TypedContent.TableRows < 1 || TypedContent.TableColumns < 1)
+        {
+            return false;
+        }
+        
+        // Vérifier que le tableau a du contenu
+        if (TypedContent.TableCells == null || TypedContent.TableCells.Count == 0)
+        {
+            return false;
+        }
+        
+        return true;
+    }
+
+    // Méthode pour valider le bloc de manière plus approfondie
+    private bool ValidateBlock()
+    {
+        try
+        {
+            // Vérifier que le contenu est cohérent
+            if (TypedContent.TableCells == null)
+            {
+                return false;
+            }
+            
+            // Vérifier que chaque ligne a le bon nombre de colonnes
+            foreach (var row in TypedContent.TableCells)
+            {
+                if (row == null || row.Count != TypedContent.TableColumns)
+                {
+                    return false;
+                }
+            }
+            
+            // Vérifier les en-têtes si présents
+            if (TypedContent.HasHeader && TypedContent.HeaderCells.Count != TypedContent.TableColumns)
+            {
+                return false;
+            }
+            
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la validation: {ex.Message}");
+            return false;
+        }
+    }
+
+    // Méthode pour créer un contenu de tableau par défaut
+    private TableBlockContent CreateDefaultTableContent()
+    {
+        return new TableBlockContent
+        {
+            Title = string.Empty,
+            TableRows = 2,
+            TableColumns = 2,
+            HasHeader = true,
+            TableStyle = "table table-bordered",
+            HeaderCells = new List<string> { "Colonne 1", "Colonne 2" },
+            TableCells = new List<List<string>> {
+                new List<string> { "Cellule 1,1", "Cellule 1,2" },
+                new List<string> { "Cellule 2,1", "Cellule 2,2" }
+            },
+            TableContent = string.Empty
+        };
+    }
+
+    // Méthode pour valider et corriger la structure du tableau
+    private void ValidateAndFixTableStructure()
+    {
+        try
+        {
+            // Initialiser les listes si elles sont nulles
+            if (TypedContent.HeaderCells == null)
+            {
+                TypedContent.HeaderCells = new List<string>();
+            }
+            
+            if (TypedContent.TableCells == null)
+            {
+                TypedContent.TableCells = new List<List<string>>();
+            }
+            
+            // Corriger les dimensions si nécessaire
+            if (TypedContent.TableRows < 1) TypedContent.TableRows = 1;
+            if (TypedContent.TableColumns < 1) TypedContent.TableColumns = 1;
+            
+            // Ajuster les en-têtes pour correspondre au nombre de colonnes
+            while (TypedContent.HeaderCells.Count < TypedContent.TableColumns)
+            {
+                TypedContent.HeaderCells.Add($"Colonne {TypedContent.HeaderCells.Count + 1}");
+            }
+            while (TypedContent.HeaderCells.Count > TypedContent.TableColumns)
+            {
+                TypedContent.HeaderCells.RemoveAt(TypedContent.HeaderCells.Count - 1);
+            }
+            
+            // Ajuster les lignes pour correspondre au nombre de lignes
+            while (TypedContent.TableCells.Count < TypedContent.TableRows)
+            {
+                var newRow = new List<string>();
+                for (int i = 0; i < TypedContent.TableColumns; i++)
+                {
+                    newRow.Add($"Cellule {TypedContent.TableCells.Count + 1},{i + 1}");
+                }
+                TypedContent.TableCells.Add(newRow);
+            }
+            while (TypedContent.TableCells.Count > TypedContent.TableRows)
+            {
+                TypedContent.TableCells.RemoveAt(TypedContent.TableCells.Count - 1);
+            }
+            
+            // Ajuster chaque ligne pour correspondre au nombre de colonnes
+            for (int r = 0; r < TypedContent.TableCells.Count; r++)
+            {
+                if (TypedContent.TableCells[r] == null)
+                {
+                    TypedContent.TableCells[r] = new List<string>();
+                }
+                
+                while (TypedContent.TableCells[r].Count < TypedContent.TableColumns)
+                {
+                    TypedContent.TableCells[r].Add($"Cellule {r + 1},{TypedContent.TableCells[r].Count + 1}");
+                }
+                while (TypedContent.TableCells[r].Count > TypedContent.TableColumns)
+                {
+                    TypedContent.TableCells[r].RemoveAt(TypedContent.TableCells[r].Count - 1);
+                }
+            }
+            
+            // Vérifier le style du tableau
+            if (string.IsNullOrEmpty(TypedContent.TableStyle))
+            {
+                TypedContent.TableStyle = "table table-bordered";
+            }
+            
+            Console.WriteLine($"Structure validée - Lignes: {TypedContent.TableRows}, Colonnes: {TypedContent.TableColumns}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la validation de la structure: {ex.Message}");
+            ResetTableStructure();
+        }
     }
 
     // Classe pour contenu spécifique à TableBlock

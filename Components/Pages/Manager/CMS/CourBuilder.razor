@@ -27,17 +27,16 @@
     @foreach (var block in Blocks)
     {
         <div class="mb-3 cours-block @(block == SelectedBlock ? "block-selected" : "")" @onclick="() => SelectBlock(block)">
-            <DynamicComponent Type="@GetBlockComponent(block.Type)" Parameters="@(new Dictionary<string, object>
-                                                            {
-                                                                ["Block"] = block,
-                                                                ["OnBlockChanged"] = EventCallback.Factory.Create<CoursBlock>(this, () => StateHasChanged()),
-                                                                ["OnDeleteRequested"] = EventCallback.Factory.Create<CoursBlock>(this, (b) => RemoveBlock(b))
-                                                            })" />
+            <DynamicComponent Type="@GetBlockComponent(block.Type)" Parameters="@GetBlockParameters(block)" />
         </div>
     }
 </div>
 
 @code {
+    // Ajout du paramètre CoursId
+    [Parameter]
+    public int CoursId { get; set; }
+
     // Modifiez la définition de CoursBlock pour garantir que les propriétés sont initialisées
     public class CoursBlock
     {
@@ -54,17 +53,35 @@
         public string? QuizId { get; set; }
         public string? Url { get; set; }
         public string? FileUrl { get; set; }
-        public List<string> FileUrls { get; set; } = new(); // ✅ Ajout de l'initialisation manquante
+        public List<string> FileUrls { get; set; } = new();
     }
 
     private List<CoursBlock> Blocks { get; set; } = new();
     
-    // Ajouter la propriété SelectedBlock et son événement
     [Parameter]
     public CoursBlock? SelectedBlock { get; set; }
 
     [Parameter]
     public EventCallback<CoursBlock?> SelectedBlockChanged { get; set; }
+
+    // Méthode pour créer les paramètres du bloc avec CoursId
+    private Dictionary<string, object> GetBlockParameters(CoursBlock block)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            ["Block"] = block,
+            ["OnBlockChanged"] = EventCallback.Factory.Create<CoursBlock>(this, () => StateHasChanged()),
+            ["OnDeleteRequested"] = EventCallback.Factory.Create<CoursBlock>(this, (b) => RemoveBlock(b))
+        };
+
+        // Ajouter CoursId seulement si c'est un bloc qui en a besoin
+        if (block.Type == "tableau" || block.Type == "texte" || block.Type == "quiz")
+        {
+            parameters["CoursId"] = CoursId;
+        }
+
+        return parameters;
+    }
 
     // Méthode pour sélectionner un bloc
     private async Task SelectBlock(CoursBlock block)
@@ -80,8 +97,8 @@
         var newBlock = new CoursBlock { 
             Type = type, 
             Order = order, 
-            Title = string.Empty,  // Initialiser Title avec une chaîne vide
-            Text = string.Empty    // Initialiser Text avec une chaîne vide
+            Title = string.Empty,
+            Text = string.Empty
         };
         
         Blocks.Add(newBlock);
@@ -90,14 +107,12 @@
         SelectedBlock = newBlock;
         SelectedBlockChanged.InvokeAsync(newBlock);
         
-        // Utilisez InvokeAsync pour éviter les problèmes de rendu
         InvokeAsync(() => StateHasChanged());
     }
 
     // Méthode pour supprimer un bloc
     public void RemoveBlock(CoursBlock block)
     {
-        // Si le bloc supprimé est sélectionné, désélectionnez-le
         if (block == SelectedBlock)
         {
             SelectedBlock = null;
@@ -105,7 +120,6 @@
         }
         
         Blocks.Remove(block);
-        // Réordonner les blocs restants
         for (int i = 0; i < Blocks.Count; i++)
         {
             Blocks[i].Order = i + 1;
@@ -141,13 +155,13 @@
         }
     }
 
-    // Méthode pour obtenir la liste des blocs (pour sauvegarder dans la base de données)
+    // Méthode pour obtenir la liste des blocs
     public List<CoursBlock> GetBlocks()
     {
         return Blocks;
     }
 
-    // Méthode pour définir les blocs (lors du chargement depuis la base de données)
+    // Méthode pour définir les blocs
     public void SetBlocks(List<CoursBlock> blocks)
     {
         if (blocks == null)
@@ -160,13 +174,10 @@
         
         try
         {
-            // Videz d'abord la liste existante
             Blocks.Clear();
             
-            // Ensuite ajoutez tous les blocs dans l'ordre
             foreach (var block in blocks.OrderBy(b => b.Order))
             {
-                // ✅ S'assurer que FileUrls est initialisée pour les blocs chargés
                 if (block.FileUrls == null)
                 {
                     block.FileUrls = new List<string>();

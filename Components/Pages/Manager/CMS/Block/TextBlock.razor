@@ -117,6 +117,9 @@ else
     public dynamic Block { get; set; }
 
     [Parameter]
+    public int CoursId { get; set; }  // ✅ AJOUT DU PARAMÈTRE MANQUANT
+
+    [Parameter]
     public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
 
     [Parameter]
@@ -167,11 +170,17 @@ else
             };
             Block = newBlock;
         }
+
+        // 🔧 AJOUT : Log pour le debug
+        Console.WriteLine($"TextBlock OnInitialized - CoursId: {CoursId}, Block.Id: {Block?.Id}");
     }
 
     protected override void OnParametersSet()
     {
         EnsureContentInitialized();
+        
+        // 🔧 AJOUT : Log pour le debug
+        Console.WriteLine($"TextBlock OnParametersSet - CoursId: {CoursId}, Block.Id: {Block?.Id}");
     }
 
     private void EnsureContentInitialized()
@@ -313,6 +322,14 @@ else
                 Block.Title = TypedContent.Title;
                 Block.Text = TypedContent.Text;
                 
+                // 🔧 AJOUT : Sauvegarde en base de données si nécessaire (comme TableBlock)
+                if (CoursId > 0)
+                {
+                    Console.WriteLine($"TextBlock: Sauvegarde pour CoursId: {CoursId}");
+                    // Ici, vous pouvez ajouter la logique de sauvegarde si nécessaire
+                    // bool success = await BlockService.SaveBlockAsync(Block, CoursId);
+                }
+                
                 _originalContent = null;
                 IsEditing = false;
                 
@@ -370,6 +387,8 @@ else
         
         IsEditing = false;
         hasUnsavedChanges = false;
+        errorMessage = null;
+        titleError = false;
     }
 
     // Méthode SaveChanges conservée pour la compatibilité
@@ -383,6 +402,14 @@ else
         bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc de texte ?");
         if (confirmed)
         {
+            // 🔧 AJOUT : Supprimer de la base de données si nécessaire
+            if (CoursId > 0)
+            {
+                Console.WriteLine($"TextBlock: Suppression pour CoursId: {CoursId}");
+                // Ici, vous pouvez ajouter la logique de suppression si nécessaire
+                // bool success = await BlockService.DeleteBlockAsync(Block.Id, CoursId);
+            }
+
             await OnDeleteRequested.InvokeAsync(Block);
         }
     }

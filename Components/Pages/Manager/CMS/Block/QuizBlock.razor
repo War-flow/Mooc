@@ -41,13 +41,7 @@
                     <InputTextArea class="form-control" @bind-Value="QuizData.Question" rows="3"
                                    placeholder="Saisissez votre question..." />
                 }
-                <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox" id="@useRichEditorId"
-                           @onchange="ToggleRichEditor" checked="@useRichEditor" />
-                    <label class="form-check-label" for="@useRichEditorId">
-                        Utiliser l'éditeur riche
-                    </label>
-                </div>
+
             </div>
 
             <div class="mb-3">
@@ -56,127 +50,57 @@
                     <option value="multiple-choice">Choix multiple (une seule réponse)</option>
                     <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
                     <option value="true-false">Vrai/Faux</option>
-                    <option value="text">Réponse libre</option>
                 </InputSelect>
             </div>
 
-            @if (QuizData.Type != "text")
-            {
-                <div class="mb-3">
-                    <label class="form-label">
-                        Réponses
+            <div class="mb-3">
+                <label class="form-label">
+                    Réponses
+                    @if (QuizData.Type == "multiple-select")
+                    {
+                        <small class="text-muted">(Cochez les bonnes réponses)</small>
+                    }
+                    else
+                    {
+                        <small class="text-muted">(Sélectionnez la bonne réponse)</small>
+                    }
+                </label>
+
+                @for (int i = 0; i < QuizData.Options.Count; i++)
+                {
+                    var index = i;
+                    <div class="input-group mb-2">
                         @if (QuizData.Type == "multiple-select")
                         {
-                            <small class="text-muted">(Cochez les bonnes réponses)</small>
-                        }
-                        else
-                        {
-                            <small class="text-muted">(Sélectionnez la bonne réponse)</small>
-                        }
-                    </label>
-
-                    @for (int i = 0; i < QuizData.Options.Count; i++)
-                    {
-                        var index = i;
-                        <div class="input-group mb-2">
-                            @if (QuizData.Type == "multiple-select")
-                            {
-                                <div class="input-group-text">
-                                    <input class="form-check-input" type="checkbox"
-                                           checked="@QuizData.Options[index].IsCorrect"
-                                           @onchange="@(e => QuizData.Options[index].IsCorrect = (bool)e.Value!)" />
-                                </div>
-                            }
-                            else
-                            {
-                                <div class="input-group-text">
-                                    <input class="form-check-input" type="radio" name="correct-answer-@Block.Order"
-                                           checked="@QuizData.Options[index].IsCorrect"
-                                           @onchange="@(e => SetSingleCorrectAnswer(index))" />
-                                </div>
-                            }
-                            <InputText class="form-control" @bind-Value="QuizData.Options[index].Text"
-                                       placeholder="@($"Option {index + 1}")" />
-                            <button type="button" class="btn btn-outline-danger"
-                                    @onclick="() => RemoveOption(index)"
-                                    disabled="@(QuizData.Options.Count <= GetMinimumOptions())">
-                                <i class="bi bi-trash"></i>
-                            </button>
-                        </div>
-                    }
-
-                    <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddOption"
-                            disabled="@(QuizData.Options.Count >= 6)">
-                        <i class="bi bi-plus"></i> Ajouter une option
-                    </button>
-                </div>
-            }
-
-            @if (QuizData.Type == "text")
-            {
-                <div class="mb-3">
-                    <label class="form-label">Mode de validation</label>
-                    <InputSelect class="form-select" @bind-Value="QuizData.TextValidationMode">
-                        <option value="none">Aucune validation automatique</option>
-                        <option value="exact">Correspondance exacte</option>
-                        <option value="contains">Contient les mots-clés</option>
-                        <option value="regex">Expression régulière</option>
-                        <option value="multiple">Plusieurs réponses possibles</option>
-                    </InputSelect>
-                </div>
-
-                @if (QuizData.TextValidationMode != "none")
-                {
-                    <div class="mb-3">
-                        <label class="form-label">
-                            @GetValidationLabel()
-                        </label>
-                        @if (QuizData.TextValidationMode == "multiple")
-                        {
-                            <div class="mb-2">
-                                @for (int i = 0; i < QuizData.AcceptableAnswers.Count; i++)
-                                {
-                                    var index = i;
-                                    <div class="input-group mb-2">
-                                        <InputText class="form-control" @bind-Value="QuizData.AcceptableAnswers[index]"
-                                                   placeholder="@($"Réponse acceptable {index + 1}")" />
-                                        <button type="button" class="btn btn-outline-danger"
-                                                @onclick="() => RemoveAcceptableAnswer(index)"
-                                                disabled="@(QuizData.AcceptableAnswers.Count <= 1)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
-                                }
-                                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddAcceptableAnswer"
-                                        disabled="@(QuizData.AcceptableAnswers.Count >= 10)">
-                                    <i class="bi bi-plus"></i> Ajouter une réponse
-                                </button>
+                            <div class="input-group-text">
+                                <input class="form-check-input" type="checkbox"
+                                       checked="@QuizData.Options[index].IsCorrect"
+                                       @onchange="@(e => QuizData.Options[index].IsCorrect = (bool)e.Value!)" />
                             </div>
                         }
                         else
                         {
-                            <InputTextArea class="form-control" @bind-Value="QuizData.ExpectedAnswer" rows="2"
-                                           placeholder="@GetValidationPlaceholder()" />
+                            <div class="input-group-text">
+                                <input class="form-check-input" type="radio" name="correct-answer-@Block.Order"
+                                       checked="@QuizData.Options[index].IsCorrect"
+                                       @onchange="@(e => SetSingleCorrectAnswer(index))" />
+                            </div>
                         }
-
-                        @if (QuizData.TextValidationMode == "regex")
-                        {
-                            <small class="form-text text-muted">
-                                Exemple: <code>^(oui|yes|si)$</code> pour accepter "oui", "yes" ou "si"
-                            </small>
-                        }
+                        <InputText class="form-control" @bind-Value="QuizData.Options[index].Text"
+                                   placeholder="@($"Option {index + 1}")" />
+                        <button type="button" class="btn btn-outline-danger"
+                                @onclick="() => RemoveOption(index)"
+                                disabled="@(QuizData.Options.Count <= GetMinimumOptions())">
+                            <i class="bi bi-trash"></i>
+                        </button>
                     </div>
                 }
 
-                <div class="mb-3">
-                    <div class="form-check">
-                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.CaseSensitive" id="@caseSensitiveId" />
-                        <label class="form-check-label" for="@caseSensitiveId">
-                            Respecter la casse (majuscules/minuscules)
-                        </label>
-                    </div>
-                </div>
-            }
+                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddOption"
+                        disabled="@(QuizData.Options.Count >= 6)">
+                    <i class="bi bi-plus"></i> Ajouter une option
+                </button>
+            </div>
 
             <div class="mb-3">
                 <label class="form-label">Explication (optionnel)</label>
@@ -205,46 +129,36 @@
                     <strong>@((MarkupString)QuizData.Question)</strong>
                 </div>
 
-                @if (QuizData.Type != "text")
-                {
-                    <div class="options mb-3">
-                        @for (int i = 0; i < QuizData.Options.Count; i++)
-                        {
-                            var index = i;
-                            <div class="form-check">
-                                @if (QuizData.Type == "multiple-select")
+                <div class="options mb-3">
+                    @for (int i = 0; i < QuizData.Options.Count; i++)
+                    {
+                        var index = i;
+                        <div class="form-check">
+                            @if (QuizData.Type == "multiple-select")
+                            {
+                                <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
+                                       disabled="@IsAnswered" @bind="UserAnswers[index]" />
+                            }
+                            else
+                            {
+                                <input class="form-check-input" type="radio" name="quiz-@Block.Order"
+                                       id="option-@Block.Order-@index" value="@index"
+                                       disabled="@IsAnswered" @onchange="@(e => SetUserAnswer(index))" />
+                            }
+                            <label class="form-check-label @GetOptionClass(index)" for="option-@Block.Order-@index">
+                                @QuizData.Options[index].Text
+                                @if (IsAnswered && QuizData.Options[index].IsCorrect)
                                 {
-                                    <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
-                                           disabled="@IsAnswered" @bind="UserAnswers[index]" />
+                                    <i class="bi bi-check-circle-fill text-success ms-2"></i>
                                 }
-                                else
+                                else if (IsAnswered && UserAnswers[index] && !QuizData.Options[index].IsCorrect)
                                 {
-                                    <input class="form-check-input" type="radio" name="quiz-@Block.Order"
-                                           id="option-@Block.Order-@index" value="@index"
-                                           disabled="@IsAnswered" @onchange="@(e => SetUserAnswer(index))" />
+                                    <i class="bi bi-x-circle-fill text-danger ms-2"></i>
                                 }
-                                <label class="form-check-label @GetOptionClass(index)" for="option-@Block.Order-@index">
-                                    @QuizData.Options[index].Text
-                                    @if (IsAnswered && QuizData.Options[index].IsCorrect)
-                                    {
-                                        <i class="bi bi-check-circle-fill text-success ms-2"></i>
-                                    }
-                                    else if (IsAnswered && UserAnswers[index] && !QuizData.Options[index].IsCorrect)
-                                    {
-                                        <i class="bi bi-x-circle-fill text-danger ms-2"></i>
-                                    }
-                                </label>
-                            </div>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <div class="mb-3">
-                        <InputTextArea class="form-control" @bind-Value="UserTextAnswer" rows="3"
-                                       disabled="@IsAnswered" placeholder="Votre réponse..." />
-                    </div>
-                }
+                            </label>
+                        </div>
+                    }
+                </div>
 
                 <div class="quiz-actions mb-3">
                     @if (!IsAnswered)
@@ -348,14 +262,12 @@
 
     // Propriétés calculées pour les IDs
     private string showFeedbackId => $"showFeedback-{Block.Order}";
-    private string caseSensitiveId => $"caseSensitive-{Block.Order}";
     private string useRichEditorId => $"useRichEditor-{Block.Order}";
 
     // État du quiz
     private bool IsAnswered { get; set; } = false;
     private bool? IsCorrect { get; set; } = null;
     private List<bool> UserAnswers { get; set; } = new();
-    private string UserTextAnswer { get; set; } = string.Empty;
     private string ValidationMessage { get; set; } = string.Empty;
 
     // Structure des données du quiz
@@ -367,11 +279,7 @@
         public string Question { get; set; } = string.Empty;
         public string Type { get; set; } = "multiple-choice";
         public List<QuizOption> Options { get; set; } = new();
-        public string ExpectedAnswer { get; set; } = string.Empty;
         public string Explanation { get; set; } = string.Empty;
-        public string TextValidationMode { get; set; } = "none";
-        public List<string> AcceptableAnswers { get; set; } = new();
-        public bool CaseSensitive { get; set; } = false;
         public bool ShowValidationFeedback { get; set; } = true;
 
         public QuizStructure()
@@ -379,7 +287,6 @@
             // Initialiser avec 2 options par défaut
             Options.Add(new QuizOption { Text = "", IsCorrect = false });
             Options.Add(new QuizOption { Text = "", IsCorrect = false });
-            AcceptableAnswers.Add("");
         }
     }
 
@@ -415,12 +322,6 @@
             if (!string.IsNullOrEmpty(Block.Content?.ToString()))
             {
                 QuizData = System.Text.Json.JsonSerializer.Deserialize<QuizStructure>(Block.Content.ToString()) ?? new QuizStructure();
-
-                // Assurer la compatibilité avec les anciens quizzes
-                if (QuizData.AcceptableAnswers == null || !QuizData.AcceptableAnswers.Any())
-                {
-                    QuizData.AcceptableAnswers = new List<string> { QuizData.ExpectedAnswer ?? "" };
-                }
             }
         }
         catch
@@ -479,29 +380,6 @@
         return QuizData.Type == "true-false" ? 2 : 2;
     }
 
-    private string GetValidationLabel()
-    {
-        return QuizData.TextValidationMode switch
-        {
-            "exact" => "Réponse exacte attendue",
-            "contains" => "Mots-clés requis (séparés par des virgules)",
-            "regex" => "Expression régulière",
-            "multiple" => "Réponses acceptables",
-            _ => "Réponse attendue"
-        };
-    }
-
-    private string GetValidationPlaceholder()
-    {
-        return QuizData.TextValidationMode switch
-        {
-            "exact" => "Réponse exacte...",
-            "contains" => "mot1, mot2, mot3...",
-            "regex" => "^(réponse1|réponse2)$",
-            _ => "Réponse type..."
-        };
-    }
-
     private void OnQuizTypeChanged(ChangeEventArgs e)
     {
         QuizData.Type = e.Value?.ToString() ?? "multiple-choice";
@@ -529,7 +407,7 @@
             }
 
             // Validation des options pour s'assurer qu'au moins une réponse correcte existe
-            if (QuizData.Type != "text" && !QuizData.Options.Any(o => o.IsCorrect))
+            if (!QuizData.Options.Any(o => o.IsCorrect))
             {
                 await JSRuntime.InvokeVoidAsync("alert", "Veuillez sélectionner au moins une réponse correcte.");
                 return;
@@ -560,28 +438,6 @@
 
         titleError = false;
         IsEditing = !IsEditing;
-    }
-
-    private async Task ToggleRichEditor()
-    {
-        useRichEditor = !useRichEditor;
-
-        if (IsEditing)
-        {
-            if (useRichEditor)
-            {
-                await EditorService.InitializeEditorAsync(editorId, QuizData.Question);
-                EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-            }
-            else
-            {
-                QuizData.Question = await EditorService.GetEditorContentAsync(editorId);
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
-            }
-        }
-
-        StateHasChanged();
     }
 
     private async Task CancelEdit()
@@ -650,23 +506,6 @@
         }
     }
 
-    // Méthodes pour gérer les réponses acceptables (texte libre)
-    private void AddAcceptableAnswer()
-    {
-        if (QuizData.AcceptableAnswers.Count < 10)
-        {
-            QuizData.AcceptableAnswers.Add("");
-        }
-    }
-
-    private void RemoveAcceptableAnswer(int index)
-    {
-        if (QuizData.AcceptableAnswers.Count > 1)
-        {
-            QuizData.AcceptableAnswers.RemoveAt(index);
-        }
-    }
-
     // Méthodes pour gérer les réponses utilisateur
     private void SetUserAnswer(int index)
     {
@@ -680,64 +519,7 @@
 
     private void SubmitAnswer()
     {
-        // Validation pour les réponses texte
-        if (QuizData.Type == "text" && QuizData.TextValidationMode != "none")
-        {
-            string userResponse = UserTextAnswer.Trim();
-            ValidationMessage = string.Empty;
-
-            // Correspondance exacte
-            if (QuizData.TextValidationMode == "exact" && userResponse.Equals(QuizData.ExpectedAnswer.Trim(), StringComparison.OrdinalIgnoreCase))
-            {
-                IsCorrect = true;
-                return;
-            }
-
-            // Expressions régulières
-            if (QuizData.TextValidationMode == "regex")
-            {
-                try
-                {
-                    var regex = new System.Text.RegularExpressions.Regex(QuizData.AcceptableAnswers.First());
-                    if (regex.IsMatch(userResponse))
-                    {
-                        IsCorrect = true;
-                        return;
-                    }
-                }
-                catch
-                {
-                    ValidationMessage = "Expression régulière invalide.";
-                }
-            }
-
-            // Vérification des mots-clés
-            if (QuizData.TextValidationMode == "contains")
-            {
-                var keywords = QuizData.AcceptableAnswers.First().Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
-                if (keywords.All(kw => userResponse.Contains(kw.Trim(), StringComparison.OrdinalIgnoreCase)))
-                {
-                    IsCorrect = true;
-                    return;
-                }
-            }
-
-            // Réponses multiples (texte libre)
-            if (QuizData.TextValidationMode == "multiple")
-            {
-                if (QuizData.AcceptableAnswers.Any(answer => answer.Trim().Equals(userResponse, StringComparison.OrdinalIgnoreCase)))
-                {
-                    IsCorrect = true;
-                    return;
-                }
-            }
-
-            IsCorrect = false;
-        }
-        else
-        {
-            IsCorrect = QuizData.Options.Any(o => o.IsCorrect && UserAnswers[QuizData.Options.IndexOf(o)]);
-        }
+        IsCorrect = QuizData.Options.Any(o => o.IsCorrect && UserAnswers[QuizData.Options.IndexOf(o)]);
 
         // Afficher le message de validation si l'option est activée
         if (QuizData.ShowValidationFeedback)
@@ -753,11 +535,6 @@
         IsAnswered = false;
         IsCorrect = null;
         UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
-
-        if (QuizData.Type == "text" && QuizData.TextValidationMode != "none")
-        {
-            UserTextAnswer = string.Empty;
-        }
     }
 
     public async ValueTask DisposeAsync()
@@ -771,13 +548,6 @@
 
     private bool HasUserAnswer()
     {
-        if (QuizData.Type == "text")
-        {
-            return !string.IsNullOrWhiteSpace(UserTextAnswer);
-        }
-        else
-        {
-            return UserAnswers != null && UserAnswers.Any(a => a);
-        }
+        return UserAnswers != null && UserAnswers.Any(a => a);
     }
 }
