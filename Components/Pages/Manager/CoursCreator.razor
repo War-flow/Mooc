@@ -118,22 +118,30 @@
             <div class="card-body">
                 <!-- Boutons flottants -->
                 <div class="floating-buttons">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MoveSelectedBlockUp" title="Déplacer le bloc sélectionné vers le haut">
+                    <button type="button" class="btn" @onclick="MoveSelectedBlockUp" title="Déplacer le bloc sélectionné vers le haut">
                         <i class="bi bi-arrow-up"></i> Monter le bloc
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="MoveSelectedBlockDown" title="Déplacer le bloc sélectionné vers le bas">
+
+                    <button type="button" class="btn" @onclick="MoveSelectedBlockDown" title="Déplacer le bloc sélectionné vers le bas">
                         <i class="bi bi-arrow-down"></i> Descendre le bloc
+                    </button>
+
+                    <buton type="button" class="btn" @onclick="RetourVersListe"
+                        aria-label="Annuler les modifications">
+                        <i class="bi bi-x-lg"></i> Annuler
+                    </buton>
+
+                    <button type="submit" class="btn">
+                        <i class="bi bi-floppy"></i> @(isEditing ? "Mettre à jour" : "Créer le cours")
                     </button>
                 </div>
 
                 <CourBuilder @ref="coursBuilder" @bind-SelectedBlock="selectedBlock" CoursId="@(CoursId ?? 0)" />
+
             </div>
         </div>
 
-        <div class="d-flex justify-content-end mb-5">
-            <button type="button" class="btn btn-secondary me-2" @onclick="RetourVersListe">Annuler</button>
-            <button type="submit" class="btn btn-primary">@(isEditing ? "Mettre à jour" : "Créer le cours")</button>
-        </div>
+
     </EditForm>
 </div>
 

@@ -37,23 +37,62 @@
     [Parameter]
     public int CoursId { get; set; }
 
-    // Modifiez la définition de CoursBlock pour garantir que les propriétés sont initialisées
+    /// <summary>
+    /// Représente un bloc de contenu dans le créateur de cours.
+    /// </summary>
     public class CoursBlock
     {
+        /// <summary>Identifiant unique du bloc.</summary>
         public Guid Id { get; set; } = Guid.NewGuid();
-        public string Type { get; set; } = string.Empty;
+
+        /// <summary>Type du bloc (texte, image, quiz, etc.).</summary>
+        public required string Type { get; set; }
+
+        /// <summary>Contenu générique du bloc.</summary>
         public object? Content { get; set; }
+
+        /// <summary>Ordre d’affichage du bloc.</summary>
         public int Order { get; set; }
+
+        /// <summary>Titre du bloc.</summary>
         public string Title { get; set; } = string.Empty;
+
+        /// <summary>Texte du bloc.</summary>
         public string Text { get; set; } = string.Empty;
+
+        /// <summary>Message d’information ou d’erreur.</summary>
         public string? Message { get; set; }
+
+        /// <summary>URL de l’image associée.</summary>
         public string? ImageUrl { get; set; }
+
+        /// <summary>URL de la vidéo associée.</summary>
         public string? VideoUrl { get; set; }
+
+        /// <summary>URL de l’audio associé.</summary>
         public string? AudioUrl { get; set; }
+
+        /// <summary>Identifiant du quiz associé.</summary>
         public string? QuizId { get; set; }
+
+        /// <summary>URL d’un lien externe.</summary>
         public string? Url { get; set; }
+
+        /// <summary>URL d’un fichier associé.</summary>
         public string? FileUrl { get; set; }
+
+        /// <summary>Liste d’URLs de fichiers associés.</summary>
         public List<string> FileUrls { get; set; } = new();
+
+        /// <summary>
+        /// Constructeur par défaut pour garantir l’initialisation des propriétés.
+        /// </summary>
+        public CoursBlock()
+        {
+            Title = Title ?? string.Empty;
+            Text = Text ?? string.Empty;
+            FileUrls = FileUrls ?? new List<string>();
+        }
     }
 
     private List<CoursBlock> Blocks { get; set; } = new();
