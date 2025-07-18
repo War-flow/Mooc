@@ -1,0 +1,28 @@
+﻿@using Microsoft.AspNetCore.Components
+
+<div class="quiz-block-viewer">
+    @if (!string.IsNullOrEmpty(Block.Title))
+    {
+        <h4 class="block-title">@Block.Title</h4>
+    }
+    
+    <div class="alert alert-secondary">
+        <i class="bi bi-question-circle me-2"></i>
+        Quiz interactif disponible uniquement en mode cours.
+    </div>
+    
+    @if (!string.IsNullOrEmpty(Block.Text))
+    {
+        <div class="block-description">
+            @Block.Text
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+    
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+}

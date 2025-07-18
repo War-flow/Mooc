@@ -30,7 +30,7 @@ h1:focus {
 
 .invalid {
     outline: 1px solid #e50000;
-}
+}               
 
 .validation-message {
     color: #e50000;
@@ -446,236 +446,39 @@ h1:focus {
     background-color: inherit;
 }
 
-.separator-dashed .separator-line {
-    background: none;
-    border-top: 2px dashed #dee2e6;
-    height: 0;
-}
-
-.separator-dotted .separator-line {
-    background: none;
-    border-top: 2px dotted #dee2e6;
-    height: 0;
-}
-
 .separator-gradient .separator-line {
     background: linear-gradient(90deg, transparent 0%, #dee2e6 50%, transparent 100%);
+    height: 2px;
 }
 
-.separator-wave .separator-line {
-    background: none;
-    height: 8px;
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #dee2e6 13px, #dee2e6 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #dee2e6 13px, #dee2e6 20px, transparent 21px);
-    background-size: 40px 20px;
-    background-repeat: repeat-x;
-}
-
-.separator-zigzag .separator-line {
-    background: none;
-    height: 8px;
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #dee2e6 35%, #dee2e6 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #dee2e6 35%, #dee2e6 65%, transparent 65%);
-    background-size: 20px 8px;
-    background-repeat: repeat-x;
-}
 
 /* Épaisseurs */
-.separator-thin .separator-line { 
-    height: 1px; 
-}
-
-.separator-thin.separator-dashed .separator-line,
-.separator-thin.separator-dotted .separator-line { 
-    border-width: 1px; 
-}
 
 .separator-medium .separator-line { 
     height: 2px; 
 }
 
-.separator-medium.separator-dashed .separator-line,
-.separator-medium.separator-dotted .separator-line { 
-    border-width: 2px; 
-}
-
-.separator-thick .separator-line { 
-    height: 4px; 
-}
-
-.separator-thick.separator-dashed .separator-line,
-.separator-thick.separator-dotted .separator-line { 
-    border-width: 4px; 
-}
-
-.separator-thick.separator-wave .separator-line { 
-    height: 12px; 
-    background-size: 40px 24px; 
-}
-
-.separator-thick.separator-zigzag .separator-line { 
-    height: 12px; 
-    background-size: 30px 12px; 
-}
-
 /* Couleurs */
-.separator-primary .separator-line { 
-    background-color: #007bff; 
-    border-color: #007bff; 
+
+/* Styles pour la couleur noire */
+.separator-black .separator-line {
+    background-color: #000000;
+    border-color: #000000;
 }
 
-.separator-primary.separator-dashed .separator-line,
-.separator-primary.separator-dotted .separator-line { 
-    border-color: #007bff; 
+.separator-black.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #000000 50%, transparent 100%);
 }
 
-.separator-primary.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #007bff 50%, transparent 100%);
+/* Styles avec spécificité plus élevée pour la couleur noire */
+.separator-display.separator-black.separator-double-line .separator-line {
+    background-color: #000000 !important;
 }
 
-.separator-primary.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #007bff 13px, #007bff 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #007bff 13px, #007bff 20px, transparent 21px);
+.separator-display.separator-black.separator-gradient .separator-line {
+    background: linear-gradient(90deg, transparent 0%, #000000 50%, transparent 100%) !important;
 }
 
-.separator-primary.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #007bff 35%, #007bff 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #007bff 35%, #007bff 65%, transparent 65%);
-}
-
-.separator-secondary .separator-line { 
-    background-color: #6c757d; 
-    border-color: #6c757d; 
-}
-
-.separator-secondary.separator-dashed .separator-line,
-.separator-secondary.separator-dotted .separator-line { 
-    border-color: #6c757d; 
-}
-
-.separator-secondary.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #6c757d 50%, transparent 100%);
-}
-
-.separator-secondary.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #6c757d 13px, #6c757d 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #6c757d 13px, #6c757d 20px, transparent 21px);
-}
-
-.separator-secondary.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #6c757d 35%, #6c757d 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #6c757d 35%, #6c757d 65%, transparent 65%);
-}
-
-.separator-success .separator-line { 
-    background-color: #28a745; 
-    border-color: #28a745; 
-}
-
-.separator-success.separator-dashed .separator-line,
-.separator-success.separator-dotted .separator-line { 
-    border-color: #28a745; 
-}
-
-.separator-success.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #28a745 50%, transparent 100%);
-}
-
-.separator-success.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #28a745 13px, #28a745 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #28a745 13px, #28a745 20px, transparent 21px);
-}
-
-.separator-success.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #28a745 35%, #28a745 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #28a745 35%, #28a745 65%, transparent 65%);
-}
-
-.separator-danger .separator-line { 
-    background-color: #dc3545; 
-    border-color: #dc3545; 
-}
-
-.separator-danger.separator-dashed .separator-line,
-.separator-danger.separator-dotted .separator-line { 
-    border-color: #dc3545; 
-}
-
-.separator-danger.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #dc3545 50%, transparent 100%);
-}
-
-.separator-danger.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #dc3545 13px, #dc3545 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #dc3545 13px, #dc3545 20px, transparent 21px);
-}
-
-.separator-danger.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #dc3545 35%, #dc3545 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #dc3545 35%, #dc3545 65%, transparent 65%);
-}
-
-.separator-warning .separator-line { 
-    background-color: #ffc107; 
-    border-color: #ffc107; 
-}
-
-.separator-warning.separator-dashed .separator-line,
-.separator-warning.separator-dotted .separator-line { 
-    border-color: #ffc107; 
-}
-
-.separator-warning.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #ffc107 50%, transparent 100%);
-}
-
-.separator-warning.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #ffc107 13px, #ffc107 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #ffc107 13px, #ffc107 20px, transparent 21px);
-}
-
-.separator-warning.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #ffc107 35%, #ffc107 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #ffc107 35%, #ffc107 65%, transparent 65%);
-}
-
-.separator-info .separator-line { 
-    background-color: #17a2b8; 
-    border-color: #17a2b8; 
-}
-
-.separator-info.separator-dashed .separator-line,
-.separator-info.separator-dotted .separator-line { 
-    border-color: #17a2b8; 
-}
-
-.separator-info.separator-gradient .separator-line {
-    background: linear-gradient(90deg, transparent 0%, #17a2b8 50%, transparent 100%);
-}
-
-.separator-info.separator-wave .separator-line {
-    background-image: 
-        radial-gradient(circle at 10px -5px, transparent 12px, #17a2b8 13px, #17a2b8 20px, transparent 21px),
-        radial-gradient(circle at 30px 25px, transparent 12px, #17a2b8 13px, #17a2b8 20px, transparent 21px);
-}
-
-.separator-info.separator-zigzag .separator-line {
-    background-image: 
-        linear-gradient(135deg, transparent 0%, transparent 35%, #17a2b8 35%, #17a2b8 65%, transparent 65%),
-        linear-gradient(45deg, transparent 0%, transparent 35%, #17a2b8 35%, #17a2b8 65%, transparent 65%);
-}
 
 /* Responsive */
 @media (max-width: 768px) {
@@ -762,13 +565,63 @@ h1:focus {
     gap: 0.5rem;
 }
 
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .quiz-block {
-        padding: 1rem;
-    }
-    
-    .quiz-display .options {
-        margin-left: 0.5rem;
-    }
+/* Styles pour le visualiseur de cours */
+.cours-viewer-container {
+    padding: 0;
+}
+
+.cours-block-viewer {
+    border: 1px solid #e9ecef;
+    border-radius: 8px;
+    padding: 20px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.cours-block-viewer:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.block-title {
+    color: #495057;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.block-content {
+    line-height: 1.6;
+    color: #212529;
+}
+
+.block-description {
+    color: #6c757d;
+    font-style: italic;
+}
+
+.text-block-viewer, 
+.image-block-viewer, 
+.video-block-viewer, 
+.audio-block-viewer,
+.info-block-viewer {
+    width: 100%;
+}
+
+.info-block-viewer {
+    border-left: 4px solid;
+}
+
+.info-block-viewer.alert-info {
+    border-left-color: #0dcaf0;
+}
+
+.info-block-viewer.alert-warning {
+    border-left-color: #ffc107;
+}
+
+.info-block-viewer.alert-success {
+    border-left-color: #198754;
+}
+
+.info-block-viewer.alert-danger {
+    border-left-color: #dc3545;
 }

@@ -10,7 +10,7 @@ namespace Mooc.Data
         public string? Image { get; set; } // Chemin vers l'image de la session
         public string? Description { get; set; }
         public DateTime StartDate { get; set; }
-        public DateTime? EndDate { get; set; }
+        public DateTime EndDate { get; set; }
         public int Work { get; set; }
         public bool IsActive { get; set; } = false; // Indique si la session est active
 

@@ -1,0 +1,33 @@
+﻿@using Microsoft.AspNetCore.Components
+
+<div class="video-block-viewer">
+    @if (!string.IsNullOrEmpty(Block.Title))
+    {
+        <h4 class="block-title">@Block.Title</h4>
+    }
+    
+    @if (!string.IsNullOrEmpty(Block.VideoUrl))
+    {
+        <div class="ratio ratio-16x9">
+            <video controls class="rounded">
+                <source src="@Block.VideoUrl" type="video/mp4">
+                Votre navigateur ne support pas les vidéos HTML5.
+            </video>
+        </div>
+    }
+    
+    @if (!string.IsNullOrEmpty(Block.Text))
+    {
+        <div class="block-description mt-2">
+            @Block.Text
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+    
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+}

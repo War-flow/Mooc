@@ -1,0 +1,23 @@
+﻿@using Microsoft.AspNetCore.Components
+
+<div class="text-block-viewer">
+    @if (!string.IsNullOrEmpty(Block.Title))
+    {
+        <h4 class="block-title">@Block.Title</h4>
+    }
+    
+    @if (!string.IsNullOrEmpty(Block.Text))
+    {
+        <div class="block-content">
+            @((MarkupString)Block.Text)
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+    
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+}

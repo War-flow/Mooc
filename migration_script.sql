@@ -197,7 +197,7 @@ BEGIN
         [Image] nvarchar(256) NOT NULL,
         [Description] nvarchar(300) NULL,
         [StartDate] date NOT NULL,
-        [EndDate] date NULL,
+        [EndDate] date NOT NULL,
         [Work] int NOT NULL,
         [IsActive] boolean NOT NULL,
         [UserId] nvarchar(450) NULL,

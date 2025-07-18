@@ -1,0 +1,70 @@
+﻿@using Microsoft.AspNetCore.Components
+@using static Mooc.Components.Pages.Manager.CMS.CourBuilder
+
+<div class="space-block-viewer">
+
+    @* Affichage du séparateur avec les styles configurés *@
+    <div class="separator-display @GetSeparatorClasses()">
+        <div class="separator-line"></div>
+    </div>
+
+</div>
+
+@code {
+    [Parameter]
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+
+    private SeparatorSettings? separatorSettings;
+
+    protected override void OnInitialized()
+    {
+        LoadSeparatorSettings();
+    }
+
+    private void LoadSeparatorSettings()
+    {
+        if (!string.IsNullOrEmpty(Block.Text))
+        {
+            try
+            {
+                separatorSettings = System.Text.Json.JsonSerializer.Deserialize<SeparatorSettings>(Block.Text);
+            }
+            catch
+            {
+                // Si la désérialisation échoue, utiliser les valeurs par défaut
+                separatorSettings = new SeparatorSettings();
+            }
+        }
+        else
+        {
+            separatorSettings = new SeparatorSettings();
+        }
+    }
+
+    private string GetSeparatorClasses()
+    {
+        if (separatorSettings == null) return "separator-line separator-medium separator-default separator-spacing-medium";
+        
+        var classes = new List<string>
+        {
+            $"separator-{separatorSettings.Style ?? "line"}",
+            $"separator-{separatorSettings.Thickness ?? "medium"}",
+            $"separator-{separatorSettings.Color ?? "default"}",
+            $"separator-spacing-{separatorSettings.Spacing ?? "medium"}"
+        };
+        
+        return string.Join(" ", classes);
+    }
+
+    // Classe pour stocker les paramètres du séparateur (identique à SpaceBlock.razor)
+    private class SeparatorSettings
+    {
+        public string Style { get; set; } = "line";
+        public string Thickness { get; set; } = "medium";
+        public string Color { get; set; } = "default";
+        public string Spacing { get; set; } = "medium";
+    }
+}

@@ -48,7 +48,7 @@
                                 }
                                 <div class="pt-3">
                                     <p>Date de début : @session.StartDate.ToString("dd/MM/yyyy")</p>
-                                    <p>Date de fin : @(session.EndDate.HasValue ? session.EndDate.Value.ToString("dd/MM/yyyy") : "Non définie")</p>
+                                    <p>Date de fin : @session.EndDate.ToString("dd/MM/yyyy")</p>
                                     <p>Effort estimé : @GetEstimatedEffort(session.Work) h</p>
                                 </div>
                             </div>

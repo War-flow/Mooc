@@ -59,7 +59,7 @@
                                 <td>@session.Title</td>
                                 <td>@(session.Description?.Length > 30 ? session.Description.Substring(0, 30) + "..." : session.Description)</td>
                                 <td>@session.StartDate.ToShortDateString()</td>
-                                <td>@(session.EndDate.HasValue ? session.EndDate.Value.ToShortDateString() : "-")</td>
+                                <td>@session.EndDate.ToShortDateString()</td>
                                 <td>
                                     <button class="btn @(session.IsActive ? "btn-success" : "btn-secondary")" 
                                             @onclick="() => ToggleSessionStatus(session.Id)">
@@ -259,7 +259,7 @@
                 Image = session.Image ?? string.Empty,
                 Description = session.Description ?? string.Empty,
                 StartDate = session.StartDate,
-                EndDate = session.EndDate ?? DateTime.Today.AddDays(30),
+                EndDate = session.EndDate,
                 Work = session.Work,
                 IsActive = session.IsActive
             };
@@ -374,7 +374,7 @@
                     session.Image = imagePath;
                     session.Description = sessionModel.Description;
                     session.StartDate = sessionModel.StartDate;
-                    session.EndDate = sessionModel.EndDate;
+                    session.EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30);
                     session.Work = sessionModel.Work;
                     session.IsActive = sessionModel.IsActive;
 
@@ -390,7 +390,7 @@
                     Image = imagePath,
                     Description = sessionModel.Description,
                     StartDate = sessionModel.StartDate,
-                    EndDate = sessionModel.EndDate,
+                    EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30),
                     Work = sessionModel.Work,
                     IsActive = sessionModel.IsActive
                 };

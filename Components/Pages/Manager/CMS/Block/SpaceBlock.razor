@@ -32,41 +32,16 @@
             <div class="separator-options">
                 <div class="form-group mb-3">
                     <label class="form-label">Style du séparateur :</label>
-                    <select class="form-select" @bind="separatorStyle">
+                    <select class="form-select" value="@separatorStyle" @onchange="OnStyleChanged">
                         <option value="line">Ligne simple</option>
                         <option value="double-line">Ligne double</option>
-                        <option value="dashed">Ligne pointillée</option>
-                        <option value="dotted">Ligne en points</option>
                         <option value="gradient">Dégradé</option>
-                        <option value="wave">Vague</option>
-                        <option value="zigzag">Zigzag</option>
-                    </select>
-                </div>
-                
-                <div class="form-group mb-3">
-                    <label class="form-label">Épaisseur :</label>
-                    <select class="form-select" @bind="separatorThickness">
-                        <option value="thin">Fine</option>
-                        <option value="medium">Moyenne</option>
-                        <option value="thick">Épaisse</option>
-                    </select>
-                </div>
-                
-                <div class="form-group mb-3">
-                    <label class="form-label">Couleur :</label>
-                    <select class="form-select" @bind="separatorColor">
-                        <option value="default">Par défaut</option>
-                        <option value="primary">Bleu</option>
-                        <option value="secondary">Gris</option>
-                        <option value="success">Vert</option>
-                        <option value="danger">Rouge</option>
-                        <option value="warning">Jaune</option>
                     </select>
                 </div>
                 
                 <div class="form-group mb-3">
                     <label class="form-label">Espacement :</label>
-                    <select class="form-select" @bind="separatorSpacing">
+                    <select class="form-select" value="@separatorSpacing" @onchange="OnSpacingChanged">
                         <option value="small">Petit</option>
                         <option value="medium">Moyen</option>
                         <option value="large">Grand</option>
@@ -77,7 +52,7 @@
         }
         
         @* Affichage du séparateur avec les styles appliqués *@
-        <div class="separator-display @GetSeparatorClasses()">
+        <div class="separator-display @GetSeparatorClasses()" @key="separatorKey">
             <div class="separator-line"></div>
         </div>
     </div>
@@ -119,11 +94,12 @@
     
     private bool titleError = false;
     private string originalTitle = string.Empty;
+    private string separatorKey = Guid.NewGuid().ToString();
     
-    // Propriétés du séparateur
+    // Propriétés du séparateur - couleur et épaisseur fixées
     private string separatorStyle = "line";
-    private string separatorThickness = "medium";
-    private string separatorColor = "default";
+    private string separatorThickness = "medium"; // Toujours moyenne
+    private string separatorColor = "black"; // Toujours noir
     private string separatorSpacing = "medium";
     
     protected override void OnInitialized()
@@ -142,9 +118,10 @@
                 if (settings != null)
                 {
                     separatorStyle = settings.Style ?? "line";
-                    separatorThickness = settings.Thickness ?? "medium";
-                    separatorColor = settings.Color ?? "default";
                     separatorSpacing = settings.Spacing ?? "medium";
+                    // Forcer la couleur noire et l'épaisseur moyenne
+                    separatorThickness = "medium";
+                    separatorColor = "black";
                 }
             }
             catch
@@ -163,7 +140,7 @@
     {
         separatorStyle = "line";
         separatorThickness = "medium";
-        separatorColor = "default";
+        separatorColor = "black";
         separatorSpacing = "medium";
     }
     
@@ -172,12 +149,31 @@
         var settings = new SeparatorSettings
         {
             Style = separatorStyle,
-            Thickness = separatorThickness,
-            Color = separatorColor,
+            Thickness = "medium", // Toujours moyenne
+            Color = "black", // Toujours noir
             Spacing = separatorSpacing
         };
         
         Block.Text = System.Text.Json.JsonSerializer.Serialize(settings);
+    }
+    
+    private void OnStyleChanged(ChangeEventArgs e)
+    {
+        separatorStyle = e.Value?.ToString() ?? "line";
+        UpdateSeparatorDisplay();
+    }
+    
+    private void OnSpacingChanged(ChangeEventArgs e)
+    {
+        separatorSpacing = e.Value?.ToString() ?? "medium";
+        UpdateSeparatorDisplay();
+    }
+    
+    private void UpdateSeparatorDisplay()
+    {
+        // Forcer la mise à jour du rendu en générant une nouvelle clé
+        separatorKey = Guid.NewGuid().ToString();
+        StateHasChanged();
     }
     
     private string GetTypeClass()
@@ -199,8 +195,8 @@
         var classes = new List<string>
         {
             $"separator-{separatorStyle}",
-            $"separator-{separatorThickness}",
-            $"separator-{separatorColor}",
+            $"separator-{separatorThickness}", // Toujours "medium"
+            $"separator-{separatorColor}",     // Toujours "black"
             $"separator-spacing-{separatorSpacing}"
         };
         
@@ -242,6 +238,9 @@
         
         // Recharger les paramètres du séparateur
         LoadSeparatorSettings();
+        
+        // Regénérer la clé pour forcer le rendu
+        separatorKey = Guid.NewGuid().ToString();
         
         IsEditing = false;
         StateHasChanged();

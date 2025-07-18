@@ -1,0 +1,84 @@
+﻿@using Microsoft.AspNetCore.Components
+@using System.IO
+
+<div class="file-block-viewer">
+    @if (!string.IsNullOrEmpty(Block.Title))
+    {
+        <h4 class="block-title">@Block.Title</h4>
+    }
+    
+    @* Affichage du fichier unique (FileUrl) *@
+    @if (!string.IsNullOrEmpty(GetFile()))
+    {
+        <div class="single-file mb-3">
+            <a href="@GetFile()" target="_blank" class="file-link d-flex align-items-center">
+                <div class="file-icon @GetFileIconClass(GetFile()) me-2"></div>
+                <span class="file-name">@Path.GetFileName(GetFile())</span>
+                <i class="bi bi-download ms-2"></i>
+            </a>
+        </div>
+    }
+    
+    @* Affichage des fichiers multiples (FileUrls) *@
+    @if (GetFiles().Any())
+    {
+        <div class="file-list">
+            @foreach (var fileUrl in GetFiles())
+            {
+                <div class="d-flex align-items-center mb-2 file-item">
+                    <div class="file-icon @GetFileIconClass(fileUrl) me-2"></div>
+                    <a href="@fileUrl" target="_blank" class="file-link">
+                        <span class="file-name">@Path.GetFileName(fileUrl)</span>
+                        <i class="bi bi-download ms-2"></i>
+                    </a>
+                </div>
+            }
+        </div>
+    }
+    
+    @* Message si aucun fichier n'est disponible *@
+    @if (string.IsNullOrEmpty(GetFile()) && !GetFiles().Any())
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i>
+            Aucun fichier disponible pour ce bloc.
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public CourBuilder.CoursBlock Block { get; set; } = default!;
+
+    [Parameter]
+    public bool IsReadOnly { get; set; } = true;
+
+    private string GetFile()
+    {
+        return Block.FileUrl ?? string.Empty;
+    }
+
+    private List<string> GetFiles()
+    {
+        return Block.FileUrls ?? new List<string>();
+    }
+
+    private string GetFileIconClass(string fileUrl)
+    {
+        if (string.IsNullOrEmpty(fileUrl))
+            return "bi-file";
+
+        string extension = Path.GetExtension(fileUrl).ToLowerInvariant();
+
+        return extension switch
+        {
+            ".pdf" => "bi-file-earmark-pdf",
+            ".doc" or ".docx" => "bi-file-earmark-word",
+            ".xls" or ".xlsx" => "bi-file-earmark-excel",
+            ".ppt" or ".pptx" => "bi-file-earmark-slides",
+            ".zip" => "bi-file-earmark-zip",
+            ".txt" => "bi-file-earmark-text",
+            _ => "bi-file-earmark"
+        };
+    }
+}
