@@ -61,14 +61,14 @@
                                 <td>@session.StartDate.ToShortDateString()</td>
                                 <td>@(session.EndDate.HasValue ? session.EndDate.Value.ToShortDateString() : "-")</td>
                                 <td>
-                                    <button class="btn btn-sm @(session.IsActive ? "btn-success" : "btn-secondary")" 
+                                    <button class="btn @(session.IsActive ? "btn-success" : "btn-secondary")" 
                                             @onclick="() => ToggleSessionStatus(session.Id)">
                                         @(session.IsActive ? "En ligne" : "Hors ligne")
                                     </button>
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-info me-2" @onclick="() => EditSession(session.Id)">Modifier</button>
-                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteSessionConfirmation(session.Id)">Supprimer</button>
+                                    <button class="btn" @onclick="() => EditSession(session.Id)">Modifier</button>
+                                    <button class="btn" @onclick="() => DeleteSessionConfirmation(session.Id)">Supprimer</button>
                                 </td>
                                 <td>
                                     <a class="btn" href="/Manager/Cours?sessionId=@session.Id">Voir les cours</a>

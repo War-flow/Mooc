@@ -22,7 +22,7 @@
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between mb-4">
         <h2>@(isEditing ? "Modifier un cours" : "Créer un cours")</h2>
-        <button class="btn btn-secondary" @onclick="RetourVersListe">Retour à la liste</button>
+        <button class="btn" @onclick="RetourVersListe">Retour à la liste</button>
     </div>
 
     @if (showError)
@@ -382,10 +382,12 @@
 
     private void RetourVersListe()
     {
-        if (sessionIdFromUrl.HasValue)
-            NavigationManager.NavigateTo($"/Manager/Cours?sessionId={sessionIdFromUrl.Value}");
-        else
-            NavigationManager.NavigateTo("/Manager/Cours");
+        // Navigue vers la liste des cours, en conservant le sessionId si sélectionné
+        var url = coursModel.SessionId > 0
+            ? $"/Manager/Cours?sessionId={coursModel.SessionId}"
+            : "/Manager/Cours";
+
+        NavigationManager.NavigateTo(url);
     }
 
     // Méthode pour déplacer le bloc sélectionné vers le haut

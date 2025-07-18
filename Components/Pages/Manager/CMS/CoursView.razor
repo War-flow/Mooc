@@ -1,0 +1,88 @@
+﻿@page "/Cours/View/{coursId:int}"
+
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Mooc.Services
+@using Microsoft.AspNetCore.WebUtilities
+@using Mooc.Components.Pages.Manager.CMS
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(coursModel?.Title ?? "Cours")</PageTitle>
+
+@if (coursModel != null)
+{
+    <div class="container mt-4">
+        <h2>@coursModel.Title</h2>
+        <p>@coursModel.Description</p>
+        <p><strong>Durée estimée :</strong> @coursModel.Duration heures</p>
+        <p><strong>Session :</strong> @coursModel.SessionTitle</p>
+        <p><strong>Publié :</strong> @(coursModel.IsPublished ? "Oui" : "Non")</p>
+        <p><strong>Obligatoire :</strong> @(coursModel.IsRequired ? "Oui" : "Non")</p>
+        <!-- Ajoutez ici l’affichage des blocs de contenu si besoin -->
+    </div>
+}
+else
+{
+    <div>Chargement du cours...</div>
+}
+
+@code {
+    [Parameter]
+    public int coursId { get; set; }
+
+    private CoursViewModel? coursModel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCoursData(coursId);
+    }
+
+    private async Task LoadCoursData(int coursId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses
+                .Include(c => c.Session)
+                .FirstOrDefaultAsync(c => c.Id == coursId);
+
+            if (cours != null)
+            {
+                coursModel = new CoursViewModel
+                {
+                    Title = cours.Title,
+                    Description = cours.Description ?? "",
+                    Duration = cours.Duration,
+                    SessionTitle = cours.Session?.Title ?? "Non défini",
+                    IsPublished = cours.IsPublished,
+                    IsRequired = cours.IsRequired
+                };
+            }
+            else
+            {
+                // Gérer le cas où le cours n’existe pas
+                NavigationManager.NavigateTo("/Manager/Cours");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Gérer les erreurs
+        }
+    }
+
+    private class CoursViewModel
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public int Duration { get; set; }
+        public string SessionTitle { get; set; } = "";
+        public bool IsPublished { get; set; }
+        public bool IsRequired { get; set; }
+    }
+}
