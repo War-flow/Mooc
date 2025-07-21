@@ -1,3 +1,0 @@
-@rendermode InteractiveServer :
- 
-Spécifie que ce composant sera rendu en mode interactif côté serveur, permettant des mises à jour dynamiques de l'interface utilisateur sans rechargement de page

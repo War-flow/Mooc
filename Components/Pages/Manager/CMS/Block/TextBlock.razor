@@ -4,22 +4,23 @@
 @using Mooc.Services
 @using static Mooc.Components.Pages.Manager.CMS.CourBuilder
 @inject IJSRuntime JSRuntime
+@using Mooc.Components.Shared
 
-@if (Block != null)
-{
+@using System.ComponentModel.DataAnnotations
+
+<EditForm Model="TypedContent" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
     <div class="text-block @GetTypeClass()" id="block-@Block.Order">
-        <h4 class="text-title @(string.IsNullOrEmpty(GetBlockTitle()) ? "text-muted" : "")">
+        <h4 class="text-title @(string.IsNullOrEmpty(TypedContent.Title) ? "text-muted" : "")">
             @if (IsEditing)
             {
-                <input type="text" class="form-control" value="@GetBlockTitle()" @oninput="OnTitleChanged" placeholder="Titre (optionnel)"/>
-                @if (titleError)
-                {
-                    <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
-                }
+                <InputText class="form-control" @bind-Value="TypedContent.Title" placeholder="Titre (optionnel)" />
             }
-            else if (!string.IsNullOrEmpty(GetBlockTitle()))
+            else if (!string.IsNullOrEmpty(TypedContent.Title))
             {
-                @GetBlockTitle()
+                @TypedContent.Title
             }
         </h4>
 
@@ -28,24 +29,28 @@
             {
                 @if (useRichEditor)
                 {
-                    <div id="editor-@Block.Order" class="rich-editor" style="height:@(EditorHeight)px;"></div>
+                    <RichEditor 
+
+                    Value="@TypedContent.Text" 
+                    ValueChanged="@OnTextContentChanged" 
+                    Height="@EditorHeight"
+                    Placeholder="Saisissez le contenu de votre bloc..." 
+                    MaxLength="10000" 
+                    EditorId="@editorId"
+                    ShowCharacterCount="true" 
+                    
+                    />
                 }
                 else
                 {
-                    <textarea class="form-control" value="@GetBlockText()" @oninput="OnTextChanged" rows="5"></textarea>
+                    <InputTextArea class="form-control" @bind-Value="TypedContent.Text" rows="5" />
                 }
+                
             }
             else
             {
                 <div class="text-message">
-                    @if (useRichEditor)
-                    {
-                        @((MarkupString)GetBlockText())
-                    }
-                    else
-                    {
-                        @GetBlockText()
-                    }
+                    @((MarkupString)TypedContent.Text)
                 </div>
             }
         </div>
@@ -99,13 +104,7 @@
             </div>
         }
     </div>
-}
-else
-{
-    <div class="alert alert-warning">
-        Chargement du bloc de texte en cours...
-    </div>
-}
+</EditForm>
 
 @code {
     [Parameter]
@@ -115,7 +114,7 @@ else
     public dynamic Block { get; set; }
 
     [Parameter]
-    public int CoursId { get; set; }  // ✅ AJOUT DU PARAMÈTRE MANQUANT
+    public int CoursId { get; set; }
 
     [Parameter]
     public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
@@ -126,6 +125,9 @@ else
     [Parameter]
     public bool IsEditing { get; set; } = false;
 
+    [Parameter]
+    public EventCallback<bool> OnEditStateChanged { get; set; }
+
     private bool useRichEditor { get; set; } = true;
     private bool titleError { get; set; } = false;
     private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
@@ -133,33 +135,26 @@ else
     private bool showSaveSuccess { get; set; } = false;
     private bool editorInitialized { get; set; } = false;
 
-    // Ajouter propriété pour la hauteur de l'éditeur
     [Parameter]
-    public int EditorHeight { get; set; } = 200;
+    public int EditorHeight { get; set; } = 300;
 
     private Timer? autoSaveTimer;
     private bool hasUnsavedChanges = false;
 
-    // Ajouter des propriétés pour la validation
     private string? errorMessage;
     private bool hasValidationErrors => !string.IsNullOrEmpty(errorMessage) || titleError;
 
-    // Contenu de sauvegarde pour annulation
     private TextBlockContent? _originalContent;
 
-    // Propriété de commodité pour accéder au contenu typé
     private TextBlockContent TypedContent => Block.Content as TextBlockContent ?? new TextBlockContent();
 
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        
         EnsureContentInitialized();
         
-        // S'assurer que Block n'est pas null
         if (Block == null)
         {
-            // Créer un objet CoursBlock avec les propriétés minimales requises
             var newBlock = new CoursBlock
             {
                 Type = "texte",
@@ -169,15 +164,12 @@ else
             Block = newBlock;
         }
 
-        // 🔧 AJOUT : Log pour le debug
         Console.WriteLine($"TextBlock OnInitialized - CoursId: {CoursId}, Block.Id: {Block?.Id}");
     }
 
     protected override void OnParametersSet()
     {
         EnsureContentInitialized();
-        
-        // 🔧 AJOUT : Log pour le debug
         Console.WriteLine($"TextBlock OnParametersSet - CoursId: {CoursId}, Block.Id: {Block?.Id}");
     }
 
@@ -193,81 +185,18 @@ else
         }
     }
 
-
-    // Cette méthode sera appelée lorsque le contenu de l'éditeur change
-    private void OnContentChanged(string elementId, string content)
+    private async Task OnTextContentChanged(string newContent)
     {
-        if (Block != null)
-        {
-            TypedContent.Text = content;
-            hasUnsavedChanges = true;
-        }
+        TypedContent.Text = newContent;
+        hasUnsavedChanges = true;
+        StateHasChanged();
     }
 
-    // Méthode pour gérer le changement de texte dans le textarea
-    private void OnTextChanged(ChangeEventArgs e)
-    {
-        if (Block != null && e.Value != null)
-        {
-            TypedContent.Text = e.Value.ToString() ?? string.Empty;
-            hasUnsavedChanges = true;
-        }
-    }
-
-    // Méthode pour gérer le changement de titre
-    private void OnTitleChanged(ChangeEventArgs e)
-    {
-        if (Block != null && e.Value != null)
-        {
-            string value = e.Value.ToString() ?? string.Empty;
-            
-            if (value.Length > 100)
-            {
-                titleError = true;
-                return;
-            }
-            
-            titleError = false;
-            TypedContent.Title = value;
-            hasUnsavedChanges = true;
-        }
-    }
-
-    // Méthode de validation similaire à InfoBlock
     private bool IsValid()
     {
         return !string.IsNullOrWhiteSpace(TypedContent.Text);
     }
 
-    // Méthode de validation étendue
-    private bool ValidateBlock()
-    {
-        errorMessage = null;
-        titleError = false;
-
-        if (TypedContent.Title.Length > 100)
-        {
-            titleError = true;
-            errorMessage = "Le titre ne peut pas dépasser 100 caractères";
-            return false;
-        }
-
-        if (string.IsNullOrWhiteSpace(TypedContent.Text))
-        {
-            errorMessage = "Le contenu ne peut pas être vide";
-            return false;
-        }
-
-        if (TypedContent.Text.Length > 10000)
-        {
-            errorMessage = "Le contenu ne peut pas dépasser 10 000 caractères";
-            return false;
-        }
-
-        return true;
-    }
-
-    // Nouvelle méthode ToggleEdit similaire à InfoBlock
     private async Task ToggleEdit()
     {
         if (IsEditing)
@@ -280,16 +209,12 @@ else
                 isSaving = true;
                 StateHasChanged();
 
-                // Synchroniser vers Block pour compatibilité
                 Block.Title = TypedContent.Title;
                 Block.Text = TypedContent.Text;
                 
-                // 🔧 AJOUT : Sauvegarde en base de données si nécessaire (comme TableBlock)
                 if (CoursId > 0)
                 {
                     Console.WriteLine($"TextBlock: Sauvegarde pour CoursId: {CoursId}");
-                    // Ici, vous pouvez ajouter la logique de sauvegarde si nécessaire
-                    // bool success = await BlockService.SaveBlockAsync(Block, CoursId);
                 }
                 
                 _originalContent = null;
@@ -316,7 +241,6 @@ else
         }
         else
         {
-            // Créer un backup
             _originalContent = new TextBlockContent
             {
                 Title = TypedContent.Title,
@@ -324,18 +248,15 @@ else
             };
             
             IsEditing = true;
-            
-            // Initialiser l'éditeur après le rendu
+            await OnEditStateChanged.InvokeAsync(IsEditing);
             StateHasChanged();
         }
     }
 
-    // Nouvelle méthode CancelEdit similaire à InfoBlock
     private async Task CancelEdit()
     {
         try
         {
-            // Restaurer le contenu original
             if (_originalContent != null)
             {
                 Block.Content = _originalContent;
@@ -349,10 +270,7 @@ else
             errorMessage = null;
             titleError = false;
         
-            // Forcer le re-rendu complet
             StateHasChanged();
-            
-            // Attendre un peu pour que le DOM se mette à jour
             await Task.Delay(100);
         }
         catch (Exception ex)
@@ -362,61 +280,35 @@ else
         }
     }
 
-    // Méthode SaveChanges conservée pour la compatibilité
-    private async Task SaveChanges()
-    {
-        await ToggleEdit();
-    }
-
     private async Task RequestDelete()
     {
         bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc de texte ?");
         if (confirmed)
         {
-            // 🔧 AJOUT : Supprimer de la base de données si nécessaire
             if (CoursId > 0)
             {
                 Console.WriteLine($"TextBlock: Suppression pour CoursId: {CoursId}");
-                // Ici, vous pouvez ajouter la logique de suppression si nécessaire
-                // bool success = await BlockService.DeleteBlockAsync(Block.Id, CoursId);
             }
 
             await OnDeleteRequested.InvokeAsync(Block);
         }
     }
      
-    private string GetTypeClass()
-    {
-        var classList = new List<string>();
-        
-        if (IsEditing)
-        {
-            classList.Add("editing");
-        }
-        
-        if (string.IsNullOrEmpty(TypedContent.Text))
-        {
-            classList.Add("empty");
-        }
-        
-        return string.Join(" ", classList);
-    }
+    private string GetTypeClass() =>
+        $"{(IsEditing ? "editing" : "")} {(string.IsNullOrEmpty(TypedContent.Text) ? "empty" : "")}".Trim();
 
-    // Méthodes helper pour accéder aux propriétés de Block de façon sécurisée
-    private string GetBlockText()
-    {
-        return TypedContent.Text;
-    }
-
-    private string GetBlockTitle()
-    {
-        return TypedContent.Title;
-    }
-
-    // Classe pour contenu spécifique à TextBlock
     public class TextBlockContent
     {
+        [MaxLength(100, ErrorMessage = "Le titre ne peut pas dépasser 100 caractères")]
         public string Title { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Le contenu ne peut pas être vide")]
+        [MaxLength(10000, ErrorMessage = "Le contenu ne peut pas dépasser 10 000 caractères")]
         public string Text { get; set; } = string.Empty;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        await ToggleEdit();
     }
 }

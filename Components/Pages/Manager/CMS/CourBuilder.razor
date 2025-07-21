@@ -3,7 +3,7 @@
 <h3>Créateur de cours</h3>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-    <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un texte</button>
+    <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("image")'>Ajouter une image</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("video")'>Ajouter une vidéo</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
@@ -11,7 +11,6 @@
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("lien")'>Ajouter un lien</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("fichier")'>Ajouter un fichier</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("separateur")'>Ajouter un séparateur</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("info")'>Ajouter une info</button>
 </div>
 
@@ -243,7 +242,6 @@
         "audio" => typeof(AudioBlock),
         "tableau" => typeof(TableBlock),
         "fichier" => typeof(FileBlock),
-        "separateur" => typeof(SpaceBlock),
         "info" => typeof(InfoBlock),
         _ => typeof(TextBlock)
     };

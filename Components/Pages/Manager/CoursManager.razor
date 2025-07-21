@@ -14,7 +14,7 @@
 @attribute [Authorize(Policy = "GestionFormation")]
 @attribute [StreamRendering]
 
-<PageTitle>Gestion des cours</PageTitle>
+<PageTitle>Modules</PageTitle>
 
 @if (session != null)
 {
@@ -23,7 +23,7 @@
             <h2>@session.Title</h2>
             <div>
                 <button class="btn btn-primary" @onclick="() => CreerCours(session.Id)">
-                    <i class="bi bi-plus-circle me-2"></i>Nouveau cours
+                    <i class="bi bi-plus-circle me-2"></i>Nouveau Module
                 </button>
                 <a class="btn btn-outline-secondary ms-2" href="/Manager/Session">
                     <i class="bi bi-arrow-left me-2"></i>Retour aux sessions
@@ -33,7 +33,7 @@
 
         <div class="card">
             <div class="card-header bg-light">
-                <h3 class="mb-0">Cours de cette session</h3>
+                <h3 class="mb-0">Module de cette session</h3>
             </div>
             <div class="card-body">
                 @if (coursList.Any())

@@ -1,0 +1,286 @@
+﻿@using Microsoft.JSInterop
+@implements IAsyncDisposable
+@inject IJSRuntime JSRuntime
+
+<div class="rich-text-editor">
+    @if (ShowToolbar)
+    {
+        <div class="editor-toolbar">
+            <!-- Formatage de texte -->
+            <div class="toolbar-group">
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("bold")' title="Gras">
+                    <i class="bi bi-type-bold"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("italic")' title="Italique">
+                    <i class="bi bi-type-italic"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("underline")' title="Souligné">
+                    <i class="bi bi-type-underline"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("strikethrough")' title="Barré">
+                    <i class="bi bi-type-strikethrough"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Alignement -->
+            <div class="toolbar-group">
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("justifyLeft")' title="Aligner à gauche">
+                    <i class="bi bi-text-left"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("justifyCenter")' title="Centrer">
+                    <i class="bi bi-text-center"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("justifyRight")' title="Aligner à droite">
+                    <i class="bi bi-text-right"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("justifyFull")' title="Justifier">
+                    <i class="bi bi-justify"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Listes -->
+            <div class="toolbar-group">
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("insertUnorderedList")' title="Liste à puces">
+                    <i class="bi bi-list-ul"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("insertOrderedList")' title="Liste numérotée">
+                    <i class="bi bi-list-ol"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("outdent")' title="Diminuer le retrait">
+                    <i class="bi bi-text-indent-right"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("indent")' title="Augmenter le retrait">
+                    <i class="bi bi-text-indent-left"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Titres -->
+            <div class="toolbar-group">
+                <select class="toolbar-select" @onchange="OnHeadingChange">
+                    <option value="h6">12</option>
+                    <option value="h5">14</option>
+                    <option value="h4">16</option>
+                    <option value="h3">18</option>
+                    <option value="h2">20</option>
+                    <option value="h1">24</option>
+                </select>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Couleurs -->
+            <div class="toolbar-group">
+                <div class="color-picker-wrapper">
+                    <button type="button" class="toolbar-btn color-btn" title="Couleur du texte">
+                        <i class="bi bi-fonts"></i>
+                        <input type="color" class="color-input" @onchange="OnTextColorChange" value="#000000" />
+                    </button>
+                    <button type="button" class="toolbar-btn color-btn" title="Couleur de fond">
+                        <i class="bi bi-paint-bucket"></i>
+                        <input type="color" class="color-input" @onchange="OnBackgroundColorChange" value="#ffff00" />
+                    </button>
+                </div>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Liens et autres -->
+            <div class="toolbar-group">
+                <button type="button" class="toolbar-btn" @onclick="InsertLink" title="Insérer un lien">
+                    <i class="bi bi-link-45deg"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("unlink")' title="Supprimer le lien">
+                    <i class="bi bi-link-45deg-slash"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick="InsertImage" title="Insérer une image">
+                    <i class="bi bi-image"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick="InsertVideo" title="Insérer une vidéo">
+                    <i class="bi bi-camera-video"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick="InsertAudio" title="Insérer un audio">
+                    <i class="bi bi-mic"></i>
+                </button>
+            </div>
+
+            <div class="toolbar-separator"></div>
+
+            <!-- Actions -->
+            <div class="toolbar-group">
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("undo")' title="Annuler">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("redo")' title="Refaire">
+                    <i class="bi bi-arrow-clockwise"></i>
+                </button>
+                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("removeFormat")' title="Supprimer le formatage">
+                    <i class="bi bi-eraser"></i>
+                </button>
+            </div>
+        </div>
+    }
+
+    <div @ref="editorElement" id="@EditorId" class="rich-editor-content" style="min-height: @(Height)px;"></div>
+    
+    @if (ShowCharacterCount)
+    {
+        <small class="text-muted mt-1 d-block">
+            @characterCount/@MaxLength caractères
+        </small>
+    }
+</div>
+
+@code {
+    private ElementReference editorElement;
+    private IJSObjectReference? jsModule;
+    private DotNetObjectReference<RichEditor>? dotNetRef;
+    private string characterCount = "0";
+
+    [Parameter] public string Value { get; set; } = string.Empty;
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter] public string EditorId { get; set; } = Guid.NewGuid().ToString();
+    [Parameter] public int Height { get; set; } = 200;
+    [Parameter] public int MaxLength { get; set; } = 10000;
+    [Parameter] public bool ShowCharacterCount { get; set; } = true;
+    [Parameter] public bool ShowToolbar { get; set; } = true;
+    [Parameter] public string Placeholder { get; set; } = "Commencez à écrire...";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/RichEditor.js");
+            dotNetRef = DotNetObjectReference.Create(this);
+            
+            await jsModule.InvokeVoidAsync("initializeEditor", EditorId, dotNetRef, new
+            {
+                height = Height,
+                placeholder = Placeholder,
+                maxLength = MaxLength,
+                initialContent = Value
+            });
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnContentChanged(string content, int length)
+    {
+        Value = content;
+        characterCount = length.ToString();
+        await ValueChanged.InvokeAsync(content);
+        StateHasChanged();
+    }
+
+    private async Task ExecuteCommand(string command)
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("executeCommand", EditorId, command);
+        }
+    }
+
+    private async Task ExecuteCommandWithValue(string command, string value)
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("executeCommandWithValue", EditorId, command, value);
+        }
+    }
+
+    private async Task OnHeadingChange(ChangeEventArgs e)
+    {
+        string value = e.Value?.ToString() ?? "";
+        if (!string.IsNullOrEmpty(value))
+        {
+            await ExecuteCommandWithValue("formatBlock", value);
+        }
+        else
+        {
+            await ExecuteCommandWithValue("formatBlock", "div");
+        }
+    }
+
+    private async Task OnTextColorChange(ChangeEventArgs e)
+    {
+        string color = e.Value?.ToString() ?? "#000000";
+        await ExecuteCommandWithValue("foreColor", color);
+    }
+
+    private async Task OnBackgroundColorChange(ChangeEventArgs e)
+    {
+        string color = e.Value?.ToString() ?? "#ffff00";
+        await ExecuteCommandWithValue("backColor", color);
+    }
+
+    private async Task InsertLink()
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("insertLink", EditorId);
+        }
+    }
+
+    private async Task InsertImage()
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("insertImage", EditorId);
+        }
+    }
+
+    private async Task InsertVideo()
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("insertVideo", EditorId);
+        }
+    }
+
+    private async Task InsertAudio()
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("insertAudio", EditorId);
+        }
+    }
+
+    public async Task SetContent(string content)
+    {
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("setContent", EditorId, content);
+        }
+    }
+
+    public async Task<string> GetContent()
+    {
+        if (jsModule != null)
+        {
+            return await jsModule.InvokeAsync<string>("getContent", EditorId);
+        }
+        return string.Empty;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (jsModule != null)
+        {
+            try
+            {
+                await jsModule.InvokeVoidAsync("destroyEditor", EditorId);
+                await jsModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // Circuit is already disconnected, safe to ignore
+            }
+        }
+        dotNetRef?.Dispose();
+    }
+}
