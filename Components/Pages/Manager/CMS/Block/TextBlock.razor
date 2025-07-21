@@ -4,8 +4,6 @@
 @using Mooc.Services
 @using static Mooc.Components.Pages.Manager.CMS.CourBuilder
 @inject IJSRuntime JSRuntime
-@inject RichEditorService EditorService
-@implements IAsyncDisposable
 
 @if (Block != null)
 {
@@ -195,35 +193,6 @@ else
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (Block != null && useRichEditor && IsEditing && !editorInitialized)
-        {
-            await InitializeRichEditor();
-        }
-    }
-
-    // Méthode améliorée pour initialiser l'éditeur
-    private async Task InitializeRichEditor()
-    {
-        if (Block == null || !useRichEditor || editorInitialized) return;
-        
-        try
-        {
-            string content = TypedContent.Text;
-            // Initialiser l'éditeur riche avec la hauteur configurable
-            await EditorService.InitializeEditorAsync(editorId, content);
-            
-            // S'abonner aux changements de contenu
-            EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-            
-            editorInitialized = true;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de l'initialisation de l'éditeur: {ex.Message}");
-        }
-    }
 
     // Cette méthode sera appelée lorsque le contenu de l'éditeur change
     private void OnContentChanged(string elementId, string content)
@@ -311,13 +280,6 @@ else
                 isSaving = true;
                 StateHasChanged();
 
-                // Récupérer le contenu de l'éditeur si nécessaire
-                if (useRichEditor && editorInitialized)
-                {
-                    string editorContent = await EditorService.GetEditorContentAsync(editorId);
-                    TypedContent.Text = editorContent;
-                }
-
                 // Synchroniser vers Block pour compatibilité
                 Block.Title = TypedContent.Title;
                 Block.Text = TypedContent.Text;
@@ -371,24 +333,33 @@ else
     // Nouvelle méthode CancelEdit similaire à InfoBlock
     private async Task CancelEdit()
     {
-        if (_originalContent != null)
+        try
         {
-            Block.Content = _originalContent;
-            Block.Title = _originalContent.Title;
-            Block.Text = _originalContent.Text;
-        }
+            // Restaurer le contenu original
+            if (_originalContent != null)
+            {
+                Block.Content = _originalContent;
+                Block.Title = _originalContent.Title;
+                Block.Text = _originalContent.Text;
+                _originalContent = null;
+            }
         
-        // Nettoyer l'éditeur riche si nécessaire
-        if (useRichEditor && editorInitialized)
+            IsEditing = false;
+            hasUnsavedChanges = false;
+            errorMessage = null;
+            titleError = false;
+        
+            // Forcer le re-rendu complet
+            StateHasChanged();
+            
+            // Attendre un peu pour que le DOM se mette à jour
+            await Task.Delay(100);
+        }
+        catch (Exception ex)
         {
-            await EditorService.DestroyEditorAsync(editorId);
-            editorInitialized = false;
+            Console.WriteLine($"Erreur lors de l'annulation: {ex.Message}");
+            errorMessage = "Erreur lors de l'annulation des modifications";
         }
-        
-        IsEditing = false;
-        hasUnsavedChanges = false;
-        errorMessage = null;
-        titleError = false;
     }
 
     // Méthode SaveChanges conservée pour la compatibilité
@@ -440,27 +411,6 @@ else
     private string GetBlockTitle()
     {
         return TypedContent.Title;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        autoSaveTimer?.Dispose();
-        
-        try
-        {
-            // Nettoyer les ressources lors de la suppression du composant
-            if (Block != null && useRichEditor && editorInitialized)
-            {
-                await EditorService.DestroyEditorAsync(editorId);
-                EditorInterop.UnsubscribeFromContentChanges(editorId);
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur disposal: {ex.Message}");
-        }
-        
-        _originalContent = null;
     }
 
     // Classe pour contenu spécifique à TextBlock

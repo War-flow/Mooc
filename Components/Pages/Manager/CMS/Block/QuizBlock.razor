@@ -2,8 +2,6 @@
 @using Microsoft.JSInterop
 @using Mooc.Services
 @inject IJSRuntime JSRuntime
-@inject RichEditorService EditorService
-@implements IAsyncDisposable
 
 <div class="quiz-block @GetTypeClass()" @attributes="AdditionalAttributes">
     <h4 class="quiz-title">
@@ -336,15 +334,6 @@
         UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (IsEditing && useRichEditor)
-        {
-            await EditorService.InitializeEditorAsync(editorId, QuizData.Question);
-            EditorInterop.SubscribeToContentChanges(editorId, OnContentChanged);
-        }
-    }
-
     private void OnContentChanged(string elementId, string content)
     {
         QuizData.Question = content;
@@ -413,12 +402,6 @@
                 return;
             }
 
-            // Récupérer le contenu de l'éditeur riche si utilisé
-            if (useRichEditor)
-            {
-                QuizData.Question = await EditorService.GetEditorContentAsync(editorId);
-            }
-
             // Sauvegarder les données du quiz
             Block.Content = System.Text.Json.JsonSerializer.Serialize(QuizData);
 
@@ -456,12 +439,6 @@
         }
 
         Block.Title = originalTitle;
-
-        if (useRichEditor)
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
 
         IsEditing = false;
         StateHasChanged();
@@ -535,15 +512,6 @@
         IsAnswered = false;
         IsCorrect = null;
         UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (IsEditing && useRichEditor)
-        {
-            await EditorService.DestroyEditorAsync(editorId);
-            EditorInterop.UnsubscribeFromContentChanges(editorId);
-        }
     }
 
     private bool HasUserAnswer()
