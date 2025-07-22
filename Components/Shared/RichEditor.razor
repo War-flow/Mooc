@@ -96,16 +96,21 @@
                     <i class="bi bi-link-45deg"></i>
                 </button>
                 <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("unlink")' title="Supprimer le lien">
-                    <i class="bi bi-link-45deg-slash"></i>
-                </button>
-                <button type="button" class="toolbar-btn" @onclick="InsertImage" title="Insérer une image">
-                    <i class="bi bi-image"></i>
+                    <i class="bi bi-slash-circle"></i>
                 </button>
                 <button type="button" class="toolbar-btn" @onclick="InsertVideo" title="Insérer une vidéo">
                     <i class="bi bi-camera-video"></i>
                 </button>
                 <button type="button" class="toolbar-btn" @onclick="InsertAudio" title="Insérer un audio">
                     <i class="bi bi-mic"></i>
+                </button>
+                <InputFile @ref="imageInputComponent" 
+                           style="display:none" 
+                           OnChange="@OnImageSelected" 
+                           accept="image/*" 
+                           data-id="@($"upload-{EditorId}")" />
+                <button type="button" class="toolbar-btn" @onclick="TriggerImageUpload" title="Télécharger une image">
+                    <i class="bi bi-upload"></i>
                 </button>
             </div>
 
@@ -141,6 +146,7 @@
     private IJSObjectReference? jsModule;
     private DotNetObjectReference<RichEditor>? dotNetRef;
     private string characterCount = "0";
+    private ElementReference imageInput;
 
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
@@ -247,6 +253,60 @@
         if (jsModule != null)
         {
             await jsModule.InvokeVoidAsync("insertAudio", EditorId);
+        }
+    }
+
+    private InputFile? imageInputComponent;
+
+    private async Task TriggerImageUpload()
+    {
+        // Utiliser l'approche avec sélecteur CSS qui fonctionne déjà
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-{EditorId}']");
+        }
+    }
+
+    private async Task OnImageSelected(InputFileChangeEventArgs e)
+    {
+        if (e?.FileCount > 0)
+        {
+            var file = e.GetMultipleFiles(1).FirstOrDefault();
+            
+            // Vérifier la taille et le type de fichier
+            if (file != null)
+            {
+                if (file.Size > 10 * 1024 * 1024) // 10MB max
+                {
+                    // Gérer l'erreur de taille
+                    return;
+                }
+                
+                if (!file.ContentType.StartsWith("image/"))
+                {
+                    // Gérer l'erreur de type
+                    return;
+                }
+
+                try
+                {
+                    using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+                    using var ms = new MemoryStream();
+                    await stream.CopyToAsync(ms);
+                    var bytes = ms.ToArray();
+                    var base64 = Convert.ToBase64String(bytes);
+                    var imageDataUrl = $"data:{file.ContentType};base64,{base64}";
+
+                    if (jsModule != null)
+                    {
+                        await jsModule.InvokeVoidAsync("insertImageFromUrl", EditorId, imageDataUrl);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors du téléchargement de l'image: {ex.Message}");
+                }
+            }
         }
     }
 

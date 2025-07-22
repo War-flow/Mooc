@@ -116,18 +116,6 @@ export function insertLink(editorId) {
     }
 }
 
-export function insertImage(editorId) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        editor.element.focus();
-        const url = prompt('Entrez l\'URL de l\'image:');
-        if (url) {
-            document.execCommand('insertImage', false, url);
-            editor.element.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-    }
-}
-
 export function insertVideo(editorId) {
     const url = prompt("URL de la vidéo (mp4, webm, etc.) :");
     if (url) {
@@ -143,6 +131,40 @@ export function insertAudio(editorId) {
         const audioHtml = `<audio controls style="width:100%"><source src="${url}" type="audio/mpeg"></audio>`;
         document.getElementById(editorId).focus();
         document.execCommand('insertHTML', false, audioHtml);
+    }
+}
+
+export function insertImageFromUrl(editorId, imageUrl) {
+    const editor = window.richTextEditors[editorId];
+    if (editor && editor.element) {
+        // Créer l'élément image
+        const img = document.createElement('img');
+        img.src = imageUrl;
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.display = "block";
+        img.style.margin = "10px auto";
+        
+        // Insérer l'image à la position du curseur
+        editor.element.focus();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(img);
+            
+            // Placer le curseur après l'image
+            range.setStartAfter(img);
+            range.setEndAfter(img);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            // Si pas de sélection, ajouter à la fin
+            editor.element.appendChild(img);
+        }
+        
+        // Déclencher l'événement pour mettre à jour le contenu
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
     }
 }
 
@@ -167,5 +189,14 @@ export function destroyEditor(editorId) {
         element.removeEventListener('blur', handlers.handleBlur);
         element.removeEventListener('keydown', handlers.handleKeyDown);
         delete window.richTextEditors[editorId];
+    }
+}
+
+export function triggerFileInputClick(selector) {
+    const element = document.querySelector(selector);
+    if (element && typeof element.click === 'function') {
+        element.click();
+    } else {
+        console.error('Élément input file non trouvé avec le sélecteur:', selector);
     }
 }
