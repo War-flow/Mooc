@@ -4,10 +4,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("fichier")'>Ajouter un fichier</button>
 </div>
 
 <div class="cours-container">
@@ -57,9 +54,6 @@
 
         /// <summary>Message d’information ou d’erreur.</summary>
         public string? Message { get; set; }
-
-        /// <summary>URL de l’audio associé.</summary>
-        public string? AudioUrl { get; set; }
 
         /// <summary>Identifiant du quiz associé.</summary>
         public string? QuizId { get; set; }
@@ -223,9 +217,6 @@
     {
         "texte" => typeof(TextBlock),
         "quiz" => typeof(QuizBlock),
-        "audio" => typeof(AudioBlock),
-        "tableau" => typeof(TableBlock),
-        "fichier" => typeof(FileBlock),
         _ => typeof(TextBlock)
     };
 }

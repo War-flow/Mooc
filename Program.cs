@@ -152,6 +152,9 @@ namespace Mooc
 
             builder.Services.AddHealthChecks();
 
+            // Ajouter le logging et la configuration
+            builder.Services.AddLogging();
+
             var app = builder.Build();
 
             // Configuration du pipeline de requêtes HTTP

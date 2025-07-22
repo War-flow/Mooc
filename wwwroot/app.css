@@ -529,6 +529,11 @@ h1:focus {
     border-color: #6c757d;
 }
 
+.toolbar-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .toolbar-separator {
     width: 1px;
     height: 1.5rem;
@@ -680,4 +685,22 @@ h1:focus {
 
 .text-message img.loaded {
     opacity: 1;
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.alert {
+    border-radius: 0.375rem;
+    margin-bottom: 0;
+}
+
+.alert .bi {
+    margin-right: 0.5rem;
 }

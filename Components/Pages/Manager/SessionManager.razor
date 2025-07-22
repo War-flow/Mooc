@@ -325,7 +325,7 @@
                 // Supprimer l'image si elle existe
                 if (!string.IsNullOrEmpty(session.Image) && session.Image.StartsWith("/uploads/"))
                 {
-                    FileUploadService.DeleteImage(session.Image);
+                    FileUploadService.DeleteFile(session.Image);
                 }
 
                 context.Sessions.Remove(session);
@@ -368,7 +368,7 @@
                     // Supprimer l'ancienne image si une nouvelle a été sélectionnée et que l'ancienne existe
                     if (selectedImageFile != null && !string.IsNullOrEmpty(oldImagePath) && oldImagePath.StartsWith("/uploads/"))
                     {
-                        FileUploadService.DeleteImage(oldImagePath);
+                        FileUploadService.DeleteFile(oldImagePath);
                     }
                     
                     session.Image = imagePath;

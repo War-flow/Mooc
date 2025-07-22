@@ -165,10 +165,7 @@
     private Type GetViewerBlockComponent(string type) => type switch
     {
         "texte" => typeof(TextBlockViewer),
-        "audio" => typeof(AudioBlockViewer),
         "quiz" => typeof(QuizBlockViewer),
-        "tableau" => typeof(TableBlockViewer),
-        "fichier" => typeof(FileBlockViewer),
         _ => typeof(TextBlockViewer)
     };
 

@@ -1,7 +1,6 @@
 ﻿@page "/manager/cms/block/text/{blockId:int}"
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
-@using Microsoft.EntityFrameworkCore.Internal
 @using Microsoft.JSInterop
 @using Mooc.Data
 @using Mooc.Services
@@ -9,6 +8,7 @@
 @inject IJSRuntime JSRuntime
 @using Mooc.Components.Shared
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@implements IAsyncDisposable
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
@@ -35,14 +35,14 @@
                 @if (useRichEditor)
                 {
                     <RichEditor @ref="richEditorRef"
-                    Value="@TypedContent.Text" 
-                    ValueChanged="@OnTextContentChanged" 
-                    Height="@EditorHeight"
-                    Placeholder="Saisissez le contenu de votre bloc..." 
-                    MaxLength="10000" 
-                    EditorId="@editorId"
-                    ShowCharacterCount="true" 
-                    ShowToolbar="true"
+                        Value="@TypedContent.Text" 
+                        ValueChanged="@OnTextContentChanged" 
+                        Height="@EditorHeight"
+                        Placeholder="Saisissez le contenu de votre bloc..." 
+                        MaxLength="10000" 
+                        EditorId="@editorId"
+                        ShowCharacterCount="true" 
+                        ShowToolbar="true"
                     />
                 }
                 else
@@ -89,7 +89,7 @@
             }
         </div>
 
-        <!-- Indicateur de sauvegarde -->
+        <!-- Indicateurs d'état -->
         @if (isSaving)
         {
             <div class="save-indicator">
@@ -98,105 +98,83 @@
             </div>
         }
 
-        <!-- Message de succès temporaire -->
         @if (showSaveSuccess)
         {
             <div class="alert alert-success mt-2 p-2 fade-out">
+                <i class="bi bi-check-circle-fill"></i>
                 Modifications enregistrées avec succès
             </div>
         }
 
-        <!-- Message d'erreur -->
         @if (!string.IsNullOrEmpty(errorMessage))
         {
-            <div class="alert alert-danger mt-2 p-2">
+            <div class="alert alert-danger mt-2 p-2" role="alert">
+                <i class="bi bi-exclamation-triangle-fill"></i>
                 @errorMessage
+                <button type="button" class="btn-close btn-close-sm ms-2" @onclick="ClearError" aria-label="Fermer"></button>
             </div>
         }
     </div>
 </EditForm>
 
 @code {
-    [Parameter]
-    public int BlockId { get; set; }
+    // === Paramètres ===
+    [Parameter] public int BlockId { get; set; }
+    [Parameter] public dynamic Block { get; set; }
+    [Parameter] public int CoursId { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
+    [Parameter] public bool IsEditing { get; set; } = false;
+    [Parameter] public EventCallback<bool> OnEditStateChanged { get; set; }
+    [Parameter] public int EditorHeight { get; set; } = 300;
 
-    [Parameter]
-    public dynamic Block { get; set; }
-
-    [Parameter]
-    public int CoursId { get; set; }
-
-    [Parameter]
-    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
-
-    [Parameter]
-    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
-
-    [Parameter]
-    public bool IsEditing { get; set; } = false;
-
-    [Parameter]
-    public EventCallback<bool> OnEditStateChanged { get; set; }
-
+    // === État du composant ===
     private bool useRichEditor { get; set; } = true;
-    private bool titleError { get; set; } = false;
-    private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
     private bool isSaving { get; set; } = false;
     private bool showSaveSuccess { get; set; } = false;
-    private bool editorInitialized { get; set; } = false;
     private RichEditor? richEditorRef;
-
-    [Parameter]
-    public int EditorHeight { get; set; } = 300;
-
-    private Timer? autoSaveTimer;
-    private bool hasUnsavedChanges = false;
-
     private string? errorMessage;
-    private bool hasValidationErrors => !string.IsNullOrEmpty(errorMessage) || titleError;
-
     private TextBlockContent? _originalContent;
+    private CancellationTokenSource? _autoSaveCts;
+    private Timer? _successMessageTimer;
 
+    // === Propriétés calculées ===
+    private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
     private TextBlockContent TypedContent => Block.Content as TextBlockContent ?? new TextBlockContent();
 
     protected override void OnInitialized()
     {
-        base.OnInitialized();
         EnsureContentInitialized();
-        
+        InitializeBlock();
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Optimisation : éviter les re-rendus inutiles
+        if (Block?.Content is not TextBlockContent)
+        {
+            EnsureContentInitialized();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && !IsEditing && TypedContent.Text.Contains("<img"))
+        {
+            await EnhanceImageDisplay();
+        }
+    }
+
+    private void InitializeBlock()
+    {
         if (Block == null)
         {
-            var newBlock = new CoursBlock
+            Block = new CoursBlock
             {
                 Type = "texte",
                 Title = string.Empty,
                 Order = 0
             };
-            Block = newBlock;
-        }
-
-        Console.WriteLine($"TextBlock OnInitialized - CoursId: {CoursId}, Block.Id: {Block?.Id}");
-    }
-
-    protected override void OnParametersSet()
-    {
-        EnsureContentInitialized();
-        Console.WriteLine($"TextBlock OnParametersSet - CoursId: {CoursId}, Block.Id: {Block?.Id}");
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (!firstRender && richEditorRef != null && !IsEditing)
-        {
-            // Appeler la fonction JavaScript pour améliorer l'affichage des images après le rendu
-            try
-            {
-                await JSRuntime.InvokeVoidAsync("enhanceImageDisplay");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erreur lors de l'amélioration de l'affichage des images: {ex.Message}");
-            }
         }
     }
 
@@ -212,155 +190,220 @@
         }
     }
 
+    private async Task EnhanceImageDisplay()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("enhanceImageDisplay");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur amélioration images: {ex.Message}");
+        }
+    }
+
     private string SanitizeHtmlContent(string htmlContent)
     {
         if (string.IsNullOrEmpty(htmlContent))
             return string.Empty;
             
-        // Nettoyer le contenu des placeholders résiduels SANS toucher aux images
         var cleaned = htmlContent
             .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
             .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
-            
-        // Log pour debug - vérifier si des images sont présentes après nettoyage
-        if (cleaned.Contains("<img"))
-        {
-            Console.WriteLine("✅ Images préservées dans le contenu après nettoyage");
-        }
             
         return cleaned.Trim();
     }
 
     private async Task OnTextContentChanged(string newContent)
     {
-        // Log pour debug
-        if (newContent.Contains("<img"))
-        {
-            Console.WriteLine($"📷 Image détectée dans le contenu: {newContent.Substring(0, Math.Min(100, newContent.Length))}...");
-        }
+        var contentToSave = PreserveImagesInContent(newContent);
+        TypedContent.Text = contentToSave;
         
-        // CORRECTION: Ne pas nettoyer le contenu qui contient des images
-        // Garder le contenu original avec les images
-        string contentToSave = newContent;
+        // Debounce pour éviter trop d'appels
+        _autoSaveCts?.Cancel();
+        _autoSaveCts = new CancellationTokenSource();
         
-        // Nettoyer seulement les placeholders s'il n'y a pas d'images
-        if (!newContent.Contains("<img"))
+        try
         {
-            contentToSave = SanitizeHtmlContent(newContent);
+            await Task.Delay(500, _autoSaveCts.Token);
+            StateHasChanged();
         }
-        else
+        catch (OperationCanceledException)
         {
-            // Pour les contenus avec images, nettoyer seulement les placeholders spécifiques
-            contentToSave = newContent
+            // Annulé, normal
+        }
+    }
+
+    private string PreserveImagesInContent(string content)
+    {
+        if (content.Contains("<img"))
+        {
+            return content
                 .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
                 .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
         }
         
-        TypedContent.Text = contentToSave;
-        hasUnsavedChanges = true;
-        StateHasChanged();
+        return SanitizeHtmlContent(content);
     }
 
     private bool IsValid()
     {
-        // Considérer le contenu comme valide s'il y a du texte OU des images
-        return !string.IsNullOrWhiteSpace(TypedContent.Text) || TypedContent.Text.Contains("<img");
+        return !string.IsNullOrWhiteSpace(TypedContent.Text) || 
+               TypedContent.Text.Contains("<img") ||
+               !string.IsNullOrWhiteSpace(TypedContent.Title);
     }
 
     private async Task ToggleEdit()
     {
         if (IsEditing)
         {
-            if (!IsValid())
-                return;
-
-            try
-            {
-                isSaving = true;
-                StateHasChanged();
-
-                // Log du contenu avant sauvegarde
-                Console.WriteLine($"💾 Sauvegarde du contenu: {TypedContent.Text.Substring(0, Math.Min(100, TypedContent.Text.Length))}...");
-                if (TypedContent.Text.Contains("<img"))
-                {
-                    Console.WriteLine("✅ Image confirmée dans le contenu à sauvegarder");
-                }
-
-                Block.Title = TypedContent.Title;
-                Block.Text = TypedContent.Text;
-
-                // S'assurer que le contenu HTML est dans Content pour la sérialisation JSON
-                if (Block.Content is TextBlockContent content)
-                {
-                    content.Text = TypedContent.Text;
-                    content.Title = TypedContent.Title;
-                }
-
-                if (CoursId > 0)
-                {
-                    Console.WriteLine($"TextBlock: Sauvegarde pour CoursId: {CoursId}");
-
-                    var blockService = new Mooc.Services.BlockService(DbContextFactory);
-                    bool success = await blockService.SaveBlockAsync(Block, CoursId);
-
-                    if (!success)
-                    {
-                        Console.WriteLine("❌ Erreur lors de la sauvegarde");
-                        return;
-                    }
-
-                    // Vérifier immédiatement après la sauvegarde
-                    await VerifyImageSave();
-                }
-
-                _originalContent = null;
-                IsEditing = false;
-
-                await OnBlockChanged.InvokeAsync(Block);
-
-                showSaveSuccess = true;
-                StateHasChanged();
-
-                // Forcer l'amélioration de l'affichage des images après la sauvegarde
-                await Task.Delay(100);
-                try
-                {
-                    await JSRuntime.InvokeVoidAsync("enhanceImageDisplay");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Erreur lors de l'amélioration de l'affichage: {ex.Message}");
-                }
-
-                await Task.Delay(2000);
-                showSaveSuccess = false;
-            }
-            catch (Exception ex)
-            {
-                errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
-                Console.WriteLine($"Erreur lors de la sauvegarde: {ex.Message}");
-            }
-            finally
-            {
-                isSaving = false;
-                StateHasChanged();
-            }
+            await SaveChanges();
         }
         else
         {
-            _originalContent = new TextBlockContent
+            await StartEditing();
+        }
+    }
+
+    private async Task StartEditing()
+    {
+        // Sauvegarder l'état original
+        _originalContent = new TextBlockContent
+        {
+            Title = TypedContent.Title,
+            Text = TypedContent.Text
+        };
+        
+        IsEditing = true;
+        await OnEditStateChanged.InvokeAsync(IsEditing);
+        ClearError();
+    }
+
+    private async Task SaveChanges()
+    {
+        if (!IsValid())
+        {
+            errorMessage = "Le contenu ne peut pas être vide.";
+            return;
+        }
+
+        try
+        {
+            isSaving = true;
+            ClearError();
+
+            Block.Title = TypedContent.Title;
+            Block.Text = TypedContent.Text;
+
+            // Mise à jour du contenu sérialisable
+            if (Block.Content is TextBlockContent content)
             {
-                Title = TypedContent.Title,
-                Text = TypedContent.Text
-            };
+                content.Text = TypedContent.Text;
+                content.Title = TypedContent.Title;
+            }
+
+            if (CoursId > 0)
+            {
+                var blockService = new Mooc.Services.BlockService(DbContextFactory);
+                bool success = await blockService.SaveBlockAsync(Block, CoursId);
+
+                if (!success)
+                {
+                    errorMessage = "Erreur lors de la sauvegarde.";
+                    return;
+                }
+
+                await VerifyImageSave();
+            }
+
+            _originalContent = null;
+            IsEditing = false;
+
+            await OnBlockChanged.InvokeAsync(Block);
+            await ShowSuccessMessage();
             
-            IsEditing = true;
-            await OnEditStateChanged.InvokeAsync(IsEditing);
+            // Améliorer l'affichage après sauvegarde
+            await Task.Delay(100);
+            await EnhanceImageDisplay();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
+            Console.WriteLine($"Erreur sauvegarde: {ex.Message}");
+        }
+        finally
+        {
+            isSaving = false;
             StateHasChanged();
         }
     }
 
-    // Nouvelle méthode pour vérifier la sauvegarde des images
+    private async Task ShowSuccessMessage()
+    {
+        showSaveSuccess = true;
+        StateHasChanged();
+
+        _successMessageTimer?.Dispose();
+        _successMessageTimer = new Timer(_ => InvokeAsync(() =>
+        {
+            showSaveSuccess = false;
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task CancelEdit()
+    {
+        try
+        {
+            if (_originalContent != null)
+            {
+                // Restaurer le contenu original
+                Block.Content = _originalContent;
+                Block.Title = _originalContent.Title;
+                Block.Text = _originalContent.Text;
+                _originalContent = null;
+            }
+
+            IsEditing = false;
+            ClearError();
+            await OnEditStateChanged.InvokeAsync(IsEditing);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur annulation: {ex.Message}");
+            errorMessage = "Erreur lors de l'annulation des modifications";
+        }
+        finally
+        {
+            StateHasChanged();
+        }
+    }
+
+    private async Task RequestDelete()
+    {
+        try
+        {
+            bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", 
+                "Êtes-vous sûr de vouloir supprimer ce bloc de texte ?");
+            
+            if (confirmed)
+            {
+                await OnDeleteRequested.InvokeAsync(Block);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur suppression: {ex.Message}");
+            errorMessage = "Erreur lors de la suppression";
+        }
+    }
+
+    private void ClearError()
+    {
+        errorMessage = null;
+        StateHasChanged();
+    }
+
     private async Task VerifyImageSave()
     {
         try
@@ -370,88 +413,37 @@
             using var context = await DbContextFactory.CreateDbContextAsync();
             var cours = await context.Courses.FindAsync(CoursId);
             
-            if (cours != null && !string.IsNullOrEmpty(cours.Content))
+            if (cours?.Content != null)
             {
-                var blocksFromDb = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new List<CourBuilder.CoursBlock>();
+                var blocksFromDb = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new();
                 var savedBlock = blocksFromDb.FirstOrDefault(b => b.Id == Block.Id);
                 
-                if (savedBlock != null)
+                if (savedBlock?.Text?.Contains("/uploads/images/") == true)
                 {
-                    var savedText = savedBlock.Text ?? "";
-                    // Vérifier les URLs d'images au lieu du base64
-                    if (savedText.Contains("/uploads/images/"))
-                    {
-                        Console.WriteLine("✅ SUCCÈS: URL d'image sauvegardée en base de données");
-                      }
-                      else if (savedText.Contains("<img"))
-                      {
-                        Console.WriteLine("⚠️ Image trouvée mais format non optimal");
-                      }
-                      else
-                      {
-                        Console.WriteLine("❌ Aucune image dans le contenu sauvegardé");
-                      }
+                    Console.WriteLine("✅ Image sauvegardée avec succès");
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"❌ Erreur lors de la vérification: {ex.Message}");
+            Console.WriteLine($"Erreur vérification: {ex.Message}");
         }
     }
 
-    // Améliorer la méthode CancelEdit pour préserver les images
-    private async Task CancelEdit()
-    {
-        try
-        {
-            if (_originalContent != null)
-            {
-                // Rétablir le contenu original avec les images
-                Block.Content = _originalContent;
-                Block.Title = _originalContent.Title;
-                Block.Text = _originalContent.Text;
-                
-                // Log pour debug
-                if (_originalContent.Text.Contains("<img"))
-                {
-                    Console.WriteLine("🔄 Restauration du contenu avec images");
-                }
-                
-                _originalContent = null;
-            }
-        
-            IsEditing = false;
-            hasUnsavedChanges = false;
-            errorMessage = null;
-            titleError = false;
-        
-            StateHasChanged();
-            await Task.Delay(100);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors de l'annulation: {ex.Message}");
-            errorMessage = "Erreur lors de l'annulation des modifications";
-        }
-    }
-
-    private async Task RequestDelete()
-    {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce bloc de texte ?");
-        if (confirmed)
-        {
-            if (CoursId > 0)
-            {
-                Console.WriteLine($"TextBlock: Suppression pour CoursId: {CoursId}");
-            }
-
-            await OnDeleteRequested.InvokeAsync(Block);
-        }
-    }
-     
     private string GetTypeClass() =>
         $"{(IsEditing ? "editing" : "")} {(string.IsNullOrEmpty(TypedContent.Text) ? "empty" : "")}".Trim();
+
+    private async Task HandleValidSubmit()
+    {
+        await ToggleEdit();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        _autoSaveCts?.Cancel();
+        _autoSaveCts?.Dispose();
+        _successMessageTimer?.Dispose();
+    }
 
     public class TextBlockContent
     {
@@ -461,10 +453,5 @@
         [Required(ErrorMessage = "Le contenu ne peut pas être vide")]
         [MaxLength(10000, ErrorMessage = "Le contenu ne peut pas dépasser 10 000 caractères")]
         public string Text { get; set; } = string.Empty;
-    }
-
-    private async Task HandleValidSubmit()
-    {
-        await ToggleEdit();
     }
 }

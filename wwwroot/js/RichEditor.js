@@ -361,3 +361,51 @@ if (typeof window !== 'undefined') {
         });
     }
 }
+
+// Ajouter cette fonction à RichEditor.js
+export function insertFileFromUrl(editorId, fileUrl, fileName) {
+    const editor = window.richTextEditors[editorId];
+    if (editor && editor.element) {
+        // Nettoyer le placeholder si présent
+        if (editor.element.innerHTML.includes('color: #6c757d')) {
+            editor.element.innerHTML = '';
+        }
+        
+        // Créer un lien de téléchargement pour le fichier
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileName || 'fichier';
+        link.textContent = `📎 ${fileName || 'Télécharger le fichier'}`;
+        link.style.display = 'inline-block';
+        link.style.margin = '5px';
+        link.style.padding = '8px 12px';
+        link.style.backgroundColor = '#f8f9fa';
+        link.style.border = '1px solid #dee2e6';
+        link.style.borderRadius = '4px';
+        link.style.textDecoration = 'none';
+        link.style.color = '#495057';
+        
+        // Ajouter un attribut pour identifier les fichiers uploadés
+        link.setAttribute('data-uploaded-file', 'true');
+        
+        // Insérer le lien
+        editor.element.focus();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(link);
+            range.setStartAfter(link);
+            range.setEndAfter(link);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            editor.element.appendChild(link);
+        }
+        
+        // Mettre à jour le contenu
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        console.log('📎 Fichier inséré:', fileUrl);
+    }
+}

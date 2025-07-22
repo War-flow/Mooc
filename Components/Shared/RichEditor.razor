@@ -63,9 +63,10 @@
 
             <div class="toolbar-separator"></div>
 
-            <!-- Titres -->
+            <!-- Titres avec sélection par défaut améliorée -->
             <div class="toolbar-group">
-                <select class="toolbar-select" @onchange="OnHeadingChange">
+                <select class="toolbar-select" @onchange="OnHeadingChange" value="@currentHeading">
+                    <option value="">Format normal</option>
                     <option value="h6">12</option>
                     <option value="h5">14</option>
                     <option value="h4">16</option>
@@ -109,17 +110,47 @@
                            OnChange="@OnImageSelected" 
                            accept="image/*" 
                            data-id="@($"upload-{EditorId}")" />
-                <button type="button" class="toolbar-btn" @onclick="TriggerImageUpload" title="Télécharger une image">
-                    <i class="bi bi-upload"></i>
+                <button type="button" class="toolbar-btn" @onclick="TriggerImageUpload" title="Télécharger une image" disabled="@isUploading">
+                    @if (isImageUploading)
+                    {
+                        <i class="bi bi-arrow-clockwise spin"></i>
+                    }
+                    else
+                    {
+                        <i class="bi bi-upload"></i>
+                    }
                 </button>
-                <!-- Ajouter un InputFile pour l'audio (après celui des images) -->
+
                 <InputFile @ref="audioInputComponent" 
                            style="display:none" 
                            OnChange="@OnAudioSelected" 
                            accept="audio/*" 
                            data-id="@($"upload-audio-{EditorId}")" />
-                <button type="button" class="toolbar-btn" @onclick="TriggerAudioUpload" title="Ajouter un audio">
-                    <i class="bi bi-music-note-beamed"></i>
+                <button type="button" class="toolbar-btn" @onclick="TriggerAudioUpload" title="Ajouter un audio" disabled="@isUploading">
+                    @if (isAudioUploading)
+                    {
+                        <i class="bi bi-arrow-clockwise spin"></i>
+                    }
+                    else
+                    {
+                        <i class="bi bi-music-note-beamed"></i>
+                    }
+                </button>
+
+                <InputFile @ref="fileInputComponent"
+                           style="display:none"
+                           OnChange="@OnFileSelected"
+                           accept=".pdf,.doc,.docx,.txt,.zip,.xlsx,.pptx,.xls,.rar"
+                           data-id="@($"upload-file-{EditorId}")" />
+                <button type="button" class="toolbar-btn" @onclick="TriggerFileUpload" title="Ajouter un fichier" disabled="@isUploading">
+                    @if (isFileUploading)
+                    {
+                        <i class="bi bi-arrow-clockwise spin"></i>
+                    }
+                    else
+                    {
+                        <i class="bi bi-file-earmark-arrow-down"></i>
+                    }
                 </button>
             </div>
 
@@ -140,6 +171,23 @@
         </div>
     }
 
+    <!-- Messages d'erreur et de succès -->
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger alert-dismissible fade show mt-2" role="alert">
+            <i class="bi bi-exclamation-triangle-fill"></i> @errorMessage
+            <button type="button" class="btn-close" @onclick="ClearMessages"></button>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(successMessage))
+    {
+        <div class="alert alert-success alert-dismissible fade show mt-2" role="alert">
+            <i class="bi bi-check-circle-fill"></i> @successMessage
+            <button type="button" class="btn-close" @onclick="ClearMessages"></button>
+        </div>
+    }
+
     <div @ref="editorElement" id="@EditorId" class="rich-editor-content" style="min-height: @(Height)px;"></div>
     
     @if (ShowCharacterCount)
@@ -155,7 +203,17 @@
     private IJSObjectReference? jsModule;
     private DotNetObjectReference<RichEditor>? dotNetRef;
     private string characterCount = "0";
-    private ElementReference imageInput;
+    private string currentHeading = "";
+    
+    // États d'upload
+    private bool isUploading => isImageUploading || isAudioUploading || isFileUploading;
+    private bool isImageUploading = false;
+    private bool isAudioUploading = false;
+    private bool isFileUploading = false;
+    
+    // Messages utilisateur
+    private string errorMessage = string.Empty;
+    private string successMessage = string.Empty;
 
     [Parameter] public string Value { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
@@ -165,6 +223,8 @@
     [Parameter] public bool ShowCharacterCount { get; set; } = true;
     [Parameter] public bool ShowToolbar { get; set; } = true;
     [Parameter] public string Placeholder { get; set; } = "Commencez à écrire...";
+    [Parameter] public EventCallback<string> OnError { get; set; }
+    [Parameter] public EventCallback<string> OnSuccess { get; set; }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -211,6 +271,8 @@
     private async Task OnHeadingChange(ChangeEventArgs e)
     {
         string value = e.Value?.ToString() ?? "";
+        currentHeading = value;
+        
         if (!string.IsNullOrEmpty(value))
         {
             await ExecuteCommandWithValue("formatBlock", value);
@@ -250,13 +312,30 @@
     }
 
     private InputFile? imageInputComponent;
+    private InputFile? audioInputComponent;
+    private InputFile? fileInputComponent;
 
     private async Task TriggerImageUpload()
     {
-        // Utiliser l'approche avec sélecteur CSS qui fonctionne déjà
-        if (jsModule != null)
+        if (jsModule != null && !isUploading)
         {
             await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-{EditorId}']");
+        }
+    }
+
+    private async Task TriggerAudioUpload()
+    {
+        if (jsModule != null && !isUploading)
+        {
+            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-audio-{EditorId}']");
+        }
+    }
+
+    private async Task TriggerFileUpload()
+    {
+        if (jsModule != null && !isUploading)
+        {
+            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-file-{EditorId}']");
         }
     }
 
@@ -268,57 +347,37 @@
             
             if (file != null)
             {
-                if (file.Size > 10 * 1024 * 1024) // 10MB max
-                {
-                    Console.WriteLine("❌ Fichier trop volumineux");
-                    return;
-                }
-                
-                if (!file.ContentType.StartsWith("image/"))
-                {
-                    Console.WriteLine("❌ Type de fichier non supporté");
-                    return;
-                }
+                isImageUploading = true;
+                ClearMessages();
+                StateHasChanged();
 
                 try
                 {
-                    // Utiliser le FileUploadService pour sauvegarder l'image
                     var uploadResult = await FileUploadService.UploadImageAsync(file);
 
-                    // Supposons que uploadResult est de type string (chemin de l'image ou message d'erreur)
-                    // Adaptez le code pour traiter uploadResult comme une chaîne
                     if (!string.IsNullOrEmpty(uploadResult))
                     {
-                        // Utiliser l'URL du serveur au lieu du base64
-                        var imageUrl = uploadResult; // Par exemple: "/uploads/images/unique-filename.jpg"
-                        
                         if (jsModule != null)
                         {
-                            await jsModule.InvokeVoidAsync("insertImageFromUrl", EditorId, imageUrl);
-                            Console.WriteLine($"✅ Image sauvegardée: {imageUrl}");
+                            await jsModule.InvokeVoidAsync("insertImageFromUrl", EditorId, uploadResult);
+                            await ShowSuccessMessage($"Image '{file.Name}' ajoutée avec succès");
                         }
                     }
                     else
                     {
-                        Console.WriteLine("❌ Erreur lors de l'upload de l'image");
+                        await ShowErrorMessage("Erreur lors de l'upload de l'image");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Erreur lors du téléchargement de l'image: {ex.Message}");
+                    await ShowErrorMessage($"Erreur : {ex.Message}");
+                }
+                finally
+                {
+                    isImageUploading = false;
+                    StateHasChanged();
                 }
             }
-        }
-    }
-
-    private InputFile? audioInputComponent;
-
-    private async Task TriggerAudioUpload()
-    {
-        // Utiliser l'approche avec sélecteur CSS qui fonctionne déjà
-        if (jsModule != null)
-        {
-            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-audio-{EditorId}']");
         }
     }
 
@@ -330,47 +389,133 @@
             
             if (file != null)
             {
-                if (file.Size > 10 * 1024 * 1024) // 10MB max
-                {
-                    Console.WriteLine("❌ Fichier audio trop volumineux");
-                    return;
-                }
-                
-                if (!file.ContentType.StartsWith("audio/"))
-                {
-                    Console.WriteLine("❌ Type de fichier audio non supporté");
-                    return;
-                }
+                isAudioUploading = true;
+                ClearMessages();
+                StateHasChanged();
 
                 try
                 {
-                    // Utiliser le FileUploadService pour sauvegarder l'audio
                     var uploadResult = await FileUploadService.UploadAudioAsync(file);
 
-                    // Supposons que uploadResult est de type string (chemin de l'audio ou message d'erreur)
-                    // Adaptez le code pour traiter uploadResult comme une chaîne
                     if (!string.IsNullOrEmpty(uploadResult))
                     {
-                        // Utiliser l'URL du serveur au lieu du base64
-                        var audioUrl = uploadResult; // Par exemple: "/uploads/audios/unique-filename.mp3"
-                        
                         if (jsModule != null)
                         {
-                            await jsModule.InvokeVoidAsync("insertAudioFromUrl", EditorId, audioUrl);
-                            Console.WriteLine($"✅ Audio sauvegardé: {audioUrl}");
+                            await jsModule.InvokeVoidAsync("insertAudioFromUrl", EditorId, uploadResult);
+                            await ShowSuccessMessage($"Audio '{file.Name}' ajouté avec succès");
                         }
                     }
                     else
                     {
-                        Console.WriteLine("❌ Erreur lors de l'upload de l'audio");
+                        await ShowErrorMessage("Erreur lors de l'upload de l'audio");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Erreur lors du téléchargement de l'audio: {ex.Message}");
+                    await ShowErrorMessage($"Erreur : {ex.Message}");
+                }
+                finally
+                {
+                    isAudioUploading = false;
+                    StateHasChanged();
                 }
             }
         }
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        if (e?.FileCount > 0)
+        {
+            var file = e.GetMultipleFiles(1).FirstOrDefault();
+
+            if (file != null)
+            {
+                isFileUploading = true;
+                ClearMessages();
+                StateHasChanged();
+
+                try
+                {
+                    var uploadResult = await FileUploadService.UploadFileAsync(file);
+
+                    if (!string.IsNullOrEmpty(uploadResult))
+                    {
+                        if (jsModule != null)
+                        {
+                            await jsModule.InvokeVoidAsync("insertFileFromUrl", EditorId, uploadResult, file.Name);
+                            await ShowSuccessMessage($"Fichier '{file.Name}' ajouté avec succès");
+                        }
+                    }
+                    else
+                    {
+                        await ShowErrorMessage("Erreur lors de l'upload du fichier");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await ShowErrorMessage($"Erreur : {ex.Message}");
+                }
+                finally
+                {
+                    isFileUploading = false;
+                    StateHasChanged();
+                }
+            }
+        }
+    }
+
+    private async Task ShowErrorMessage(string message)
+    {
+        errorMessage = message;
+        successMessage = string.Empty;
+        
+        if (OnError.HasDelegate)
+        {
+            await OnError.InvokeAsync(message);
+        }
+        
+        StateHasChanged();
+        
+        // Auto-clear après 5 secondes
+        _ = Task.Delay(5000).ContinueWith(_ => 
+        {
+            InvokeAsync(() =>
+            {
+                errorMessage = string.Empty;
+                StateHasChanged();
+            });
+        });
+    }
+
+    private async Task ShowSuccessMessage(string message)
+    {
+        successMessage = message;
+        errorMessage = string.Empty;
+        
+        if (OnSuccess.HasDelegate)
+        {
+            await OnSuccess.InvokeAsync(message);
+        }
+        
+        StateHasChanged();
+        
+        // Auto-clear après 3 secondes
+        _ = Task.Delay(3000).ContinueWith(_ => 
+        {
+            InvokeAsync(() =>
+            {
+                successMessage = string.Empty;
+                StateHasChanged();
+            });
+        });
+    }
+
+    private void ClearMessages()
+    {
+        errorMessage = string.Empty;
+        successMessage = string.Empty;
+        StateHasChanged();
     }
 
     public async Task SetContent(string content)

@@ -1,161 +1,208 @@
 ﻿using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System;
 using System.IO;
 using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace Mooc.Services
 {
     public class FileUploadService
     {
+        /// <summary>
+        /// Service pour gérer les uploads de fichiers.
+        /// </summary>
         private readonly IWebHostEnvironment _environment;
+        private readonly ILogger<FileUploadService> _logger;
+        private readonly IConfiguration _configuration;
 
-        public FileUploadService(IWebHostEnvironment environment)
+        // Configuration par défaut
+        private readonly string[] _allowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp" };
+        private readonly string[] _allowedAudioExtensions = { ".mp3", ".wav", ".ogg", ".m4a", ".webm" };
+        private readonly string[] _allowedFileExtensions = { ".pdf", ".doc", ".docx", ".txt", ".zip", ".xlsx", ".pptx", ".xls", ".rar" };
+
+        // Tailles maximales par type de fichier
+        private readonly Dictionary<string, long> _maxFileSizes = new()
+        {
+            { "image", 2 * 1024 * 1024 }, // 2MB
+            { "audio", 10 * 1024 * 1024 }, // 10MB
+            { "file", 50 * 1024 * 1024 } // 50MB
+        };
+
+        /// <summary>
+        /// Constructeur du service d'upload de fichiers.
+        /// </summary>
+        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IConfiguration configuration)
         {
             _environment = environment;
+            _logger = logger;
+            _configuration = configuration;
         }
 
+        /// <summary>
+        /// Upload une image.
+        /// </summary>
         public async Task<string> UploadImageAsync(IBrowserFile file)
         {
+            _logger.LogInformation("Début de l'upload d'image: {FileName}, Taille: {Size} bytes", file.Name, file.Size);
+            
             try
             {
-                // Vérifie que c'est bien une image
-                if (!file.ContentType.StartsWith("image/"))
-                {
-                    throw new InvalidOperationException("Le fichier doit être une image.");
-                }
+                ValidateFile(file, "image", _allowedImageExtensions, _maxFileSizes["image"]);
+                
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "images");
+                EnsureDirectoryExists(uploadsFolder);
 
-                // Crée le dossier s'il n'existe pas
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "sessions");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                // Crée un nom de fichier unique
-                var uniqueFileName = $"{Guid.NewGuid()}_{file.Name}";
+                var uniqueFileName = GenerateUniqueFileName(file.Name);
                 var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                // Limite la taille du fichier à 2MB
-                const long maxFileSize = 2 * 1024 * 1024; // 2MB
-                await using var stream = file.OpenReadStream(maxFileSize);
-                await using var fileStream = new FileStream(filePath, FileMode.Create);
-                await stream.CopyToAsync(fileStream);
-
-                // Retourne le chemin relatif pour l'utilisation dans l'application
-                return $"/uploads/sessions/{uniqueFileName}";
+                await SaveFileAsync(file, filePath, _maxFileSizes["image"]);
+                
+                var relativePath = $"/uploads/images/{uniqueFileName}";
+                _logger.LogInformation("Upload d'image réussi: {RelativePath}", relativePath);
+                
+                return relativePath;
             }
             catch (Exception ex)
             {
-                // Log error or handle accordingly
+                _logger.LogError(ex, "Erreur lors de l'upload d'image: {FileName}", file.Name);
                 throw new InvalidOperationException($"Erreur lors de l'upload de l'image : {ex.Message}", ex);
             }
         }
 
-        // Méthode pour télécharger un fichier avec rapport de progression
-        public async Task<string> UploadFileAsync(Stream fileStream, string contentType, IProgress<double> progress)
+        /// <summary>
+        ///     
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public async Task<string> UploadAudioAsync(IBrowserFile file)
         {
+            _logger.LogInformation("Début de l'upload d'audio: {FileName}, Taille: {Size} bytes", file.Name, file.Size);
+            
             try
             {
-                // Déterminer le dossier cible en fonction du type de contenu
-                string subfolder = contentType.StartsWith("image/") ? "images" : "files";
+                ValidateFile(file, "audio", _allowedAudioExtensions, _maxFileSizes["audio"]);
                 
-                // Crée le dossier s'il n'existe pas
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", subfolder);
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "audio");
+                EnsureDirectoryExists(uploadsFolder);
 
-                // Crée un nom de fichier unique
-                var uniqueFileName = $"{Guid.NewGuid()}.{GetFileExtensionFromContentType(contentType)}";
+                var uniqueFileName = GenerateUniqueFileName(file.Name);
                 var filePath = Path.Combine(uploadsFolder, uniqueFileName);
 
-                // Créer un buffer pour la lecture
-                var buffer = new byte[4096];
-                var totalRead = 0L;
-                var fileLength = fileStream.Length;
+                await SaveFileAsync(file, filePath, _maxFileSizes["audio"]);
                 
-                // Créer un nouveau fichier pour écrire
-                await using var fileWriteStream = new FileStream(filePath, FileMode.Create);
+                var relativePath = $"/uploads/audio/{uniqueFileName}";
+                _logger.LogInformation("Upload d'audio réussi: {RelativePath}", relativePath);
                 
-                // Lire et écrire par blocs avec rapport de progression
-                int bytesRead;
-                while ((bytesRead = await fileStream.ReadAsync(buffer)) > 0)
-                {
-                    await fileWriteStream.WriteAsync(buffer.AsMemory(0, bytesRead));
-                    totalRead += bytesRead;
-                    progress?.Report((double)totalRead / fileLength * 100);
-                }
-
-                // Retourne le chemin relatif pour l'utilisation dans l'application
-                return $"/uploads/{subfolder}/{uniqueFileName}";
+                return relativePath;
             }
             catch (Exception ex)
             {
-                // Log error or handle accordingly
+                _logger.LogError(ex, "Erreur lors de l'upload d'audio: {FileName}", file.Name);
+                throw new InvalidOperationException($"Erreur lors de l'upload de l'audio : {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        ///     
+        /// </summary>
+        /// <param name="file"></param>
+        /// <returns></returns>
+        /// <exception cref="InvalidOperationException"></exception>
+        public async Task<string> UploadFileAsync(IBrowserFile file)
+        {
+            _logger.LogInformation("Début de l'upload de fichier: {FileName}, Taille: {Size} bytes", file.Name, file.Size);
+            
+            try
+            {
+                ValidateFile(file, "file", _allowedFileExtensions, _maxFileSizes["file"]);
+                
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "files");
+                EnsureDirectoryExists(uploadsFolder);
+
+                var uniqueFileName = GenerateUniqueFileName(file.Name);
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                await SaveFileAsync(file, filePath, _maxFileSizes["file"]);
+                
+                var relativePath = $"/uploads/files/{uniqueFileName}";
+                _logger.LogInformation("Upload de fichier réussi: {RelativePath}", relativePath);
+                
+                return relativePath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de l'upload de fichier: {FileName}", file.Name);
                 throw new InvalidOperationException($"Erreur lors de l'upload du fichier : {ex.Message}", ex);
             }
         }
 
-        public async Task<(bool Success, string? FileUrl, string? ErrorMessage)> UploadFileAsync(Stream fileStream, string fileName)
+        // Méthodes utilitaires privées
+        private void ValidateFile(IBrowserFile file, string fileType, string[] allowedExtensions, long maxSize)
         {
-            try
+            if (file == null)
+                throw new ArgumentNullException(nameof(file));
+
+            if (file.Size <= 0)
+                throw new InvalidOperationException("Le fichier est vide.");
+
+            if (file.Size > maxSize)
+                throw new InvalidOperationException($"Le fichier est trop volumineux. Taille maximale autorisée : {maxSize / (1024 * 1024)} MB.");
+
+            var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+            if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
             {
-                // Crée le dossier s'il n'existe pas
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "files");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                // Crée un nom de fichier unique
-                var uniqueFileName = $"{Guid.NewGuid()}_{fileName}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                // Écrit le fichier sur le disque
-                await using var fileWriteStream = new FileStream(filePath, FileMode.Create);
-                await fileStream.CopyToAsync(fileWriteStream);
-
-                // Retourne le chemin relatif pour l'utilisation dans l'application
-                return (true, $"/uploads/files/{uniqueFileName}", null);
+                throw new InvalidOperationException($"Type de fichier non autorisé. Extensions acceptées pour {fileType} : {string.Join(", ", allowedExtensions)}");
             }
-            catch (Exception ex)
+
+            // Validation supplémentaire du nom de fichier
+            if (string.IsNullOrWhiteSpace(file.Name) || file.Name.Length > 255)
+                throw new InvalidOperationException("Nom de fichier invalide.");
+        }
+
+        private string GenerateUniqueFileName(string originalFileName)
+        {
+            var sanitizedName = SanitizeFileName(originalFileName);
+            return $"{Guid.NewGuid()}_{sanitizedName}";
+        }
+
+        private static string SanitizeFileName(string fileName)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                return "file";
+
+            // Supprimer les caractères non autorisés
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+            
+            // Remplacer les espaces par des underscores et limiter la longueur
+            sanitized = Regex.Replace(sanitized, @"\s+", "_");
+            sanitized = sanitized.Length > 100 ? sanitized[..100] : sanitized;
+            
+            return string.IsNullOrEmpty(sanitized) ? "file" : sanitized;
+        }
+
+        private void EnsureDirectoryExists(string directoryPath)
+        {
+            if (!Directory.Exists(directoryPath))
             {
-                // Log error or handle accordingly
-                return (false, null, $"Erreur lors de l'upload du fichier : {ex.Message}");
+                Directory.CreateDirectory(directoryPath);
+                _logger.LogInformation("Dossier créé: {DirectoryPath}", directoryPath);
             }
         }
 
-        public void DeleteImage(string imagePath)
+        private async Task SaveFileAsync(IBrowserFile file, string filePath, long maxSize)
         {
-            if (string.IsNullOrEmpty(imagePath))
-                return;
-
-            try
-            {
-                // Extraire le nom du fichier du chemin relatif
-                string fileName = Path.GetFileName(imagePath);
-                
-                // Déterminer le dossier en fonction du chemin
-                string subfolder = imagePath.Contains("/images/") ? "images" : "sessions";
-                
-                // Construire le chemin absolu
-                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", subfolder, fileName);
-                
-                // Vérifier si le fichier existe avant de le supprimer
-                if (File.Exists(fullPath))
-                {
-                    File.Delete(fullPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                // Log error or handle accordingly
-                throw new InvalidOperationException($"Erreur lors de la suppression de l'image : {ex.Message}", ex);
-            }
+            await using var stream = file.OpenReadStream(maxSize);
+            await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true);
+            await stream.CopyToAsync(fileStream);
         }
-
+        // <summary>
+        /// Supprime un fichier du serveur.
+        
         public void DeleteFile(string filePath)
         {
             if (string.IsNullOrEmpty(filePath))
@@ -163,81 +210,34 @@ namespace Mooc.Services
 
             try
             {
-                // Extraire le nom du fichier du chemin relatif
-                string fileName = Path.GetFileName(filePath);
+                var fileName = Path.GetFileName(filePath);
+                var subfolder = DetermineSubfolder(filePath);
+                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", subfolder, fileName);
                 
-                // Construire le chemin absolu
-                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", "files", fileName);
-                
-                // Vérifier si le fichier existe avant de le supprimer
                 if (File.Exists(fullPath))
                 {
                     File.Delete(fullPath);
+                    _logger.LogInformation("Fichier supprimé: {FilePath}", fullPath);
+                }
+                else
+                {
+                    _logger.LogWarning("Tentative de suppression d'un fichier inexistant: {FilePath}", fullPath);
                 }
             }
             catch (Exception ex)
             {
-                // Log error or handle accordingly
+                _logger.LogError(ex, "Erreur lors de la suppression du fichier: {FilePath}", filePath);
                 throw new InvalidOperationException($"Erreur lors de la suppression du fichier : {ex.Message}", ex);
             }
         }
-        
-        // Méthode utilitaire pour obtenir l'extension de fichier à partir du type de contenu
-        private string GetFileExtensionFromContentType(string contentType)
+
+        private static string DetermineSubfolder(string filePath)
         {
-            return contentType switch
-            {
-                "image/jpeg" => "jpg",
-                "image/png" => "png",
-                "image/gif" => "gif",
-                "image/svg+xml" => "svg",
-                "image/webp" => "webp",
-                "image/bmp" => "bmp",
-                "image/tiff" => "tiff",
-                "audio/mpeg" => "mp3",
-                "audio/ogg" => "ogg",
-                "audio/wav" => "wav",
-                "audio/mp4" => "m4a",
-                "audio/webm" => "webm",
-                _ => "bin"
-            };
-        }
-
-        public async Task<string> UploadAudioAsync(IBrowserFile file)
-        {
-            try
-            {
-                // Vérifie que c'est bien un fichier audio
-                if (!file.ContentType.StartsWith("audio/"))
-                {
-                    throw new InvalidOperationException("Le fichier doit être un audio.");
-                }
-
-                // Crée le dossier s'il n'existe pas
-                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "audio");
-                if (!Directory.Exists(uploadsFolder))
-                {
-                    Directory.CreateDirectory(uploadsFolder);
-                }
-
-                // Crée un nom de fichier unique
-                var uniqueFileName = $"{Guid.NewGuid()}_{file.Name}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                // Limite la taille du fichier à 10MB pour l'audio
-                const long maxFileSize = 10 * 1024 * 1024; // 10MB
-                await using var stream = file.OpenReadStream(maxFileSize);
-                await using var fileStream = new FileStream(filePath, FileMode.Create);
-                await stream.CopyToAsync(fileStream);
-
-                // Retourne le chemin relatif pour l'utilisation dans l'application
-                return $"/uploads/audio/{uniqueFileName}";
-            }
-            catch (Exception ex)
-            {
-                // Log error or handle accordingly
-                throw new InvalidOperationException($"Erreur lors de l'upload de l'audio : {ex.Message}", ex);
-            }
+            if (filePath.Contains("/images/")) return "images";
+            if (filePath.Contains("/audio/")) return "audio";
+            if (filePath.Contains("/files/")) return "files";
+            if (filePath.Contains("/sessions/")) return "sessions";
+            return "files"; // Par défaut
         }
     }
 }
