@@ -194,8 +194,50 @@ namespace Mooc.Services
                 "image/webp" => "webp",
                 "image/bmp" => "bmp",
                 "image/tiff" => "tiff",
+                "audio/mpeg" => "mp3",
+                "audio/ogg" => "ogg",
+                "audio/wav" => "wav",
+                "audio/mp4" => "m4a",
+                "audio/webm" => "webm",
                 _ => "bin"
             };
+        }
+
+        public async Task<string> UploadAudioAsync(IBrowserFile file)
+        {
+            try
+            {
+                // Vérifie que c'est bien un fichier audio
+                if (!file.ContentType.StartsWith("audio/"))
+                {
+                    throw new InvalidOperationException("Le fichier doit être un audio.");
+                }
+
+                // Crée le dossier s'il n'existe pas
+                var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "audio");
+                if (!Directory.Exists(uploadsFolder))
+                {
+                    Directory.CreateDirectory(uploadsFolder);
+                }
+
+                // Crée un nom de fichier unique
+                var uniqueFileName = $"{Guid.NewGuid()}_{file.Name}";
+                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+
+                // Limite la taille du fichier à 10MB pour l'audio
+                const long maxFileSize = 10 * 1024 * 1024; // 10MB
+                await using var stream = file.OpenReadStream(maxFileSize);
+                await using var fileStream = new FileStream(filePath, FileMode.Create);
+                await stream.CopyToAsync(fileStream);
+
+                // Retourne le chemin relatif pour l'utilisation dans l'application
+                return $"/uploads/audio/{uniqueFileName}";
+            }
+            catch (Exception ex)
+            {
+                // Log error or handle accordingly
+                throw new InvalidOperationException($"Erreur lors de l'upload de l'audio : {ex.Message}", ex);
+            }
         }
     }
 }

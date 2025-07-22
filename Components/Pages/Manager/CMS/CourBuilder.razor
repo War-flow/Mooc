@@ -4,7 +4,6 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("image")'>Ajouter une image</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("audio")'>Ajouter un audio</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
     <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("tableau")'>Ajouter un tableau</button>
@@ -58,9 +57,6 @@
 
         /// <summary>Message d’information ou d’erreur.</summary>
         public string? Message { get; set; }
-
-        /// <summary>URL de l’image associée.</summary>
-        public string? ImageUrl { get; set; }
 
         /// <summary>URL de l’audio associé.</summary>
         public string? AudioUrl { get; set; }
@@ -226,7 +222,6 @@
     Type GetBlockComponent(string type) => type switch
     {
         "texte" => typeof(TextBlock),
-        "image" => typeof(ImageBlock),
         "quiz" => typeof(QuizBlock),
         "audio" => typeof(AudioBlock),
         "tableau" => typeof(TableBlock),

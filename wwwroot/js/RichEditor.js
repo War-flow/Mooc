@@ -150,12 +150,69 @@ export function insertVideo(editorId) {
     }
 }
 
-export function insertAudio(editorId) {
-    const url = prompt("URL de l'audio (mp3, ogg, etc.) :");
-    if (url) {
-        const audioHtml = `<audio controls style="width:100%"><source src="${url}" type="audio/mpeg"></audio>`;
-        document.getElementById(editorId).focus();
-        document.execCommand('insertHTML', false, audioHtml);
+// Nouvelle fonction pour insérer l'audio depuis une URL
+export function insertAudioFromUrl(editorId, audioUrl) {
+    const editor = window.richTextEditors[editorId];
+    if (editor && editor.element) {
+        // Nettoyer le placeholder si présent
+        if (editor.element.innerHTML.includes('color: #6c757d')) {
+            editor.element.innerHTML = '';
+        }
+        
+        // Créer l'élément audio
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.style.width = "100%";
+        audio.style.maxWidth = "100%";
+        audio.style.display = "block";
+        audio.style.margin = "10px auto";
+        
+        // Créer l'élément source
+        const source = document.createElement('source');
+        source.src = audioUrl;
+        source.type = getAudioMimeType(audioUrl);
+        
+        audio.appendChild(source);
+        
+        // Ajouter un attribut pour identifier les audios uploadés
+        audio.setAttribute('data-uploaded-audio', 'true');
+        
+        // Insérer l'audio
+        editor.element.focus();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(audio);
+            range.setStartAfter(audio);
+            range.setEndAfter(audio);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            editor.element.appendChild(audio);
+        }
+        
+        // Mettre à jour le contenu
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        console.log('🎵 Audio URL inséré:', audioUrl);
+    }
+}
+
+// Fonction utilitaire pour déterminer le type MIME de l'audio
+function getAudioMimeType(audioUrl) {
+    const extension = audioUrl.split('.').pop().toLowerCase();
+    switch (extension) {
+        case 'mp3':
+            return 'audio/mpeg';
+        case 'ogg':
+            return 'audio/ogg';
+        case 'wav':
+            return 'audio/wav';
+        case 'm4a':
+            return 'audio/mp4';
+        default:
+            return 'audio/mpeg';
     }
 }
 

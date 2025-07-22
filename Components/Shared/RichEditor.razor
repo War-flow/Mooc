@@ -104,9 +104,6 @@
                 <button type="button" class="toolbar-btn" @onclick="InsertVideo" title="Insérer une vidéo">
                     <i class="bi bi-camera-video"></i>
                 </button>
-                <button type="button" class="toolbar-btn" @onclick="InsertAudio" title="Insérer un audio">
-                    <i class="bi bi-mic"></i>
-                </button>
                 <InputFile @ref="imageInputComponent" 
                            style="display:none" 
                            OnChange="@OnImageSelected" 
@@ -114,6 +111,15 @@
                            data-id="@($"upload-{EditorId}")" />
                 <button type="button" class="toolbar-btn" @onclick="TriggerImageUpload" title="Télécharger une image">
                     <i class="bi bi-upload"></i>
+                </button>
+                <!-- Ajouter un InputFile pour l'audio (après celui des images) -->
+                <InputFile @ref="audioInputComponent" 
+                           style="display:none" 
+                           OnChange="@OnAudioSelected" 
+                           accept="audio/*" 
+                           data-id="@($"upload-audio-{EditorId}")" />
+                <button type="button" class="toolbar-btn" @onclick="TriggerAudioUpload" title="Ajouter un audio">
+                    <i class="bi bi-music-note-beamed"></i>
                 </button>
             </div>
 
@@ -235,27 +241,11 @@
         }
     }
 
-    private async Task InsertImage()
-    {
-        if (jsModule != null)
-        {
-            await jsModule.InvokeVoidAsync("insertImage", EditorId);
-        }
-    }
-
     private async Task InsertVideo()
     {
         if (jsModule != null)
         {
             await jsModule.InvokeVoidAsync("insertVideo", EditorId);
-        }
-    }
-
-    private async Task InsertAudio()
-    {
-        if (jsModule != null)
-        {
-            await jsModule.InvokeVoidAsync("insertAudio", EditorId);
         }
     }
 
@@ -316,6 +306,68 @@
                 catch (Exception ex)
                 {
                     Console.WriteLine($"❌ Erreur lors du téléchargement de l'image: {ex.Message}");
+                }
+            }
+        }
+    }
+
+    private InputFile? audioInputComponent;
+
+    private async Task TriggerAudioUpload()
+    {
+        // Utiliser l'approche avec sélecteur CSS qui fonctionne déjà
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-audio-{EditorId}']");
+        }
+    }
+
+    private async Task OnAudioSelected(InputFileChangeEventArgs e)
+    {
+        if (e?.FileCount > 0)
+        {
+            var file = e.GetMultipleFiles(1).FirstOrDefault();
+            
+            if (file != null)
+            {
+                if (file.Size > 10 * 1024 * 1024) // 10MB max
+                {
+                    Console.WriteLine("❌ Fichier audio trop volumineux");
+                    return;
+                }
+                
+                if (!file.ContentType.StartsWith("audio/"))
+                {
+                    Console.WriteLine("❌ Type de fichier audio non supporté");
+                    return;
+                }
+
+                try
+                {
+                    // Utiliser le FileUploadService pour sauvegarder l'audio
+                    var uploadResult = await FileUploadService.UploadAudioAsync(file);
+
+                    // Supposons que uploadResult est de type string (chemin de l'audio ou message d'erreur)
+                    // Adaptez le code pour traiter uploadResult comme une chaîne
+                    if (!string.IsNullOrEmpty(uploadResult))
+                    {
+                        // Utiliser l'URL du serveur au lieu du base64
+                        var audioUrl = uploadResult; // Par exemple: "/uploads/audios/unique-filename.mp3"
+                        
+                        if (jsModule != null)
+                        {
+                            await jsModule.InvokeVoidAsync("insertAudioFromUrl", EditorId, audioUrl);
+                            Console.WriteLine($"✅ Audio sauvegardé: {audioUrl}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("❌ Erreur lors de l'upload de l'audio");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Erreur lors du téléchargement de l'audio: {ex.Message}");
                 }
             }
         }
