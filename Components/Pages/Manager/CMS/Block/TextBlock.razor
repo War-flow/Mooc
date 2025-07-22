@@ -1,12 +1,17 @@
 ﻿@page "/manager/cms/block/text/{blockId:int}"
 @using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.EntityFrameworkCore.Internal
 @using Microsoft.JSInterop
+@using Mooc.Data
 @using Mooc.Services
 @using static Mooc.Components.Pages.Manager.CMS.CourBuilder
 @inject IJSRuntime JSRuntime
 @using Mooc.Components.Shared
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 
 @using System.ComponentModel.DataAnnotations
+@using System.Text.Json
 
 <EditForm Model="TypedContent" OnValidSubmit="HandleValidSubmit">
     <DataAnnotationsValidator />
@@ -48,7 +53,14 @@
             else
             {
                 <div class="text-message">
-                    @((MarkupString)TypedContent.Text)
+                    @if (!string.IsNullOrEmpty(TypedContent.Text))
+                    {
+                        @((MarkupString)SanitizeHtmlContent(TypedContent.Text))
+                    }
+                    else
+                    {
+                        <em class="text-muted">Aucun contenu</em>
+                    }
                 </div>
             }
         </div>
@@ -172,6 +184,22 @@
         Console.WriteLine($"TextBlock OnParametersSet - CoursId: {CoursId}, Block.Id: {Block?.Id}");
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender && richEditorRef != null && !IsEditing)
+        {
+            // Appeler la fonction JavaScript pour améliorer l'affichage des images après le rendu
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("enhanceImageDisplay");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de l'amélioration de l'affichage des images: {ex.Message}");
+            }
+        }
+    }
+
     private void EnsureContentInitialized()
     {
         if (Block?.Content is not TextBlockContent)
@@ -184,16 +212,59 @@
         }
     }
 
+    private string SanitizeHtmlContent(string htmlContent)
+    {
+        if (string.IsNullOrEmpty(htmlContent))
+            return string.Empty;
+            
+        // Nettoyer le contenu des placeholders résiduels SANS toucher aux images
+        var cleaned = htmlContent
+            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
+            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
+            
+        // Log pour debug - vérifier si des images sont présentes après nettoyage
+        if (cleaned.Contains("<img"))
+        {
+            Console.WriteLine("✅ Images préservées dans le contenu après nettoyage");
+        }
+            
+        return cleaned.Trim();
+    }
+
     private async Task OnTextContentChanged(string newContent)
     {
-        TypedContent.Text = newContent;
+        // Log pour debug
+        if (newContent.Contains("<img"))
+        {
+            Console.WriteLine($"📷 Image détectée dans le contenu: {newContent.Substring(0, Math.Min(100, newContent.Length))}...");
+        }
+        
+        // CORRECTION: Ne pas nettoyer le contenu qui contient des images
+        // Garder le contenu original avec les images
+        string contentToSave = newContent;
+        
+        // Nettoyer seulement les placeholders s'il n'y a pas d'images
+        if (!newContent.Contains("<img"))
+        {
+            contentToSave = SanitizeHtmlContent(newContent);
+        }
+        else
+        {
+            // Pour les contenus avec images, nettoyer seulement les placeholders spécifiques
+            contentToSave = newContent
+                .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
+                .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
+        }
+        
+        TypedContent.Text = contentToSave;
         hasUnsavedChanges = true;
         StateHasChanged();
     }
 
     private bool IsValid()
     {
-        return !string.IsNullOrWhiteSpace(TypedContent.Text);
+        // Considérer le contenu comme valide s'il y a du texte OU des images
+        return !string.IsNullOrWhiteSpace(TypedContent.Text) || TypedContent.Text.Contains("<img");
     }
 
     private async Task ToggleEdit()
@@ -208,22 +279,59 @@
                 isSaving = true;
                 StateHasChanged();
 
+                // Log du contenu avant sauvegarde
+                Console.WriteLine($"💾 Sauvegarde du contenu: {TypedContent.Text.Substring(0, Math.Min(100, TypedContent.Text.Length))}...");
+                if (TypedContent.Text.Contains("<img"))
+                {
+                    Console.WriteLine("✅ Image confirmée dans le contenu à sauvegarder");
+                }
+
                 Block.Title = TypedContent.Title;
                 Block.Text = TypedContent.Text;
-                
+
+                // S'assurer que le contenu HTML est dans Content pour la sérialisation JSON
+                if (Block.Content is TextBlockContent content)
+                {
+                    content.Text = TypedContent.Text;
+                    content.Title = TypedContent.Title;
+                }
+
                 if (CoursId > 0)
                 {
                     Console.WriteLine($"TextBlock: Sauvegarde pour CoursId: {CoursId}");
+
+                    var blockService = new Mooc.Services.BlockService(DbContextFactory);
+                    bool success = await blockService.SaveBlockAsync(Block, CoursId);
+
+                    if (!success)
+                    {
+                        Console.WriteLine("❌ Erreur lors de la sauvegarde");
+                        return;
+                    }
+
+                    // Vérifier immédiatement après la sauvegarde
+                    await VerifyImageSave();
                 }
-                
+
                 _originalContent = null;
                 IsEditing = false;
-                
+
                 await OnBlockChanged.InvokeAsync(Block);
-                
+
                 showSaveSuccess = true;
                 StateHasChanged();
-                
+
+                // Forcer l'amélioration de l'affichage des images après la sauvegarde
+                await Task.Delay(100);
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("enhanceImageDisplay");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors de l'amélioration de l'affichage: {ex.Message}");
+                }
+
                 await Task.Delay(2000);
                 showSaveSuccess = false;
             }
@@ -252,15 +360,64 @@
         }
     }
 
+    // Nouvelle méthode pour vérifier la sauvegarde des images
+    private async Task VerifyImageSave()
+    {
+        try
+        {
+            await Task.Delay(500);
+            
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses.FindAsync(CoursId);
+            
+            if (cours != null && !string.IsNullOrEmpty(cours.Content))
+            {
+                var blocksFromDb = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new List<CourBuilder.CoursBlock>();
+                var savedBlock = blocksFromDb.FirstOrDefault(b => b.Id == Block.Id);
+                
+                if (savedBlock != null)
+                {
+                    var savedText = savedBlock.Text ?? "";
+                    // Vérifier les URLs d'images au lieu du base64
+                    if (savedText.Contains("/uploads/images/"))
+                    {
+                        Console.WriteLine("✅ SUCCÈS: URL d'image sauvegardée en base de données");
+                      }
+                      else if (savedText.Contains("<img"))
+                      {
+                        Console.WriteLine("⚠️ Image trouvée mais format non optimal");
+                      }
+                      else
+                      {
+                        Console.WriteLine("❌ Aucune image dans le contenu sauvegardé");
+                      }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Erreur lors de la vérification: {ex.Message}");
+        }
+    }
+
+    // Améliorer la méthode CancelEdit pour préserver les images
     private async Task CancelEdit()
     {
         try
         {
             if (_originalContent != null)
             {
+                // Rétablir le contenu original avec les images
                 Block.Content = _originalContent;
                 Block.Title = _originalContent.Title;
                 Block.Text = _originalContent.Text;
+                
+                // Log pour debug
+                if (_originalContent.Text.Contains("<img"))
+                {
+                    Console.WriteLine("🔄 Restauration du contenu avec images");
+                }
+                
                 _originalContent = null;
             }
         

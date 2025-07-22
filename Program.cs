@@ -1,6 +1,4 @@
-﻿using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.ResponseCompression;
 using Microsoft.EntityFrameworkCore;
@@ -8,11 +6,9 @@ using Microsoft.Net.Http.Headers;
 using Mooc.Components;
 using Mooc.Components.Account;
 using Mooc.Data;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
 using Mooc.Services;
-using System.IO.Compression;
 using System.Text.Json.Serialization;
-using Microsoft.JSInterop;
+
 
 namespace Mooc
 {

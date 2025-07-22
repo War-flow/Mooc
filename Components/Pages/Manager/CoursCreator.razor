@@ -116,16 +116,7 @@
                 <h4>Contenu du cours</h4>
             </div>
             <div class="card-body">
-                <!-- Boutons flottants -->
-                <div class="floating-buttons">
-                    <button type="button" class="btn" @onclick="MoveSelectedBlockUp" title="Déplacer le bloc sélectionné vers le haut">
-                        <i class="bi bi-arrow-up"></i> Monter le bloc
-                    </button>
-
-                    <button type="button" class="btn" @onclick="MoveSelectedBlockDown" title="Déplacer le bloc sélectionné vers le bas">
-                        <i class="bi bi-arrow-down"></i> Descendre le bloc
-                    </button>
-
+                <div>
                     <buton type="button" class="btn" @onclick="RetourVersListe"
                         aria-label="Annuler les modifications">
                         <i class="bi bi-x-lg"></i> Annuler
@@ -388,50 +379,6 @@
             : "/Manager/Cours";
 
         NavigationManager.NavigateTo(url);
-    }
-
-    // Méthode pour déplacer le bloc sélectionné vers le haut
-    private void MoveSelectedBlockUp()
-    {
-        if (selectedBlock != null && coursBuilder != null)
-        {
-            coursBuilder.MoveBlockUp(selectedBlock);
-        }
-        else
-        {
-            // Afficher un message à l'utilisateur qu'aucun bloc n'est sélectionné
-            showError = true;
-            errorMessage = "Veuillez d'abord sélectionner un bloc pour le déplacer.";
-            // Masquer le message après 3 secondes
-            InvokeAsync(async () => 
-            {
-                await Task.Delay(3000);
-                showError = false;
-                StateHasChanged();
-            });
-        }
-    }
-
-    // Méthode pour déplacer le bloc sélectionné vers le bas
-    private void MoveSelectedBlockDown()
-    {
-        if (selectedBlock != null && coursBuilder != null)
-        {
-            coursBuilder.MoveBlockDown(selectedBlock);
-        }
-        else
-        {
-            // Afficher un message à l'utilisateur qu'aucun bloc n'est sélectionné
-            showError = true;
-            errorMessage = "Veuillez d'abord sélectionner un bloc pour le déplacer.";
-            // Masquer le message après 3 secondes
-            InvokeAsync(async () => 
-            {
-                await Task.Delay(3000);
-                showError = false;
-                StateHasChanged();
-            });
-        }
     }
 
     // Modèle pour le formulaire du cours
