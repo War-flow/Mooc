@@ -1,4 +1,19 @@
 ﻿window.richTextEditors = {};
+let stickyToolbars = new Map();
+
+// Fonction utilitaire pour limiter la fréquence des appels
+function throttle(func, limit) {
+    let inThrottle;
+    return function() {
+        const args = arguments;
+        const context = this;
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+        }
+    }
+}
 
 export function initializeEditor(editorId, dotNetRef, options) {
     const element = document.getElementById(editorId);
@@ -107,6 +122,56 @@ export function initializeEditor(editorId, dotNetRef, options) {
         dotNetRef: dotNetRef,
         handlers: { handleInput, handleFocus, handleBlur, handleKeyDown }
     };
+
+    // Initialiser la barre d'outils flottante si activée
+    if (options.enableStickyToolbar !== false) {
+        initializeStickyToolbar(editorId);
+    }
+}
+
+function initializeStickyToolbar(editorId) {
+    const editorElement = document.getElementById(editorId);
+    if (!editorElement) return;
+    
+    // Trouver la barre d'outils associée
+    const toolbar = editorElement.closest('.rich-text-editor')?.querySelector('.editor-toolbar');
+    if (!toolbar) return;
+    
+    // Fonction pour gérer le défilement
+    function handleScroll() {
+        const editorRect = editorElement.getBoundingClientRect();
+        const toolbarRect = toolbar.getBoundingClientRect();
+        
+        // Distance depuis le haut de la fenêtre
+        const stickyOffset = 20;
+        
+        // Vérifier si l'éditeur est visible et si on doit activer le mode sticky
+        const shouldBeSticky = editorRect.top <= stickyOffset && 
+                              editorRect.bottom > toolbarRect.height + stickyOffset;
+        
+        if (shouldBeSticky && !toolbar.classList.contains('sticky')) {
+            toolbar.classList.add('sticky');
+            // Ajouter une marge au contenu pour éviter le chevauchement
+            editorElement.style.marginTop = (toolbarRect.height + 10) + 'px';
+        } else if (!shouldBeSticky && toolbar.classList.contains('sticky')) {
+            toolbar.classList.remove('sticky');
+            editorElement.style.marginTop = '';
+        }
+    }
+    
+    // Écouter les événements de défilement
+    const scrollListener = throttle(handleScroll, 16); // ~60fps
+    window.addEventListener('scroll', scrollListener, { passive: true });
+    
+    // Stocker la référence pour le nettoyage
+    stickyToolbars.set(editorId, {
+        toolbar: toolbar,
+        scrollListener: scrollListener,
+        editorElement: editorElement
+    });
+    
+    // Vérification initiale
+    handleScroll();
 }
 
 export function executeCommand(editorId, command) {
@@ -284,8 +349,33 @@ export function destroyEditor(editorId) {
         element.removeEventListener('keydown', handlers.handleKeyDown);
         delete window.richTextEditors[editorId];
     }
+    
+    // Nettoyer la barre d'outils flottante
+    const stickyData = stickyToolbars.get(editorId);
+    if (stickyData) {
+        window.removeEventListener('scroll', stickyData.scrollListener);
+        stickyData.toolbar.classList.remove('sticky');
+        stickyData.editorElement.style.marginTop = '';
+        stickyToolbars.delete(editorId);
+    }
 }
 
+// Fonction pour réinitialiser toutes les barres d'outils (utile après changement de taille)
+export function reinitializeStickyToolbars() {
+    stickyToolbars.forEach((data, editorId) => {
+        window.removeEventListener('scroll', data.scrollListener);
+        data.toolbar.classList.remove('sticky');
+        data.editorElement.style.marginTop = '';
+    });
+    stickyToolbars.clear();
+    
+    // Réinitialiser toutes les barres d'outils actives
+    Object.keys(window.richTextEditors).forEach(editorId => {
+        initializeStickyToolbar(editorId);
+    });
+}
+
+// Fonction pour déclencher le clic sur un input file
 export function triggerFileInputClick(selector) {
     const element = document.querySelector(selector);
     if (element && typeof element.click === 'function') {
@@ -360,6 +450,9 @@ if (typeof window !== 'undefined') {
             subtree: true
         });
     }
+    
+    // Écouter les changements de taille de fenêtre
+    window.addEventListener('resize', throttle(reinitializeStickyToolbars, 250));
 }
 
 // Ajouter cette fonction à RichEditor.js
