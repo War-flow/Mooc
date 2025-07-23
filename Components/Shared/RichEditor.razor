@@ -225,24 +225,50 @@
     [Parameter] public string Placeholder { get; set; } = "Commencez à écrire...";
     [Parameter] public EventCallback<string> OnError { get; set; }
     [Parameter] public EventCallback<string> OnSuccess { get; set; }
-    [Parameter] public bool EnableStickyToolbar { get; set; } = true; // Nouvel ajout
+    [Parameter] public bool EnableStickyToolbar { get; set; } = true;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/RichEditor.js");
-            dotNetRef = DotNetObjectReference.Create(this);
-            
-            await jsModule.InvokeVoidAsync("initializeEditor", EditorId, dotNetRef, new
+            try
             {
-                height = Height,
-                placeholder = Placeholder,
-                maxLength = MaxLength,
-                initialContent = Value,
-                enableStickyToolbar = EnableStickyToolbar // Passage du paramètre
-            });
+                jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/RichEditor.js");
+                dotNetRef = DotNetObjectReference.Create(this);
+                
+                // Création d'un objet d'options structuré pour éviter les erreurs de sérialisation
+                var editorOptions = new EditorOptions
+                {
+                    Height = Height,
+                    Placeholder = Placeholder ?? string.Empty,
+                    MaxLength = MaxLength,
+                    InitialContent = Value ?? string.Empty,
+                    EnableStickyToolbar = EnableStickyToolbar
+                };
+                
+                await jsModule.InvokeVoidAsync("initializeEditor", EditorId, dotNetRef, editorOptions);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur d'initialisation de l'éditeur : {ex.Message}");
+                Console.WriteLine($"Erreur JSException : {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                await ShowErrorMessage($"Erreur inattendue : {ex.Message}");
+                Console.WriteLine($"Erreur générale : {ex.Message}");
+            }
         }
+    }
+
+    // Classe pour structurer les options de l'éditeur
+    public class EditorOptions
+    {
+        public int Height { get; set; }
+        public string Placeholder { get; set; } = string.Empty;
+        public int MaxLength { get; set; }
+        public string InitialContent { get; set; } = string.Empty;
+        public bool EnableStickyToolbar { get; set; }
     }
 
     [JSInvokable]
@@ -258,7 +284,14 @@
     {
         if (jsModule != null)
         {
-            await jsModule.InvokeVoidAsync("executeCommand", EditorId, command);
+            try
+            {
+                await jsModule.InvokeVoidAsync("executeCommand", EditorId, command);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de l'exécution de la commande : {ex.Message}");
+            }
         }
     }
 
@@ -266,7 +299,14 @@
     {
         if (jsModule != null)
         {
-            await jsModule.InvokeVoidAsync("executeCommandWithValue", EditorId, command, value);
+            try
+            {
+                await jsModule.InvokeVoidAsync("executeCommandWithValue", EditorId, command, value);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de l'exécution de la commande avec valeur : {ex.Message}");
+            }
         }
     }
 
@@ -301,7 +341,14 @@
     {
         if (jsModule != null)
         {
-            await jsModule.InvokeVoidAsync("insertLink", EditorId);
+            try
+            {
+                await jsModule.InvokeVoidAsync("insertLink", EditorId);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de l'insertion du lien : {ex.Message}");
+            }
         }
     }
 
@@ -309,7 +356,14 @@
     {
         if (jsModule != null)
         {
-            await jsModule.InvokeVoidAsync("insertVideo", EditorId);
+            try
+            {
+                await jsModule.InvokeVoidAsync("insertVideo", EditorId);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de l'insertion de la vidéo : {ex.Message}");
+            }
         }
     }
 
@@ -321,7 +375,14 @@
     {
         if (jsModule != null && !isUploading)
         {
-            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-{EditorId}']");
+            try
+            {
+                await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-{EditorId}']");
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors du déclenchement de l'upload d'image : {ex.Message}");
+            }
         }
     }
 
@@ -329,7 +390,14 @@
     {
         if (jsModule != null && !isUploading)
         {
-            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-audio-{EditorId}']");
+            try
+            {
+                await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-audio-{EditorId}']");
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors du déclenchement de l'upload d'audio : {ex.Message}");
+            }
         }
     }
 
@@ -337,7 +405,14 @@
     {
         if (jsModule != null && !isUploading)
         {
-            await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-file-{EditorId}']");
+            try
+            {
+                await jsModule.InvokeVoidAsync("triggerFileInputClick", $"[data-id='upload-file-{EditorId}']");
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors du déclenchement de l'upload de fichier : {ex.Message}");
+            }
         }
     }
 
@@ -524,7 +599,14 @@
     {
         if (jsModule != null)
         {
-            await jsModule.InvokeVoidAsync("setContent", EditorId, content);
+            try
+            {
+                await jsModule.InvokeVoidAsync("setContent", EditorId, content);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de la définition du contenu : {ex.Message}");
+            }
         }
     }
 
@@ -532,7 +614,15 @@
     {
         if (jsModule != null)
         {
-            return await jsModule.InvokeAsync<string>("getContent", EditorId);
+            try
+            {
+                return await jsModule.InvokeAsync<string>("getContent", EditorId);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de la récupération du contenu : {ex.Message}");
+                return string.Empty;
+            }
         }
         return string.Empty;
     }
@@ -549,6 +639,10 @@
             catch (JSDisconnectedException)
             {
                 // Circuit is already disconnected, safe to ignore
+            }
+            catch (JSException)
+            {
+                // Ignore JS exceptions during disposal
             }
         }
         dotNetRef?.Dispose();

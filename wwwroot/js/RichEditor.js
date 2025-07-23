@@ -37,8 +37,12 @@ export function initializeEditor(editorId, dotNetRef, options) {
         let content = element.innerHTML;
         const textLength = element.textContent.length;
 
-        // Vérifier si le contenu contient des images ou du HTML riche
+        // Vérifier si le contenu contient des images, vidéos ou du HTML riche
         const hasRichContent = content.includes('<img') || 
+                              content.includes('<video') ||
+                              content.includes('<iframe') ||
+                              content.includes('data-video-element') ||
+                              content.includes('<audio') ||
                               content.includes('<b>') || 
                               content.includes('<i>') || 
                               content.includes('<u>') ||
@@ -62,7 +66,7 @@ export function initializeEditor(editorId, dotNetRef, options) {
             element.innerHTML = content;
         }
 
-        // Ne pas limiter la longueur si c'est du contenu HTML riche (images, etc.)
+        // Ne pas limiter la longueur si c'est du contenu HTML riche (images, vidéos, etc.)
         if (textLength > options.maxLength && !hasRichContent) {
             const textContent = element.textContent.substring(0, options.maxLength);
             element.textContent = textContent;
@@ -70,8 +74,8 @@ export function initializeEditor(editorId, dotNetRef, options) {
         }
 
         // Log pour debug
-        if (content.includes('<img')) {
-            console.log('📷 Contenu avec image détecté et envoyé à Blazor');
+        if (content.includes('<video') || content.includes('data-video-element')) {
+            console.log('🎥 Contenu avec vidéo détecté et envoyé à Blazor');
         }
 
         dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength);
@@ -84,8 +88,13 @@ export function initializeEditor(editorId, dotNetRef, options) {
     }
 
     function handleBlur() {
-        // Ne remettre le placeholder que si vraiment vide (pas d'images)
-        if (!element.textContent.trim() && !element.innerHTML.includes('<img')) {
+        // Ne remettre le placeholder que si vraiment vide (pas d'images, vidéos ou audios)
+        if (!element.textContent.trim() && 
+            !element.innerHTML.includes('<img') && 
+            !element.innerHTML.includes('<video') &&
+            !element.innerHTML.includes('<audio') &&
+            !element.innerHTML.includes('<iframe') &&
+            !element.innerHTML.includes('data-video-element')) {
             element.innerHTML = `<div style="color: #6c757d; font-style: italic;">${options.placeholder}</div>`;
         }
     }
@@ -206,16 +215,291 @@ export function insertLink(editorId) {
     }
 }
 
+// Fonction améliorée pour insérer des vidéos avec support multi-plateforme
 export function insertVideo(editorId) {
-    const url = prompt("URL de la vidéo (mp4, webm, etc.) :");
-    if (url) {
-        const videoHtml = `<video controls style="max-width:100%"><source src="${url}" type="video/mp4"></video>`;
-        document.getElementById(editorId).focus();
-        document.execCommand('insertHTML', false, videoHtml);
+    const editor = window.richTextEditors[editorId];
+    if (!editor) return;
+    
+    const url = prompt("URL de la vidéo (YouTube, Vimeo, ou lien direct mp4/webm) :");
+    if (!url) return;
+    
+    try {
+        const videoElement = createVideoElement(url);
+        insertVideoElement(editor, videoElement, url);
+    } catch (error) {
+        alert("Erreur: URL de vidéo invalide. Veuillez vérifier le lien.");
+        console.error("Erreur insertion vidéo:", error);
     }
 }
 
-// Nouvelle fonction pour insérer l'audio depuis une URL
+// Fonction pour créer l'élément vidéo approprié selon l'URL
+function createVideoElement(url) {
+    const urlObj = new URL(url);
+    
+    // Détection YouTube
+    if (isYouTubeUrl(urlObj)) {
+        return createYouTubeEmbed(extractYouTubeId(url));
+    }
+    
+    // Détection Vimeo
+    if (isVimeoUrl(urlObj)) {
+        return createVimeoEmbed(extractVimeoId(url));
+    }
+    
+    // Détection Dailymotion
+    if (isDailymotionUrl(urlObj)) {
+        return createDailymotionEmbed(extractDailymotionId(url));
+    }
+    
+    // Fichier vidéo direct
+    if (isDirectVideoUrl(url)) {
+        return createDirectVideoElement(url);
+    }
+    
+    throw new Error("Format de vidéo non supporté");
+}
+
+// Fonctions de détection des plateformes
+function isYouTubeUrl(urlObj) {
+    return ['www.youtube.com', 'youtube.com', 'youtu.be', 'm.youtube.com'].includes(urlObj.hostname);
+}
+
+function isVimeoUrl(urlObj) {
+    return ['vimeo.com', 'www.vimeo.com', 'player.vimeo.com'].includes(urlObj.hostname);
+}
+
+function isDailymotionUrl(urlObj) {
+    return ['dailymotion.com', 'www.dailymotion.com', 'dai.ly'].includes(urlObj.hostname);
+}
+
+function isDirectVideoUrl(url) {
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
+    return videoExtensions.some(ext => url.toLowerCase().includes(ext));
+}
+
+// Extraction des IDs pour les plateformes
+function extractYouTubeId(url) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+}
+
+function extractVimeoId(url) {
+    const regExp = /(?:vimeo)\.com.*(?:videos|video|channels|)\/([\d]+)/i;
+    const match = url.match(regExp);
+    return match ? match[1] : null;
+}
+
+function extractDailymotionId(url) {
+    const regExp = /^.+dailymotion.com\/(video|hub)\/([^_]+)[^#]*(#video=([^_&]+))?/;
+    const match = url.match(regExp);
+    return match ? match[2] : null;
+}
+
+// Création des éléments d'embed
+function createYouTubeEmbed(videoId) {
+    if (!videoId) throw new Error("ID YouTube invalide");
+    
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1`;
+    iframe.frameBorder = '0';
+    iframe.allowFullscreen = true;
+    iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+    
+    return wrapVideoElement(iframe, 'youtube');
+}
+
+function createVimeoEmbed(videoId) {
+    if (!videoId) throw new Error("ID Vimeo invalide");
+    
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://player.vimeo.com/video/${videoId}?color=ffffff&title=0&byline=0&portrait=0`;
+    iframe.frameBorder = '0';
+    iframe.allowFullscreen = true;
+    iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+    
+    return wrapVideoElement(iframe, 'vimeo');
+}
+
+function createDailymotionEmbed(videoId) {
+    if (!videoId) throw new Error("ID Dailymotion invalide");
+    
+    const iframe = document.createElement('iframe');
+    iframe.src = `https://www.dailymotion.com/embed/video/${videoId}`;
+    iframe.frameBorder = '0';
+    iframe.allowFullscreen = true;
+    iframe.allow = 'autoplay; fullscreen';
+    
+    return wrapVideoElement(iframe, 'dailymotion');
+}
+
+function createDirectVideoElement(url) {
+    const video = document.createElement('video');
+    video.controls = true;
+    video.preload = 'metadata';
+    
+    // Créer l'élément source
+    const source = document.createElement('source');
+    source.src = url;
+    source.type = getVideoMimeType(url);
+    
+    video.appendChild(source);
+    
+    // Message de fallback
+    video.appendChild(document.createTextNode('Votre navigateur ne supporte pas la lecture de cette vidéo.'));
+    
+    return wrapVideoElement(video, 'direct');
+}
+
+// Fonction pour wrapper les éléments vidéo avec un conteneur responsive
+function wrapVideoElement(videoElement, platform) {
+    const container = document.createElement('div');
+    container.className = `video-container video-${platform}`;
+    container.style.cssText = `
+        position: relative;
+        width: 100%;
+        max-width: 100%;
+        margin: 15px auto;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    `;
+    
+    // Style pour les iframes (YouTube, Vimeo, etc.)
+    if (videoElement.tagName === 'IFRAME') {
+        const aspectRatio = document.createElement('div');
+        aspectRatio.style.cssText = `
+            position: relative;
+            width: 100%;
+            padding-bottom: 56.25%; /* 16:9 aspect ratio */
+            height: 0;
+        `;
+        
+        videoElement.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        `;
+        
+        aspectRatio.appendChild(videoElement);
+        container.appendChild(aspectRatio);
+    } else {
+        // Style pour les éléments video directs
+        videoElement.style.cssText = `
+            width: 100%;
+            height: auto;
+            display: block;
+        `;
+        container.appendChild(videoElement);
+    }
+    
+    // Ajouter un attribut pour identifier les vidéos
+    container.setAttribute('data-video-type', platform);
+    container.setAttribute('data-video-element', 'true');
+    
+    return container;
+}
+
+// Fonction utilitaire pour déterminer le type MIME des vidéos
+function getVideoMimeType(videoUrl) {
+    const extension = videoUrl.split('.').pop().toLowerCase().split('?')[0];
+    switch (extension) {
+        case 'mp4':
+            return 'video/mp4';
+        case 'webm':
+            return 'video/webm';
+        case 'ogg':
+        case 'ogv':
+            return 'video/ogg';
+        case 'mov':
+            return 'video/quicktime';
+        case 'avi':
+            return 'video/x-msvideo';
+        case 'mkv':
+            return 'video/x-matroska';
+        default:
+            return 'video/mp4';
+    }
+}
+
+// Fonction pour insérer l'élément vidéo dans l'éditeur
+function insertVideoElement(editor, videoElement, originalUrl) {
+    // Nettoyer le placeholder si présent
+    if (editor.element.innerHTML.includes('color: #6c757d')) {
+        editor.element.innerHTML = '';
+    }
+    
+    editor.element.focus();
+    const selection = window.getSelection();
+    
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        range.insertNode(videoElement);
+        range.setStartAfter(videoElement);
+        range.setEndAfter(videoElement);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    } else {
+        editor.element.appendChild(videoElement);
+    }
+    
+    // Mettre à jour le contenu
+    editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    console.log('🎥 Vidéo insérée:', originalUrl);
+}
+
+// Fonction pour améliorer l'affichage des vidéos (similaire à enhanceImageDisplay)
+export function enhanceVideoDisplay() {
+    const selectors = ['.text-message .video-container', '.rich-editor-content .video-container', '[contenteditable] .video-container'];
+    
+    selectors.forEach(selector => {
+        document.querySelectorAll(selector).forEach(container => {
+            if (!container.classList.contains('enhanced')) {
+                container.classList.add('enhanced');
+                
+                // Ajouter des gestionnaires d'événements pour le debug
+                const videoElement = container.querySelector('video, iframe');
+                if (videoElement) {
+                    if (videoElement.tagName === 'VIDEO') {
+                        videoElement.addEventListener('loadstart', () => {
+                            console.log('🎥 Chargement vidéo démarré');
+                        });
+                        
+                        videoElement.addEventListener('canplay', () => {
+                            console.log('✅ Vidéo prête à être lue');
+                        });
+                        
+                        videoElement.addEventListener('error', (e) => {
+                            console.error('❌ Erreur vidéo:', e);
+                            container.style.border = '2px solid #dc3545';
+                            container.innerHTML = '<p style="padding: 20px; text-align: center; color: #dc3545;">❌ Erreur de chargement de la vidéo</p>';
+                        });
+                    }
+                }
+            }
+        });
+    });
+}
+
+// Fonction pour insérer une vidéo depuis une URL (utilisée par le FileUploadService)
+export function insertVideoFromUrl(editorId, videoUrl) {
+    const editor = window.richTextEditors[editorId];
+    if (editor && editor.element) {
+        try {
+            const videoElement = createDirectVideoElement(videoUrl);
+            insertVideoElement(editor, videoElement, videoUrl);
+        } catch (error) {
+            console.error("Erreur insertion vidéo URL:", error);
+        }
+    }
+}
+
+// Fonction pour insérer l'audio depuis une URL
 export function insertAudioFromUrl(editorId, audioUrl) {
     const editor = window.richTextEditors[editorId];
     if (editor && editor.element) {
@@ -325,12 +609,60 @@ export function insertImageFromUrl(editorId, imageUrl) {
     }
 }
 
+export function insertFileFromUrl(editorId, fileUrl, fileName) {
+    const editor = window.richTextEditors[editorId];
+    if (editor && editor.element) {
+        // Nettoyer le placeholder si présent
+        if (editor.element.innerHTML.includes('color: #6c757d')) {
+            editor.element.innerHTML = '';
+        }
+        
+        // Créer un lien de téléchargement pour le fichier
+        const link = document.createElement('a');
+        link.href = fileUrl;
+        link.download = fileName || 'fichier';
+        link.textContent = `📎 ${fileName || 'Télécharger le fichier'}`;
+        link.style.display = 'inline-block';
+        link.style.margin = '5px';
+        link.style.padding = '8px 12px';
+        link.style.backgroundColor = '#f8f9fa';
+        link.style.border = '1px solid #dee2e6';
+        link.style.borderRadius = '4px';
+        link.style.textDecoration = 'none';
+        link.style.color = '#495057';
+        
+        // Ajouter un attribut pour identifier les fichiers uploadés
+        link.setAttribute('data-uploaded-file', 'true');
+        
+        // Insérer le lien
+        editor.element.focus();
+        const selection = window.getSelection();
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            range.insertNode(link);
+            range.setStartAfter(link);
+            range.setEndAfter(link);
+            selection.removeAllRanges();
+            selection.addRange(range);
+        } else {
+            editor.element.appendChild(link);
+        }
+        
+        // Mettre à jour le contenu
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        console.log('📎 Fichier inséré:', fileUrl);
+    }
+}
+
 export function setContent(editorId, content) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
         editor.element.innerHTML = content;
-        // Améliorer immédiatement l'affichage des images
+        // Améliorer immédiatement l'affichage des images et vidéos
         enhanceImageDisplay();
+        enhanceVideoDisplay();
     }
 }
 
@@ -424,12 +756,16 @@ export function enhanceImageDisplay() {
 
 // Fonction globale accessible depuis Blazor
 window.enhanceImageDisplay = enhanceImageDisplay;
+window.enhanceVideoDisplay = enhanceVideoDisplay;
 
 // Appeler automatiquement
 if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', enhanceImageDisplay);
+    window.addEventListener('DOMContentLoaded', () => {
+        enhanceImageDisplay();
+        enhanceVideoDisplay();
+    });
     
-    // Observer les changements dans le DOM pour les images ajoutées dynamiquement
+    // Observer les changements dans le DOM pour les images et vidéos ajoutées dynamiquement
     if (window.MutationObserver) {
         const observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
@@ -438,6 +774,12 @@ if (typeof window !== 'undefined') {
                         if (node.nodeType === 1) { // Element node
                             if (node.tagName === 'IMG' || (node.querySelector && node.querySelector('img'))) {
                                 enhanceImageDisplay();
+                            }
+                            if (node.tagName === 'VIDEO' || 
+                                node.tagName === 'IFRAME' || 
+                                node.classList?.contains('video-container') ||
+                                (node.querySelector && (node.querySelector('video') || node.querySelector('iframe') || node.querySelector('.video-container')))) {
+                                enhanceVideoDisplay();
                             }
                         }
                     });
@@ -455,50 +797,3 @@ if (typeof window !== 'undefined') {
     window.addEventListener('resize', throttle(reinitializeStickyToolbars, 250));
 }
 
-// Ajouter cette fonction à RichEditor.js
-export function insertFileFromUrl(editorId, fileUrl, fileName) {
-    const editor = window.richTextEditors[editorId];
-    if (editor && editor.element) {
-        // Nettoyer le placeholder si présent
-        if (editor.element.innerHTML.includes('color: #6c757d')) {
-            editor.element.innerHTML = '';
-        }
-        
-        // Créer un lien de téléchargement pour le fichier
-        const link = document.createElement('a');
-        link.href = fileUrl;
-        link.download = fileName || 'fichier';
-        link.textContent = `📎 ${fileName || 'Télécharger le fichier'}`;
-        link.style.display = 'inline-block';
-        link.style.margin = '5px';
-        link.style.padding = '8px 12px';
-        link.style.backgroundColor = '#f8f9fa';
-        link.style.border = '1px solid #dee2e6';
-        link.style.borderRadius = '4px';
-        link.style.textDecoration = 'none';
-        link.style.color = '#495057';
-        
-        // Ajouter un attribut pour identifier les fichiers uploadés
-        link.setAttribute('data-uploaded-file', 'true');
-        
-        // Insérer le lien
-        editor.element.focus();
-        const selection = window.getSelection();
-        if (selection.rangeCount > 0) {
-            const range = selection.getRangeAt(0);
-            range.deleteContents();
-            range.insertNode(link);
-            range.setStartAfter(link);
-            range.setEndAfter(link);
-            selection.removeAllRanges();
-            selection.addRange(range);
-        } else {
-            editor.element.appendChild(link);
-        }
-        
-        // Mettre à jour le contenu
-        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        console.log('📎 Fichier inséré:', fileUrl);
-    }
-}
