@@ -35,14 +35,15 @@
                 @if (useRichEditor)
                 {
                     <RichEditor @ref="richEditorRef"
-                        Value="@TypedContent.Text" 
+                        Value="@currentEditorContent" 
                         ValueChanged="@OnTextContentChanged" 
                         Height="@EditorHeight"
                         Placeholder="Saisissez le contenu de votre bloc..." 
                         MaxLength="10000" 
-                        EditorId="@editorId"
+                        EditorId="@($"editor-block-{Block.Id}")"
                         ShowCharacterCount="true" 
                         ShowToolbar="true"
+                        @key="@($"editor-{Block.Id}")"
                     />
                 }
                 else
@@ -67,7 +68,9 @@
 
         <div class="block-controls mt-2">
             <button type="button" class="btn-block btn-valid"
-                    @onclick="ToggleEdit" disabled="@(IsEditing && !IsValid())"
+                    @onclick="ToggleEdit" 
+                    @onclick:preventDefault="true"
+                    disabled="@(IsEditing && !IsValid())"
                     aria-label="@(IsEditing ? "Enregistrer les modifications" : "Modifier le bloc")">
                 <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
                 @(IsEditing ? "Enregistrer" : "Modifier")
@@ -75,14 +78,18 @@
             
             @if (IsEditing)
             {
-                <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit"
+                <button type="button" class="btn-block btn-cancel" 
+                        @onclick="CancelEdit"
+                        @onclick:preventDefault="true"
                         aria-label="Annuler les modifications">
                     <i class="bi bi-x-lg"></i> Annuler
                 </button>
             }
             else
             {
-                <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete"
+                <button type="button" class="btn-block btn-cancel" 
+                        @onclick="RequestDelete"
+                        @onclick:preventDefault="true"
                         title="Supprimer ce bloc">
                     <i class="bi bi-trash"> Supprimer</i>
                 </button>
@@ -138,6 +145,10 @@
     private CancellationTokenSource? _autoSaveCts;
     private Timer? _successMessageTimer;
 
+    // État local de l'éditeur
+    private string currentEditorContent = string.Empty;
+    private bool isInitialized = false;
+
     // === Propriétés calculées ===
     private string editorId => Block != null ? $"editor-{Block.Order}" : "editor-temp";
     private TextBlockContent TypedContent => Block.Content as TextBlockContent ?? new TextBlockContent();
@@ -146,14 +157,22 @@
     {
         EnsureContentInitialized();
         InitializeBlock();
+        currentEditorContent = TypedContent?.Text ?? string.Empty;
+        isInitialized = true;
     }
 
     protected override void OnParametersSet()
     {
-        // Optimisation : éviter les re-rendus inutiles
+        // Éviter les re-rendus inutiles
         if (Block?.Content is not TextBlockContent)
         {
             EnsureContentInitialized();
+        }
+
+        // Mettre à jour le contenu de l'éditeur seulement si nécessaire
+        if (isInitialized && !IsEditing)
+        {
+            currentEditorContent = TypedContent?.Text ?? string.Empty;
         }
     }
 
@@ -162,6 +181,20 @@
         if (!firstRender && !IsEditing && TypedContent.Text.Contains("<img"))
         {
             await EnhanceImageDisplay();
+        }
+
+        // Initialiser l'éditeur seulement au premier rendu en mode édition
+        if (firstRender && IsEditing && useRichEditor && richEditorRef != null)
+        {
+            try
+            {
+                await Task.Delay(200); // Délai pour s'assurer que l'éditeur est prêt
+                await richEditorRef.SetContent(currentEditorContent);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur initialisation éditeur: {ex.Message}");
+            }
         }
     }
 
@@ -216,6 +249,9 @@
 
     private async Task OnTextContentChanged(string newContent)
     {
+        // Mettre à jour l'état local immédiatement
+        currentEditorContent = newContent;
+        
         var contentToSave = PreserveImagesInContent(newContent);
         TypedContent.Text = contentToSave;
         
@@ -225,8 +261,8 @@
         
         try
         {
-            await Task.Delay(500, _autoSaveCts.Token);
-            StateHasChanged();
+            await Task.Delay(300, _autoSaveCts.Token);
+            // Pas de StateHasChanged() ici pour éviter les re-rendus
         }
         catch (OperationCanceledException)
         {
@@ -236,6 +272,9 @@
 
     private string PreserveImagesInContent(string content)
     {
+        if (string.IsNullOrEmpty(content))
+            return string.Empty;
+
         if (content.Contains("<img"))
         {
             return content
@@ -248,8 +287,10 @@
 
     private bool IsValid()
     {
-        return !string.IsNullOrWhiteSpace(TypedContent.Text) || 
-               TypedContent.Text.Contains("<img") ||
+        var textContent = string.IsNullOrWhiteSpace(currentEditorContent) ? TypedContent.Text : currentEditorContent;
+        
+        return !string.IsNullOrWhiteSpace(textContent) || 
+               textContent.Contains("<img") ||
                !string.IsNullOrWhiteSpace(TypedContent.Title);
     }
 
@@ -274,9 +315,29 @@
             Text = TypedContent.Text
         };
         
+        // Initialiser le contenu de l'éditeur
+        currentEditorContent = TypedContent.Text ?? string.Empty;
+        
         IsEditing = true;
         await OnEditStateChanged.InvokeAsync(IsEditing);
         ClearError();
+
+        // Forcer un re-rendu mais sans changer la clé
+        StateHasChanged();
+
+        // Initialiser l'éditeur après le re-rendu
+        await Task.Delay(100);
+        if (richEditorRef != null)
+        {
+            try
+            {
+                await richEditorRef.SetContent(currentEditorContent);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur initialisation contenu: {ex.Message}");
+            }
+        }
     }
 
     private async Task SaveChanges()
@@ -284,21 +345,26 @@
         if (!IsValid())
         {
             errorMessage = "Le contenu ne peut pas être vide.";
+            StateHasChanged();
             return;
         }
 
         try
         {
             isSaving = true;
+            StateHasChanged();
             ClearError();
 
+            // Utiliser le contenu de l'éditeur
+            var finalContent = string.IsNullOrWhiteSpace(currentEditorContent) ? TypedContent.Text : currentEditorContent;
+            
             Block.Title = TypedContent.Title;
-            Block.Text = TypedContent.Text;
+            Block.Text = finalContent;
 
             // Mise à jour du contenu sérialisable
             if (Block.Content is TextBlockContent content)
             {
-                content.Text = TypedContent.Text;
+                content.Text = finalContent;
                 content.Title = TypedContent.Title;
             }
 
@@ -310,6 +376,8 @@
                 if (!success)
                 {
                     errorMessage = "Erreur lors de la sauvegarde.";
+                    isSaving = false;
+                    StateHasChanged();
                     return;
                 }
 
@@ -320,6 +388,7 @@
             IsEditing = false;
 
             await OnBlockChanged.InvokeAsync(Block);
+            await OnEditStateChanged.InvokeAsync(IsEditing);
             await ShowSuccessMessage();
             
             // Améliorer l'affichage après sauvegarde
@@ -361,6 +430,7 @@
                 Block.Content = _originalContent;
                 Block.Title = _originalContent.Title;
                 Block.Text = _originalContent.Text;
+                currentEditorContent = _originalContent.Text;
                 _originalContent = null;
             }
 
@@ -401,7 +471,6 @@
     private void ClearError()
     {
         errorMessage = null;
-        StateHasChanged();
     }
 
     private async Task VerifyImageSave()

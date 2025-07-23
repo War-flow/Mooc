@@ -168,9 +168,6 @@
                     }
                     else
                     {
-                        <button type="button" class="btn btn-outline-secondary" @onclick="ResetQuiz">
-                            Recommencer
-                        </button>
 
                         @if (IsCorrect.HasValue)
                         {
@@ -505,13 +502,6 @@
         }
 
         IsAnswered = true;
-    }
-
-    private void ResetQuiz()
-    {
-        IsAnswered = false;
-        IsCorrect = null;
-        UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
     }
 
     private bool HasUserAnswer()

@@ -59,7 +59,7 @@
                 <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("indent")' title="Augmenter le retrait">
                     <i class="bi bi-text-indent-left"></i>
                 </button>
-                <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("table")' title="Ajouter un tableau">
+                <button type="button" class="toolbar-btn" @onclick="InsertTable" title="Ajouter un tableau">
                     <i class="bi bi-table"></i>
                 </button>
             </div>
@@ -366,6 +366,20 @@
             catch (JSException ex)
             {
                 await ShowErrorMessage($"Erreur lors de l'insertion de la vidéo : {ex.Message}");
+            }
+        }
+    }
+    private async Task InsertTable()
+    {
+        if (jsModule != null)
+        {
+            try
+            {
+                await jsModule.InvokeVoidAsync("insertTable", EditorId);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de l'insertion du tableau : {ex.Message}");
             }
         }
     }

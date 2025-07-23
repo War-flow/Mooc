@@ -765,3 +765,40 @@ h1:focus {
         margin-top: 70px; /* Compenser la hauteur de la barre fixe */
     }
 }
+
+/* Styles pour les tableaux dans l'éditeur riche */
+.rich-editor-content table {
+    width: 100%;
+    margin: 10px 0;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.rich-editor-content table th,
+.rich-editor-content table td {
+    border: 1px solid #dee2e6;
+    padding: 8px;
+    text-align: left;
+    vertical-align: top;
+}
+
+.rich-editor-content table th {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+.rich-editor-content table td:focus,
+.rich-editor-content table th:focus {
+    outline: 2px solid #007bff;
+    outline-offset: -2px;
+    background-color: rgba(0, 123, 255, 0.1);
+}
+
+.table-context-menu {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    user-select: none;
+}
+
+.rich-editor-content table tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
