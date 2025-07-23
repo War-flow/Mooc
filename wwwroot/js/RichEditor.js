@@ -4,7 +4,7 @@ let stickyToolbars = new Map();
 // Fonction utilitaire pour limiter la fréquence des appels
 function throttle(func, limit) {
     let inThrottle;
-    return function() {
+    return function () {
         const args = arguments;
         const context = this;
         if (!inThrottle) {
@@ -27,7 +27,7 @@ export function initializeEditor(editorId, dotNetRef, options) {
         borderRadius: '0 0 0.375rem 0.375rem',
         padding: '0.75rem'
     });
-    
+
     element.innerHTML = options.initialContent || '';
     updatePlaceholder(element, options.placeholder);
 
@@ -46,7 +46,7 @@ export function initializeEditor(editorId, dotNetRef, options) {
 }
 
 function createEventHandlers(element, options, dotNetRef) {
-    const hasRichContent = (content) => 
+    const hasRichContent = (content) =>
         /<(?:img|video|iframe|audio|b|i|u|a|ul|ol|strong|em)\b/.test(content) ||
         content.includes('data-video-element');
 
@@ -54,10 +54,10 @@ function createEventHandlers(element, options, dotNetRef) {
         let content = element.innerHTML;
         const textLength = element.textContent.length;
         const isRich = hasRichContent(content);
-        
-        const hasRealContent = content.trim() && 
-                              !content.includes(options.placeholder) &&
-                              (textLength > 0 || isRich);
+
+        const hasRealContent = content.trim() &&
+            !content.includes(options.placeholder) &&
+            (textLength > 0 || isRich);
 
         if (!hasRealContent && !isRich) {
             updatePlaceholder(element, options.placeholder);
@@ -172,7 +172,7 @@ function insertMediaElement(editorId, url, type) {
 
 function createVideoElement(url) {
     const urlObj = new URL(url);
-    
+
     // Vérifier les plateformes supportées
     for (const [platform, config] of Object.entries(VIDEO_PLATFORMS)) {
         if (config.hosts.includes(urlObj.hostname)) {
@@ -181,12 +181,12 @@ function createVideoElement(url) {
             if (id) return createEmbed(config.embed(id), platform);
         }
     }
-    
+
     // Vidéo directe
     if (/\.(mp4|webm|ogg|mov|avi|mkv)/i.test(url)) {
         return createDirectVideo(url);
     }
-    
+
     throw new Error("Format non supporté");
 }
 
@@ -212,7 +212,7 @@ function wrapMedia(element, platform) {
     const container = document.createElement('div');
     container.className = `video-container video-${platform}`;
     container.setAttribute('data-video-element', 'true');
-    
+
     // Styles optimisés
     const isIframe = element.tagName === 'IFRAME';
     if (isIframe) {
@@ -229,7 +229,7 @@ function wrapMedia(element, platform) {
         Object.assign(element.style, { width: '100%', height: 'auto', display: 'block' });
         container.appendChild(element);
     }
-    
+
     return container;
 }
 
@@ -286,10 +286,10 @@ function insertIntoEditor(editor, element) {
     if (editor.element.innerHTML.includes('color: #6c757d')) {
         editor.element.innerHTML = '';
     }
-    
+
     editor.element.focus();
     const selection = window.getSelection();
-    
+
     if (selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
         range.deleteContents();
@@ -300,7 +300,7 @@ function insertIntoEditor(editor, element) {
     } else {
         editor.element.appendChild(element);
     }
-    
+
     editor.element.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
@@ -309,6 +309,16 @@ export function setContent(editorId, content) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
         editor.element.innerHTML = content;
+
+        // Réinitialiser les gestionnaires d'événements pour tous les tableaux
+        const tables = editor.element.querySelectorAll('table');
+        tables.forEach(table => {
+            if (!table.classList.contains('enhanced')) {
+                table.classList.add('enhanced');
+                setupTableEditHandlers(table);
+            }
+        });
+
         enhanceDisplay();
     }
 }
@@ -325,7 +335,7 @@ export function destroyEditor(editorId) {
         });
         delete window.richTextEditors[editorId];
     }
-    
+
     // Nettoyage toolbar
     const stickyData = stickyToolbars.get(editorId);
     if (stickyData) {
@@ -338,13 +348,18 @@ export function destroyEditor(editorId) {
 
 // Fonction d'amélioration consolidée
 function enhanceDisplay() {
-    const selectors = ['.text-message img', '.text-message .video-container', '.rich-editor-content img', '.rich-editor-content .video-container'];
-    
+    const selectors = ['.text-message img', '.text-message .video-container', '.rich-editor-content img', '.rich-editor-content .video-container', '.rich-editor-content table'];
+
     selectors.forEach(selector => {
         document.querySelectorAll(selector).forEach(element => {
             if (!element.classList.contains('enhanced')) {
                 element.classList.add('enhanced');
                 setupMediaHandlers(element);
+
+                // Ajouter la gestion des tableaux
+                if (element.tagName === 'TABLE') {
+                    setupTableEditHandlers(element);
+                }
             }
         });
     });
@@ -358,17 +373,55 @@ function setupMediaHandlers(element) {
     }
 }
 
-// Exports globaux et initialisation
-window.enhanceImageDisplay = window.enhanceVideoDisplay = enhanceDisplay;
+// Fonction setupTableEditHandlers - VERSION UNIQUE ET COMPLÈTE
+function setupTableEditHandlers(table) {
+    // Vérifier si les gestionnaires sont déjà configurés
+    if (table.hasAttribute('data-handlers-setup')) {
+        return;
+    }
 
-if (typeof window !== 'undefined') {
-    window.addEventListener('DOMContentLoaded', enhanceDisplay);
-    
-    // Observer optimisé
-    if (window.MutationObserver) {
-        new MutationObserver(mutations => {
-            if (mutations.some(m => m.addedNodes.length)) enhanceDisplay();
-        }).observe(document.body, { childList: true, subtree: true });
+    // Marquer le tableau comme configuré
+    table.setAttribute('data-handlers-setup', 'true');
+
+    // Empêcher la propagation des événements d'édition
+    table.addEventListener('input', function (e) {
+        e.stopPropagation();
+    });
+
+    // Gérer la navigation avec les touches fléchées
+    table.addEventListener('keydown', function (e) {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
+            e.stopPropagation();
+            handleTableNavigation(e, table);
+        }
+    });
+
+    // Ajouter le menu contextuel pour les actions de tableau
+    table.addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        showTableContextMenu(e, table);
+    });
+
+    // S'assurer que les cellules sont éditables
+    const cells = table.querySelectorAll('td, th');
+    cells.forEach(cell => {
+        if (!cell.hasAttribute('contenteditable')) {
+            cell.contentEditable = true;
+        }
+    });
+}
+
+// Nouvelle fonction pour réinitialiser les tableaux existants
+export function reinitializeTableHandlers(editorId) {
+    const editor = window.richTextEditors[editorId];
+    if (editor) {
+        const tables = editor.element.querySelectorAll('table');
+        tables.forEach(table => {
+            // Retirer l'attribut pour forcer la réinitialisation
+            table.removeAttribute('data-handlers-setup');
+            table.classList.remove('enhanced');
+            setupTableEditHandlers(table);
+        });
     }
 }
 
@@ -377,17 +430,31 @@ function initializeStickyToolbar(editorId) {
     const editorElement = document.getElementById(editorId);
     const toolbar = editorElement?.closest('.rich-text-editor')?.querySelector('.editor-toolbar');
     if (!toolbar) return;
-    
+
     const handleScroll = throttle(() => {
         const editorRect = editorElement.getBoundingClientRect();
         const shouldBeSticky = editorRect.top <= 20 && editorRect.bottom > 70;
-        
+
         toolbar.classList.toggle('sticky', shouldBeSticky);
         editorElement.style.marginTop = shouldBeSticky ? '70px' : '';
     }, 16);
-    
+
     window.addEventListener('scroll', handleScroll, { passive: true });
     stickyToolbars.set(editorId, { toolbar, scrollListener: handleScroll, editorElement });
+}
+
+// Exports globaux et initialisation
+window.enhanceImageDisplay = window.enhanceVideoDisplay = enhanceDisplay;
+
+if (typeof window !== 'undefined') {
+    window.addEventListener('DOMContentLoaded', enhanceDisplay);
+
+    // Observer optimisé
+    if (window.MutationObserver) {
+        new MutationObserver(mutations => {
+            if (mutations.some(m => m.addedNodes.length)) enhanceDisplay();
+        }).observe(document.body, { childList: true, subtree: true });
+    }
 }
 
 // Fonctions utilitaires restantes
@@ -421,17 +488,17 @@ export function reinitializeStickyToolbars() {
 export function insertTable(editorId) {
     const rows = prompt('Nombre de lignes (1-10):');
     const cols = prompt('Nombre de colonnes (1-10):');
-    
+
     if (!rows || !cols) return;
-    
+
     const numRows = parseInt(rows);
     const numCols = parseInt(cols);
-    
+
     if (isNaN(numRows) || isNaN(numCols) || numRows < 1 || numRows > 10 || numCols < 1 || numCols > 10) {
         alert('Veuillez entrer des nombres valides entre 1 et 10');
         return;
     }
-    
+
     const table = createTableElement(numRows, numCols);
     const editor = window.richTextEditors[editorId];
     if (editor) {
@@ -444,11 +511,11 @@ function createTableElement(rows, cols) {
     const table = document.createElement('table');
     table.className = 'table table-bordered table-striped';
     table.style.cssText = 'width: 100%; margin: 10px 0; border-collapse: collapse;';
-    
+
     // Créer l'en-tête
     const thead = document.createElement('thead');
     const headerRow = document.createElement('tr');
-    
+
     for (let j = 0; j < cols; j++) {
         const th = document.createElement('th');
         th.innerHTML = `En-tête ${j + 1}`;
@@ -456,16 +523,16 @@ function createTableElement(rows, cols) {
         th.contentEditable = true;
         headerRow.appendChild(th);
     }
-    
+
     thead.appendChild(headerRow);
     table.appendChild(thead);
-    
+
     // Créer le corps du tableau
     const tbody = document.createElement('tbody');
-    
+
     for (let i = 0; i < rows; i++) {
         const row = document.createElement('tr');
-        
+
         for (let j = 0; j < cols; j++) {
             const td = document.createElement('td');
             td.innerHTML = '&nbsp;';
@@ -473,50 +540,28 @@ function createTableElement(rows, cols) {
             td.contentEditable = true;
             row.appendChild(td);
         }
-        
+
         tbody.appendChild(row);
     }
-    
+
     table.appendChild(tbody);
-    
+
     // Ajouter les gestionnaires d'événements pour l'édition
     setupTableEditHandlers(table);
-    
-    return table;
-}
 
-// Fonction pour configurer les gestionnaires d'événements du tableau
-function setupTableEditHandlers(table) {
-    // Empêcher la propagation des événements d'édition
-    table.addEventListener('input', function(e) {
-        e.stopPropagation();
-    });
-    
-    // Gérer la navigation avec les touches fléchées
-    table.addEventListener('keydown', function(e) {
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-            e.stopPropagation();
-            handleTableNavigation(e, table);
-        }
-    });
-    
-    // Ajouter le menu contextuel pour les actions de tableau
-    table.addEventListener('contextmenu', function(e) {
-        e.preventDefault();
-        showTableContextMenu(e, table);
-    });
+    return table;
 }
 
 // Fonction pour gérer la navigation dans le tableau
 function handleTableNavigation(e, table) {
     const currentCell = e.target;
     if (!currentCell.matches('td, th')) return;
-    
+
     const cells = Array.from(table.querySelectorAll('td, th'));
     const currentIndex = cells.indexOf(currentCell);
-    
+
     let targetIndex = currentIndex;
-    
+
     switch (e.key) {
         case 'Tab':
             e.preventDefault();
@@ -537,7 +582,7 @@ function handleTableNavigation(e, table) {
             targetIndex = currentIndex - colsCountUp;
             break;
     }
-    
+
     if (targetIndex >= 0 && targetIndex < cells.length) {
         cells[targetIndex].focus();
         e.preventDefault();
@@ -548,7 +593,7 @@ function handleTableNavigation(e, table) {
 function showTableContextMenu(e, table) {
     // Retirer les anciens menus
     document.querySelectorAll('.table-context-menu').forEach(menu => menu.remove());
-    
+
     const menu = document.createElement('div');
     menu.className = 'table-context-menu';
     menu.style.cssText = `
@@ -563,7 +608,7 @@ function showTableContextMenu(e, table) {
         padding: 5px 0;
         min-width: 150px;
     `;
-    
+
     const menuItems = [
         { label: 'Ajouter une ligne', action: () => addTableRow(table) },
         { label: 'Ajouter une colonne', action: () => addTableColumn(table) },
@@ -571,7 +616,7 @@ function showTableContextMenu(e, table) {
         { label: 'Supprimer la colonne', action: () => deleteTableColumn(table, e.target) },
         { label: 'Supprimer le tableau', action: () => deleteTable(table) }
     ];
-    
+
     menuItems.forEach(item => {
         const menuItem = document.createElement('div');
         menuItem.textContent = item.label;
@@ -584,9 +629,9 @@ function showTableContextMenu(e, table) {
         });
         menu.appendChild(menuItem);
     });
-    
+
     document.body.appendChild(menu);
-    
+
     // Fermer le menu en cliquant ailleurs
     setTimeout(() => {
         document.addEventListener('click', function closeMenu() {
@@ -601,7 +646,7 @@ function addTableRow(table) {
     const tbody = table.querySelector('tbody');
     const firstRow = tbody.querySelector('tr');
     const colsCount = firstRow.children.length;
-    
+
     const newRow = document.createElement('tr');
     for (let i = 0; i < colsCount; i++) {
         const td = document.createElement('td');
@@ -610,17 +655,17 @@ function addTableRow(table) {
         td.contentEditable = true;
         newRow.appendChild(td);
     }
-    
+
     tbody.appendChild(newRow);
 }
 
 function addTableColumn(table) {
     const rows = table.querySelectorAll('tr');
-    
+
     rows.forEach((row, index) => {
         const cell = document.createElement(index === 0 ? 'th' : 'td');
         cell.innerHTML = index === 0 ? 'Nouvelle colonne' : '&nbsp;';
-        cell.style.cssText = index === 0 ? 
+        cell.style.cssText = index === 0 ?
             'padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold;' :
             'padding: 8px; border: 1px solid #dee2e6; min-height: 20px;';
         cell.contentEditable = true;
@@ -631,7 +676,7 @@ function addTableColumn(table) {
 function deleteTableRow(table, targetCell) {
     const row = targetCell.closest('tr');
     const tbody = table.querySelector('tbody');
-    
+
     if (tbody.children.length > 1) {
         row.remove();
     } else {
@@ -642,7 +687,7 @@ function deleteTableRow(table, targetCell) {
 function deleteTableColumn(table, targetCell) {
     const cellIndex = Array.from(targetCell.parentElement.children).indexOf(targetCell);
     const rows = table.querySelectorAll('tr');
-    
+
     if (rows[0].children.length > 1) {
         rows.forEach(row => {
             if (row.children[cellIndex]) {
@@ -659,4 +704,3 @@ function deleteTable(table) {
         table.remove();
     }
 }
-

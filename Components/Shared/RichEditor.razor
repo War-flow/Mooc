@@ -619,10 +619,28 @@
             try
             {
                 await jsModule.InvokeVoidAsync("setContent", EditorId, content);
+                // Réinitialiser les gestionnaires de tableaux après avoir défini le contenu
+                await jsModule.InvokeVoidAsync("reinitializeTableHandlers", EditorId);
             }
             catch (JSException ex)
             {
                 await ShowErrorMessage($"Erreur lors de la définition du contenu : {ex.Message}");
+            }
+        }
+    }
+
+    // Méthode pour réinitialiser manuellement les gestionnaires si nécessaire
+    public async Task ReinitializeTableHandlers()
+    {
+        if (jsModule != null)
+        {
+            try
+            {
+                await jsModule.InvokeVoidAsync("reinitializeTableHandlers", EditorId);
+            }
+            catch (JSException ex)
+            {
+                await ShowErrorMessage($"Erreur lors de la réinitialisation des gestionnaires : {ex.Message}");
             }
         }
     }
