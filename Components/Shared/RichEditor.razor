@@ -59,9 +59,6 @@
                 <button type="button" class="toolbar-btn" @onclick='() => ExecuteCommand("indent")' title="Augmenter le retrait">
                     <i class="bi bi-text-indent-left"></i>
                 </button>
-                <button type="button" class="toolbar-btn" @onclick="InsertTable" title="Ajouter un tableau">
-                    <i class="bi bi-table"></i>
-                </button>
             </div>
 
             <div class="toolbar-separator"></div>
@@ -369,20 +366,6 @@
             }
         }
     }
-    private async Task InsertTable()
-    {
-        if (jsModule != null)
-        {
-            try
-            {
-                await jsModule.InvokeVoidAsync("insertTable", EditorId);
-            }
-            catch (JSException ex)
-            {
-                await ShowErrorMessage($"Erreur lors de l'insertion du tableau : {ex.Message}");
-            }
-        }
-    }
 
     private InputFile? imageInputComponent;
     private InputFile? audioInputComponent;
@@ -619,28 +602,10 @@
             try
             {
                 await jsModule.InvokeVoidAsync("setContent", EditorId, content);
-                // Réinitialiser les gestionnaires de tableaux après avoir défini le contenu
-                await jsModule.InvokeVoidAsync("reinitializeTableHandlers", EditorId);
             }
             catch (JSException ex)
             {
                 await ShowErrorMessage($"Erreur lors de la définition du contenu : {ex.Message}");
-            }
-        }
-    }
-
-    // Méthode pour réinitialiser manuellement les gestionnaires si nécessaire
-    public async Task ReinitializeTableHandlers()
-    {
-        if (jsModule != null)
-        {
-            try
-            {
-                await jsModule.InvokeVoidAsync("reinitializeTableHandlers", EditorId);
-            }
-            catch (JSException ex)
-            {
-                await ShowErrorMessage($"Erreur lors de la réinitialisation des gestionnaires : {ex.Message}");
             }
         }
     }

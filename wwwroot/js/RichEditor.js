@@ -17,32 +17,53 @@ function throttle(func, limit) {
 
 export function initializeEditor(editorId, dotNetRef, options) {
     const element = document.getElementById(editorId);
-    if (!element) return;
+    if (!element) {
+        console.error(`Élément avec l'ID ${editorId} introuvable`);
+        return;
+    }
 
-    // Configuration de base
+    // Configuration de base améliorée
     Object.assign(element.style, {
-        contentEditable: true,
         minHeight: options.height + 'px',
         border: '1px solid #ced4da',
         borderRadius: '0 0 0.375rem 0.375rem',
-        padding: '0.75rem'
+        padding: '0.75rem',
+        outline: 'none', // Supprime le contour par défaut
+        cursor: 'text'    // Curseur de texte
     });
 
-    element.innerHTML = options.initialContent || '';
-    updatePlaceholder(element, options.placeholder);
+    // Activer contentEditable APRÈS la configuration du style
+    element.contentEditable = true;
 
-    // Gestionnaires d'événements consolidés
+    // Initialiser le contenu
+    const initialContent = options.initialContent || '';
+    if (initialContent.trim()) {
+        element.innerHTML = initialContent;
+    } else {
+        setPlaceholder(element, options.placeholder);
+    }
+
+    // Gestionnaires d'événements optimisés
     const handlers = createEventHandlers(element, options, dotNetRef);
     Object.entries(handlers).forEach(([event, handler]) => {
         element.addEventListener(event, handler);
     });
 
     // Stockage optimisé
-    window.richTextEditors[editorId] = { element, dotNetRef, handlers };
+    window.richTextEditors[editorId] = { element, dotNetRef, handlers, options };
+
+    // Assurer le focus et la capacité d'écriture
+    element.addEventListener('click', () => {
+        if (!element.contains(document.activeElement)) {
+            element.focus();
+        }
+    });
 
     if (options.enableStickyToolbar !== false) {
         initializeStickyToolbar(editorId);
     }
+
+    console.log(`Éditeur ${editorId} initialisé avec succès`);
 }
 
 function createEventHandlers(element, options, dotNetRef) {
@@ -55,17 +76,14 @@ function createEventHandlers(element, options, dotNetRef) {
         const textLength = element.textContent.length;
         const isRich = hasRichContent(content);
 
-        const hasRealContent = content.trim() &&
-            !content.includes(options.placeholder) &&
-            (textLength > 0 || isRich);
-
-        if (!hasRealContent && !isRich) {
-            updatePlaceholder(element, options.placeholder);
-            content = '';
-        } else if (content.includes(options.placeholder) && hasRealContent) {
-            content = content.replace(new RegExp(`<div[^>]*>${options.placeholder}</div>`, 'g'), '');
-            element.innerHTML = content;
+        // Nettoyer le placeholder si nécessaire
+        if (content.includes('class="placeholder-text"')) {
+            clearPlaceholder(element);
+            content = element.innerHTML;
         }
+
+        const hasRealContent = content.trim() &&
+            textLength > 0 || isRich;
 
         if (textLength > options.maxLength && !isRich) {
             element.textContent = element.textContent.substring(0, options.maxLength);
@@ -76,18 +94,27 @@ function createEventHandlers(element, options, dotNetRef) {
     };
 
     const handleFocus = () => {
-        if (element.innerHTML.includes(options.placeholder)) {
-            element.innerHTML = '';
+        // Supprimer le placeholder au focus
+        if (element.querySelector('.placeholder-text')) {
+            clearPlaceholder(element);
         }
+        element.classList.add('focused');
     };
 
     const handleBlur = () => {
+        element.classList.remove('focused');
+        // Remettre le placeholder si vide
         if (!element.textContent.trim() && !hasRichContent(element.innerHTML)) {
-            updatePlaceholder(element, options.placeholder);
+            setPlaceholder(element, options.placeholder);
         }
     };
 
     const handleKeyDown = (e) => {
+        // Supprimer le placeholder dès la première frappe
+        if (element.querySelector('.placeholder-text')) {
+            clearPlaceholder(element);
+        }
+
         if (e.ctrlKey || e.metaKey) {
             const commands = { b: 'bold', i: 'italic', u: 'underline' };
             if (commands[e.key]) {
@@ -97,11 +124,31 @@ function createEventHandlers(element, options, dotNetRef) {
         }
     };
 
-    return { input: handleInput, focus: handleFocus, blur: handleBlur, keydown: handleKeyDown };
+    const handlePaste = (e) => {
+        // Supprimer le placeholder lors du collage
+        if (element.querySelector('.placeholder-text')) {
+            clearPlaceholder(element);
+        }
+    };
+
+    return {
+        input: handleInput,
+        focus: handleFocus,
+        blur: handleBlur,
+        keydown: handleKeyDown,
+        paste: handlePaste
+    };
 }
 
-function updatePlaceholder(element, placeholder) {
-    element.innerHTML = `<div style="color: #6c757d; font-style: italic;">${placeholder}</div>`;
+function setPlaceholder(element, placeholder) {
+    element.innerHTML = `<div class="placeholder-text" style="color: #6c757d; font-style: italic; pointer-events: none;">${placeholder}</div>`;
+}
+
+function clearPlaceholder(element) {
+    const placeholderEl = element.querySelector('.placeholder-text');
+    if (placeholderEl) {
+        element.innerHTML = '';
+    }
 }
 
 // Configuration des plateformes vidéo optimisée
@@ -140,6 +187,11 @@ export function executeCommandWithValue(editorId, command, value) {
 function executeEditorCommand(editorId, command, value = null) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
+        // Supprimer le placeholder avant d'exécuter la commande
+        if (editor.element.querySelector('.placeholder-text')) {
+            clearPlaceholder(editor.element);
+        }
+
         editor.element.focus();
         document.execCommand(command, false, value);
         editor.element.dispatchEvent(new Event('input', { bubbles: true }));
@@ -283,8 +335,9 @@ function createImageElement(url) {
 }
 
 function insertIntoEditor(editor, element) {
-    if (editor.element.innerHTML.includes('color: #6c757d')) {
-        editor.element.innerHTML = '';
+    // Supprimer le placeholder
+    if (editor.element.querySelector('.placeholder-text')) {
+        clearPlaceholder(editor.element);
     }
 
     editor.element.focus();
@@ -308,23 +361,25 @@ function insertIntoEditor(editor, element) {
 export function setContent(editorId, content) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
-        editor.element.innerHTML = content;
-
-        // Réinitialiser les gestionnaires d'événements pour tous les tableaux
-        const tables = editor.element.querySelectorAll('table');
-        tables.forEach(table => {
-            if (!table.classList.contains('enhanced')) {
-                table.classList.add('enhanced');
-                setupTableEditHandlers(table);
-            }
-        });
-
+        if (content && content.trim()) {
+            editor.element.innerHTML = content;
+        } else {
+            setPlaceholder(editor.element, editor.options.placeholder);
+        }
         enhanceDisplay();
     }
 }
 
 export function getContent(editorId) {
-    return window.richTextEditors[editorId]?.element.innerHTML || '';
+    const editor = window.richTextEditors[editorId];
+    if (editor) {
+        // Ne pas retourner le placeholder
+        if (editor.element.querySelector('.placeholder-text')) {
+            return '';
+        }
+        return editor.element.innerHTML;
+    }
+    return '';
 }
 
 export function destroyEditor(editorId) {
@@ -348,18 +403,13 @@ export function destroyEditor(editorId) {
 
 // Fonction d'amélioration consolidée
 function enhanceDisplay() {
-    const selectors = ['.text-message img', '.text-message .video-container', '.rich-editor-content img', '.rich-editor-content .video-container', '.rich-editor-content table'];
+    const selectors = ['.text-message img', '.text-message .video-container', '.rich-editor-content img', '.rich-editor-content .video-container'];
 
     selectors.forEach(selector => {
         document.querySelectorAll(selector).forEach(element => {
             if (!element.classList.contains('enhanced')) {
                 element.classList.add('enhanced');
                 setupMediaHandlers(element);
-
-                // Ajouter la gestion des tableaux
-                if (element.tagName === 'TABLE') {
-                    setupTableEditHandlers(element);
-                }
             }
         });
     });
@@ -370,58 +420,6 @@ function setupMediaHandlers(element) {
         element.addEventListener('load', () => element.classList.add('loaded'));
         element.addEventListener('error', () => element.style.display = 'none');
         if (element.complete) element.classList.add('loaded');
-    }
-}
-
-// Fonction setupTableEditHandlers - VERSION UNIQUE ET COMPLÈTE
-function setupTableEditHandlers(table) {
-    // Vérifier si les gestionnaires sont déjà configurés
-    if (table.hasAttribute('data-handlers-setup')) {
-        return;
-    }
-
-    // Marquer le tableau comme configuré
-    table.setAttribute('data-handlers-setup', 'true');
-
-    // Empêcher la propagation des événements d'édition
-    table.addEventListener('input', function (e) {
-        e.stopPropagation();
-    });
-
-    // Gérer la navigation avec les touches fléchées
-    table.addEventListener('keydown', function (e) {
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab'].includes(e.key)) {
-            e.stopPropagation();
-            handleTableNavigation(e, table);
-        }
-    });
-
-    // Ajouter le menu contextuel pour les actions de tableau
-    table.addEventListener('contextmenu', function (e) {
-        e.preventDefault();
-        showTableContextMenu(e, table);
-    });
-
-    // S'assurer que les cellules sont éditables
-    const cells = table.querySelectorAll('td, th');
-    cells.forEach(cell => {
-        if (!cell.hasAttribute('contenteditable')) {
-            cell.contentEditable = true;
-        }
-    });
-}
-
-// Nouvelle fonction pour réinitialiser les tableaux existants
-export function reinitializeTableHandlers(editorId) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        const tables = editor.element.querySelectorAll('table');
-        tables.forEach(table => {
-            // Retirer l'attribut pour forcer la réinitialisation
-            table.removeAttribute('data-handlers-setup');
-            table.classList.remove('enhanced');
-            setupTableEditHandlers(table);
-        });
     }
 }
 
@@ -589,7 +587,15 @@ function handleTableNavigation(e, table) {
     }
 }
 
-// Fonction pour afficher le menu contextuel du tableau
+// Les autres fonctions de tableaux restent inchangées...
+function setupTableEditHandlers(table) {
+    table.addEventListener('keydown', (e) => handleTableNavigation(e, table));
+    table.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showTableContextMenu(e, table);
+    });
+}
+
 function showTableContextMenu(e, table) {
     // Retirer les anciens menus
     document.querySelectorAll('.table-context-menu').forEach(menu => menu.remove());
