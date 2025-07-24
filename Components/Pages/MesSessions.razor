@@ -1,0 +1,234 @@
+﻿@page "/mes-sessions"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@attribute [Authorize(Policy = "VoirCours")]
+
+<PageTitle>Mes Sessions</PageTitle>
+
+<div class="container mt-4">
+    <h2>Mes Sessions</h2>
+    
+    @if (enrolledSessions != null && enrolledSessions.Any())
+    {
+        <div class="row">
+            @foreach (var session in enrolledSessions)
+            {
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card">
+                        @if (!string.IsNullOrEmpty(session.Image))
+                        {
+                            <img src="@session.Image" class="card-img-top" alt="@session.Title">
+                        }
+                        <div class="card-body">
+                            <h5 class="card-title">@session.Title</h5>
+                            <p class="card-text">@session.Description</p>
+                            <p class="text-muted">
+                                <small>Du @session.StartDate.ToString("dd/MM/yyyy") au @session.EndDate.ToString("dd/MM/yyyy")</small>
+                            </p>
+                            
+                            @if (IsSessionActive(session))
+                            {
+                                <span class="badge bg-success mb-2">En cours</span>
+                                <br>
+                                <a href="/session/@session.Id" class="btn btn-valid">Accéder à la session</a>
+                            }
+                            else if (IsSessionUpcoming(session))
+                            {
+                                <span class="badge bg-warning mb-2">À venir</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary mb-2">Terminée</span>
+                            }
+
+                            <button class="btn btn-cancel m-lg-1" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
+                                Se désinscrire
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <p>Vous n'êtes inscrit à aucune session pour le moment.</p>
+            <a href="/" class="btn btn-primary">Découvrir les sessions disponibles</a>
+        </div>
+    }
+</div>
+
+@if (showUnsubscribeModal)
+{
+    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirmer la désinscription</h5>
+                    <button type="button" class="btn-close" @onclick="CloseUnsubscribeModal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Êtes-vous sûr de vouloir vous désinscrire de cette session ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseUnsubscribeModal">Annuler</button>
+                    <button type="button" class="btn btn-danger" @onclick="UnsubscribeFromSession" disabled="@isProcessing">
+                        @if (isProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Confirmer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<Session>? enrolledSessions;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private string? currentUserId;
+    private bool showUnsubscribeModal = false;
+    private int sessionToUnsubscribe = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadCurrentUser();
+            await LoadEnrolledSessions();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de l'initialisation : {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                var user = await UserManager.GetUserAsync(authState.User);
+                currentUserId = user?.Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement de l'utilisateur : {ex.Message}");
+        }
+    }
+
+    private async Task LoadEnrolledSessions()
+    {
+        if (string.IsNullOrEmpty(currentUserId)) 
+        {
+            enrolledSessions = new List<Session>();
+            return;
+        }
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            var user = await context.Users
+                .Include(u => u.EnrolledSessions)
+                .AsNoTracking() // Ajouter AsNoTracking pour les performances
+                .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+            enrolledSessions = user?.EnrolledSessions?.ToList() ?? new List<Session>();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des sessions : {ex.Message}");
+            enrolledSessions = new List<Session>();
+        }
+    }
+
+    private bool IsSessionActive(Session session)
+    {
+        var now = DateTime.Now;
+        return now >= session.StartDate && now <= session.EndDate;
+    }
+
+    private bool IsSessionUpcoming(Session session)
+    {
+        return DateTime.Now < session.StartDate;
+    }
+
+    private void ShowUnsubscribeModal(int sessionId)
+    {
+        if (isProcessing) return;
+        
+        sessionToUnsubscribe = sessionId;
+        showUnsubscribeModal = true;
+    }
+
+    private void CloseUnsubscribeModal()
+    {
+        showUnsubscribeModal = false;
+        sessionToUnsubscribe = 0;
+    }
+
+    private async Task UnsubscribeFromSession()
+    {
+        if (string.IsNullOrEmpty(currentUserId) || sessionToUnsubscribe == 0 || isProcessing) 
+            return;
+
+        isProcessing = true;
+        
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            var user = await context.Users
+                .Include(u => u.EnrolledSessions)
+                .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+            if (user?.EnrolledSessions != null)
+            {
+                var sessionToRemove = user.EnrolledSessions.FirstOrDefault(s => s.Id == sessionToUnsubscribe);
+                if (sessionToRemove != null)
+                {
+                    user.EnrolledSessions.Remove(sessionToRemove);
+                    await context.SaveChangesAsync();
+                    
+                    // Recharger les sessions après la désinscription
+                    await LoadEnrolledSessions();
+                    StateHasChanged(); // Forcer le re-rendu
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la désinscription : {ex.Message}");
+        }
+        finally
+        {
+            isProcessing = false;
+            CloseUnsubscribeModal();
+        }
+    }
+}

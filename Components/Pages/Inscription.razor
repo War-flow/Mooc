@@ -1,0 +1,219 @@
+﻿@page "/inscription/{SessionId:int}"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Identity
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject UserManager<ApplicationUser> UserManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager NavigationManager
+@attribute [Authorize(Policy = "VoirCours")]
+
+<PageTitle>Inscription à la session</PageTitle>
+
+@if (session != null)
+{
+    <div class="container mt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Inscription à la session</h3>
+                    </div>
+                    <div class="card-body">
+                        <h4>@session.Title</h4>
+                        <p>@session.Description</p>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <strong>Date de début :</strong> @session.StartDate.ToString("dd/MM/yyyy")
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Date de fin :</strong> @session.EndDate.ToString("dd/MM/yyyy")
+                            </div>
+                        </div>
+                        
+                        @if (!IsSessionAvailable())
+                        {
+                            <div class="alert alert-warning">
+                                @if (DateTime.Now < session.StartDate)
+                                {
+                                    <span>Cette session n'est pas encore ouverte aux inscriptions. Elle commencera le @session.StartDate.ToString("dd/MM/yyyy").</span>
+                                }
+                                else if (DateTime.Now > session.EndDate)
+                                {
+                                    <span>Cette session est terminée depuis le @session.EndDate.ToString("dd/MM/yyyy").</span>
+                                }
+                            </div>
+                        }
+                        else if (isAlreadyEnrolled)
+                        {
+                            <div class="alert alert-info">
+                                <i class="fas fa-check-circle"></i> Vous êtes déjà inscrit à cette session.
+                            </div>
+                            <a href="/mes-sessions" class="btn btn-primary m-lg-2">Voir mes sessions</a>
+                        }
+                        else
+                        {
+                            @if (showError)
+                            {
+                                <div class="alert alert-danger">
+                                    @errorMessage
+                                </div>
+                            }
+                            
+                            <div class="alert alert-info">
+                                <strong>Confirmez-vous votre inscription à cette session ?</strong>
+                            </div>
+                            
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-success" @onclick="EnrollToSession" disabled="@isProcessing">
+                                    @if (isProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2"></span>
+                                    }
+                                    Confirmer l'inscription
+                                </button>
+                                <a href="/" class="btn btn-secondary">Annuler</a>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else if (isLoading)
+{
+    <div class="d-flex justify-content-center mt-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Chargement...</span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-danger">
+        Session non trouvée.
+    </div>
+}
+
+@code {
+    [Parameter] public int SessionId { get; set; }
+    
+    private Session? session;
+    private bool isAlreadyEnrolled = false;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private bool showError = false;
+    private string errorMessage = string.Empty;
+    private string? currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            // Exécuter les opérations séquentiellement pour éviter les conflits de threading
+            await LoadCurrentUser();
+            
+            // Utiliser un seul contexte pour les deux opérations restantes
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            await LoadSession(context);
+            await CheckEnrollmentStatus(context);
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors du chargement : {ex.Message}";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            var user = await UserManager.GetUserAsync(authState.User);
+            currentUserId = user?.Id;
+        }
+    }
+
+    private async Task LoadSession(ApplicationDbContext context)
+    {
+        session = await context.Sessions
+            .Include(s => s.Courses)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == SessionId && s.IsActive);
+    }
+
+    private async Task CheckEnrollmentStatus(ApplicationDbContext context)
+    {
+        if (session == null || string.IsNullOrEmpty(currentUserId)) return;
+
+        var user = await context.Users
+            .Include(u => u.EnrolledSessions)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+        isAlreadyEnrolled = user?.EnrolledSessions?.Any(s => s.Id == SessionId) == true;
+    }
+
+    private bool IsSessionAvailable()
+    {
+        if (session == null) return false;
+        
+        var now = DateTime.Now;
+        return now >= session.StartDate && now <= session.EndDate;
+    }
+
+    private async Task EnrollToSession()
+    {
+        if (session == null || string.IsNullOrEmpty(currentUserId) || !IsSessionAvailable() || isProcessing)
+            return;
+
+        isProcessing = true;
+        showError = false;
+
+        try
+        {
+            await using var context = await DbContextFactory.CreateDbContextAsync();
+            
+            var user = await context.Users
+                .Include(u => u.EnrolledSessions)
+                .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+            if (user != null)
+            {
+                if (user.EnrolledSessions == null)
+                    user.EnrolledSessions = new List<Session>();
+
+                if (!user.EnrolledSessions.Any(s => s.Id == SessionId))
+                {
+                    var sessionToEnroll = await context.Sessions.FindAsync(SessionId);
+                    if (sessionToEnroll != null)
+                    {
+                        user.EnrolledSessions.Add(sessionToEnroll);
+                        await context.SaveChangesAsync();
+                        
+                        NavigationManager.NavigateTo("/mes-sessions");
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de l'inscription : {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

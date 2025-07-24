@@ -39,10 +39,13 @@ namespace Mooc.Services
             // Ajouter des claims au rôle Admin
             await _roleClaimService.AddClaimToRoleAsync("Admin", "Permission", "GérerUtilisateurs");
             await _roleClaimService.AddClaimToRoleAsync("Admin", "Permission", "GestionFormation");
+            await _roleClaimService.AddClaimToRoleAsync("Admin", "Permission", "VoirCours");
+            await _roleClaimService.AddClaimToRoleAsync("Admin", "Permission", "InscritSession");
 
             // Ajouter des claims au rôle Formateur
             await _roleClaimService.AddClaimToRoleAsync("Formateur", "Permission", "GestionFormation");
-
+            await _roleClaimService.AddClaimToRoleAsync("Formateur", "Permission", "VoirCours");
+            await _roleClaimService.AddClaimToRoleAsync("Formateur", "Permission", "RépondreQuiz");
             // Ajouter des claims au rôle Utilisateur
             await _roleClaimService.AddClaimToRoleAsync("Utilisateur", "Permission", "VoirCours");
             await _roleClaimService.AddClaimToRoleAsync("Utilisateur", "Permission", "RépondreQuiz");

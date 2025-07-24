@@ -3,21 +3,40 @@
 @using Microsoft.EntityFrameworkCore
 
 @{
-    // Filtrer pour n'afficher que les sessions qui sont en ligne (IsActive = true)
-    var activeSessions = Sessions?.Where(s => s.IsActive).ToList();
+    // Filtrer pour n'afficher que les sessions qui sont en ligne ET disponibles selon les dates
+    var availableSessions = Sessions?.Where(s => s.IsActive && IsSessionAvailableForEnrollment(s)).ToList();
 }
 
-@if (activeSessions != null && activeSessions.Any())
+@if (availableSessions != null && availableSessions.Any())
 {
     <div class="row row-cols-1 row-cols-md-3 g-4">
-        @foreach (var session in activeSessions)
+        @foreach (var session in availableSessions)
         {
             <div class="col">
                 <div class="card mooc">
                     <img src="@session.Image" class="card-img-top" alt="Image of @session.Title">
                     <div class="card-body">
                         <h5 class="card-title">@session.Title</h5>
-                        <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+
+                        <p>@session.Description</p>
+
+                        @if (IsSessionAvailableForEnrollment(session))
+                        {
+                            <a href="/inscription/@session.Id" class="btn m-lg-1">S'inscrire</a>
+                        }
+                        else
+                        {
+                            <button class="btn btn-secondary" disabled>
+                                @if (DateTime.Now < session.StartDate)
+                                {
+                                    <span>Bientôt disponible</span>
+                                }
+                                else
+                                {
+                                    <span>Session terminée</span>
+                                }
+                            </button>
+                        }
 
                         <!-- Button trigger modal -->
                         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-@session.Id">
@@ -35,7 +54,7 @@
                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                             <div class="modal-body">
-                                <p class="card-text">@session.Description</p>
+                                <p class="card-text">@(session.Description?.Length > 30 ? session.Description.Substring(0, 30) + "..." : session.Description)</p>
                                 @if (session.Courses != null && session.Courses.Any())
                                 {
                                     <ul class="list-group">
@@ -50,11 +69,32 @@
                                     <p>Date de début : @session.StartDate.ToString("dd/MM/yyyy")</p>
                                     <p>Date de fin : @session.EndDate.ToString("dd/MM/yyyy")</p>
                                     <p>Effort estimé : @GetEstimatedEffort(session.Work) h</p>
+                                    
+                                    @if (!IsSessionAvailableForEnrollment(session))
+                                    {
+                                        <div class="alert alert-warning">
+                                            @if (DateTime.Now < session.StartDate)
+                                            {
+                                                <span>Inscriptions ouvertes le @session.StartDate.ToString("dd/MM/yyyy")</span>
+                                            }
+                                            else
+                                            {
+                                                <span>Session terminée le @session.EndDate.ToString("dd/MM/yyyy")</span>
+                                            }
+                                        </div>
+                                    }
                                 </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-                                <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+                                @if (IsSessionAvailableForEnrollment(session))
+                                {
+                                    <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-secondary" disabled>Inscription fermée</button>
+                                }
                             </div>
                         </div>
                     </div>
@@ -65,7 +105,7 @@
 }
 else
 {
-    <p>Aucune session disponible pour le moment.</p>
+    <p>Aucune session disponible pour inscription pour le moment.</p>
 }
 
 @code {
@@ -75,5 +115,12 @@ else
     private string GetEstimatedEffort(int hours)
     {
         return hours.ToString();
+    }
+
+    private bool IsSessionAvailableForEnrollment(Session session)
+    {
+        var now = DateTime.Now;
+        // Les inscriptions sont disponibles pendant la période de la session
+        return now >= session.StartDate && now <= session.EndDate;
     }
 }

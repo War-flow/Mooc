@@ -450,8 +450,17 @@
     private void RetourVersListe()
     {
         var sessionId = cours?.SessionId;
-        var url = sessionId.HasValue ? $"/Manager/Cours?sessionId={sessionId}" : "/Manager/Cours";
-        NavigationManager.NavigateTo(url);
+
+        if (sessionId.HasValue)
+        {
+            // Si on connaît la session, rediriger vers la gestion des cours de cette session
+            NavigationManager.NavigateTo($"/session/{sessionId.Value}");
+        }
+        else
+        {
+            // Sinon, rediriger vers la liste générale des cours
+            NavigationManager.NavigateTo("/Manager/Cours");
+        }
     }
 
     private string GetBlockUrl(int blockIndex)
