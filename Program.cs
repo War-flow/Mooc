@@ -40,6 +40,9 @@ namespace Mooc
             // Ajout du service BlockService
             builder.Services.AddScoped<BlockService>();
 
+            // Ajout du service CourseStateService
+            builder.Services.AddScoped<CourseStateService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>

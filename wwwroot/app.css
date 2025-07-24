@@ -419,67 +419,70 @@ h1:focus {
     gap: 0.5rem;
 }
 
-/* Styles pour le visualiseur de cours */
-.cours-viewer-container {
-    padding: 0;
+/* Styles pour la navigation des blocs de cours */
+.cours-progress {
+    font-size: 0.875rem;
+}
+
+.block-navigation {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.list-group-item.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: white;
 }
 
 .cours-block-viewer {
-    border: 1px solid #e9ecef;
-    border-radius: 8px;
-    padding: 20px;
-    background-color: #fff;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.cours-block-viewer:hover {
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+    min-height: 300px;
 }
 
 .block-title {
-    color: #495057;
-    margin-bottom: 15px;
-    font-weight: 600;
+    color: var(--bs-primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--bs-primary);
 }
 
 .block-content {
     line-height: 1.6;
-    color: #212529;
 }
 
-.block-description {
-    color: #6c757d;
-    font-style: italic;
+/* Animation pour les transitions entre blocs */
+.cours-block-viewer {
+    animation: fadeIn 0.3s ease-in-out;
 }
 
-.text-block-viewer, 
-.image-block-viewer, 
-.video-block-viewer, 
-.audio-block-viewer,
-.info-block-viewer {
-    width: 100%;
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
-.info-block-viewer {
-    border-left: 4px solid;
+/* Responsive design pour mobile */
+@media (max-width: 768px) {
+    .block-navigation {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .block-navigation .btn {
+        width: 100%;
+        margin-bottom: 0.25rem;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
 }
-
-.info-block-viewer.alert-info {
-    border-left-color: #0dcaf0;
-}
-
-.info-block-viewer.alert-warning {
-    border-left-color: #ffc107;
-}
-
-.info-block-viewer.alert-success {
-    border-left-color: #198754;
-}
-
-.info-block-viewer.alert-danger {
-    border-left-color: #dc3545;
-}
-
 /* Styles pour l'éditeur personnalisé */
 .custom-text-editor {
     border: 1px solid #ced4da;
@@ -519,20 +522,20 @@ h1:focus {
     height: 2rem;
 }
 
-.toolbar-btn:hover {
-    background-color: #e9ecef;
-    border-color: #adb5bd;
-}
+    .toolbar-btn:hover {
+        background-color: #e9ecef;
+        border-color: #adb5bd;
+    }
 
-.toolbar-btn:active {
-    background-color: #dee2e6;
-    border-color: #6c757d;
-}
+    .toolbar-btn:active {
+        background-color: #dee2e6;
+        border-color: #6c757d;
+    }
 
-.toolbar-btn:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
+    .toolbar-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
 
 .toolbar-separator {
     width: 1px;
@@ -551,11 +554,11 @@ h1:focus {
     min-width: 6rem;
 }
 
-.toolbar-select:focus {
-    border-color: #86b7fe;
-    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-    outline: none;
-}
+    .toolbar-select:focus {
+        border-color: #86b7fe;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+        outline: none;
+    }
 
 .color-picker-wrapper {
     display: flex;
@@ -587,50 +590,67 @@ h1:focus {
     overflow-y: auto;
 }
 
-.rich-editor-content:focus {
-    box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.25);
-}
+    .rich-editor-content:focus {
+        box-shadow: inset 0 0 0 2px rgba(13, 110, 253, 0.25);
+    }
 
-/* Styles pour le contenu de l'éditeur */
-.rich-editor-content p {
-    margin-bottom: 0.5rem;
-}
+    /* Styles pour le contenu de l'éditeur */
+    .rich-editor-content p {
+        margin-bottom: 0.5rem;
+    }
 
-.rich-editor-content p:last-child {
-    margin-bottom: 0;
-}
+        .rich-editor-content p:last-child {
+            margin-bottom: 0;
+        }
 
-.rich-editor-content h1,
-.rich-editor-content h2,
-.rich-editor-content h3,
-.rich-editor-content h4,
-.rich-editor-content h5,
-.rich-editor-content h6 {
-    margin-top: 0.5rem;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-}
+    .rich-editor-content h1,
+    .rich-editor-content h2,
+    .rich-editor-content h3,
+    .rich-editor-content h4,
+    .rich-editor-content h5,
+    .rich-editor-content h6 {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+        font-weight: bold;
+    }
 
-.rich-editor-content h1 { font-size: 1.5rem; }
-.rich-editor-content h2 { font-size: 1.25rem; }
-.rich-editor-content h3 { font-size: 1.125rem; }
-.rich-editor-content h4 { font-size: 1rem; }
-.rich-editor-content h5 { font-size: 0.875rem; }
-.rich-editor-content h6 { font-size: 0.75rem; }
+    .rich-editor-content h1 {
+        font-size: 1.5rem;
+    }
 
-.rich-editor-content ul,
-.rich-editor-content ol {
-    margin-left: 1.5rem;
-    margin-bottom: 0.5rem;
-}
+    .rich-editor-content h2 {
+        font-size: 1.25rem;
+    }
 
-.rich-editor-content blockquote {
-    border-left: 4px solid #dee2e6;
-    padding-left: 1rem;
-    margin: 0.5rem 0;
-    color: #6c757d;
-    font-style: italic;
-}
+    .rich-editor-content h3 {
+        font-size: 1.125rem;
+    }
+
+    .rich-editor-content h4 {
+        font-size: 1rem;
+    }
+
+    .rich-editor-content h5 {
+        font-size: 0.875rem;
+    }
+
+    .rich-editor-content h6 {
+        font-size: 0.75rem;
+    }
+
+    .rich-editor-content ul,
+    .rich-editor-content ol {
+        margin-left: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .rich-editor-content blockquote {
+        border-left: 4px solid #dee2e6;
+        padding-left: 1rem;
+        margin: 0.5rem 0;
+        color: #6c757d;
+        font-style: italic;
+    }
 
 /* Personnalise le style des indentations (blockquote) dans l'éditeur */
 [contenteditable="true"] blockquote {
@@ -672,34 +692,39 @@ h1:focus {
     background-color: #fff;
 }
 
-.text-message * {
-    max-width: 100%;
-}
+    .text-message * {
+        max-width: 100%;
+    }
 
-/* Style spécial pour les images base64 pour éviter les problèmes de performance */
-.text-message img[src^="data:"],
-.rich-editor-content img[src^="data:"] {
-    image-rendering: auto;
-    object-fit: contain;
-}
+    /* Style spécial pour les images base64 pour éviter les problèmes de performance */
+    .text-message img[src^="data:"],
+    .rich-editor-content img[src^="data:"] {
+        image-rendering: auto;
+        object-fit: contain;
+    }
 
-/* Animation pour le chargement des images */
-.text-message img {
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-}
+    /* Animation pour le chargement des images */
+    .text-message img {
+        opacity: 0;
+        transition: opacity 0.3s ease-in-out;
+    }
 
-.text-message img.loaded {
-    opacity: 1;
-}
+        .text-message img.loaded {
+            opacity: 1;
+        }
 
 .spin {
     animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .alert {
@@ -724,32 +749,32 @@ h1:focus {
     margin-bottom: 0.5rem;
 }
 
-.editor-toolbar.sticky::before {
-    content: '';
-    position: absolute;
-    top: -1px;
-    left: -1px;
-    right: -1px;
-    bottom: -1px;
-    background: linear-gradient(45deg, rgba(13, 110, 253, 0.1), rgba(13, 110, 253, 0.05));
-    border-radius: inherit;
-    z-index: -1;
-}
+    .editor-toolbar.sticky::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: -1px;
+        right: -1px;
+        bottom: -1px;
+        background: linear-gradient(45deg, rgba(13, 110, 253, 0.1), rgba(13, 110, 253, 0.05));
+        border-radius: inherit;
+        z-index: -1;
+    }
 
 /* Assurer une transition fluide */
 .editor-toolbar {
     transition: all 0.3s ease;
 }
 
-/* Améliorer la visibilité des boutons quand la barre est flottante */
-.editor-toolbar.sticky .toolbar-btn {
-    background-color: rgba(255, 255, 255, 0.9);
-    backdrop-filter: blur(5px);
-}
+    /* Améliorer la visibilité des boutons quand la barre est flottante */
+    .editor-toolbar.sticky .toolbar-btn {
+        background-color: rgba(255, 255, 255, 0.9);
+        backdrop-filter: blur(5px);
+    }
 
-.editor-toolbar.sticky .toolbar-btn:hover {
-    background-color: #e9ecef;
-}
+        .editor-toolbar.sticky .toolbar-btn:hover {
+            background-color: #e9ecef;
+        }
 
 /* Styles responsifs pour les petits écrans */
 @media (max-width: 768px) {
@@ -760,8 +785,8 @@ h1:focus {
         right: 10px;
         margin-bottom: 0;
     }
-    
-    .editor-toolbar.sticky + .rich-editor-content {
-        margin-top: 70px; /* Compenser la hauteur de la barre fixe */
-    }
+
+        .editor-toolbar.sticky + .rich-editor-content {
+            margin-top: 70px; /* Compenser la hauteur de la barre fixe */
+        }
 }

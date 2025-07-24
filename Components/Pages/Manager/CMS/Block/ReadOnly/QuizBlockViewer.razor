@@ -1,4 +1,6 @@
 ﻿@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
 
 <div class="quiz-block-viewer">
     @if (!string.IsNullOrEmpty(Block.Title))
@@ -6,14 +8,98 @@
         <h4 class="block-title">@Block.Title</h4>
     }
     
-    <div class="alert alert-secondary">
-        <i class="bi bi-question-circle me-2"></i>
-        Quiz interactif disponible uniquement en mode cours.
-    </div>
+    @if (!string.IsNullOrEmpty(QuizData.Question))
+    {
+        <div class="quiz-display">
+            <div class="question mb-3">
+                <strong>@((MarkupString)QuizData.Question)</strong>
+            </div>
+
+            <div class="options mb-3">
+                @for (int i = 0; i < QuizData.Options.Count; i++)
+                {
+                    var index = i;
+                    <div class="form-check">
+                        @if (QuizData.Type == "multiple-select")
+                        {
+                            <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
+                                   disabled="@IsAnswered" @bind="UserAnswers[index]" />
+                        }
+                        else
+                        {
+                            <input class="form-check-input" type="radio" name="quiz-@Block.Order"
+                                   id="option-@Block.Order-@index" value="@index"
+                                   disabled="@IsAnswered" @onchange="@(e => SetUserAnswer(index))" />
+                        }
+                        <label class="form-check-label @GetOptionClass(index)" for="option-@Block.Order-@index">
+                            @QuizData.Options[index].Text
+                            @if (IsAnswered && QuizData.Options[index].IsCorrect)
+                            {
+                                <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                            }
+                            else if (IsAnswered && UserAnswers[index] && !QuizData.Options[index].IsCorrect)
+                            {
+                                <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+                            }
+                        </label>
+                    </div>
+                }
+            </div>
+
+            <div class="quiz-actions mb-3">
+                @if (!IsAnswered)
+                {
+                    <button type="button" class="btn btn-primary" @onclick="SubmitAnswer"
+                            disabled="@(!HasUserAnswer())">
+                        Valider la réponse
+                    </button>
+                }
+                else
+                {
+                    @if (IsCorrect.HasValue)
+                    {
+                        <span class="ms-3 badge @(IsCorrect.Value ? "bg-success" : "bg-danger")">
+                            @if (IsCorrect.Value)
+                            {
+                                <i class="bi bi-check-lg me-1"></i>
+                                @:Correct!
+                            }
+                            else
+                            {
+                                <i class="bi bi-x-lg me-1"></i>
+                                @:Incorrect
+                            }
+                        </span>
+                    }
+                }
+            </div>
+
+            @if (IsAnswered && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback && !string.IsNullOrEmpty(ValidationMessage))
+            {
+                <div class="alert alert-warning">
+                    <strong>Feedback :</strong> @ValidationMessage
+                </div>
+            }
+
+            @if (IsAnswered && !string.IsNullOrEmpty(QuizData.Explanation))
+            {
+                <div class="alert alert-info">
+                    <strong>Explication :</strong> @QuizData.Explanation
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            Ce quiz n'a pas encore été configuré.
+        </div>
+    }
     
     @if (!string.IsNullOrEmpty(Block.Text))
     {
-        <div class="block-description">
+        <div class="block-description mt-3">
             @Block.Text
         </div>
     }
@@ -25,4 +111,133 @@
     
     [Parameter]
     public bool IsReadOnly { get; set; } = true;
+
+    [Parameter]
+    public EventCallback<bool> OnQuizCompleted { get; set; }
+
+    // État du quiz
+    private bool IsAnswered { get; set; } = false;
+    private bool? IsCorrect { get; set; } = null;
+    private List<bool> UserAnswers { get; set; } = new();
+    private string ValidationMessage { get; set; } = string.Empty;
+
+    // Structure des données du quiz
+    private QuizStructure QuizData { get; set; } = new();
+
+    // Classes pour représenter la structure du quiz
+    public class QuizStructure
+    {
+        public string Question { get; set; } = string.Empty;
+        public string Type { get; set; } = "multiple-choice";
+        public List<QuizOption> Options { get; set; } = new();
+        public string Explanation { get; set; } = string.Empty;
+        public bool ShowValidationFeedback { get; set; } = true;
+
+        public QuizStructure()
+        {
+            Options.Add(new QuizOption { Text = "", IsCorrect = false });
+            Options.Add(new QuizOption { Text = "", IsCorrect = false });
+        }
+    }
+
+    public class QuizOption
+    {
+        public string Text { get; set; } = string.Empty;
+        public bool IsCorrect { get; set; } = false;
+    }
+
+    protected override void OnInitialized()
+    {
+        LoadQuizData();
+        InitializeUserAnswers();
+    }
+
+    private void LoadQuizData()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(Block.Content?.ToString()))
+            {
+                QuizData = System.Text.Json.JsonSerializer.Deserialize<QuizStructure>(Block.Content.ToString()) ?? new QuizStructure();
+            }
+        }
+        catch
+        {
+            QuizData = new QuizStructure();
+        }
+    }
+
+    private void InitializeUserAnswers()
+    {
+        UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
+    }
+
+    private string GetOptionClass(int index)
+    {
+        if (!IsAnswered) return string.Empty;
+
+        var classes = new List<string>();
+
+        if (QuizData.Options[index].IsCorrect)
+            classes.Add("text-success fw-bold");
+        else if (UserAnswers[index])
+            classes.Add("text-danger");
+
+        return string.Join(" ", classes);
+    }
+
+    private void SetUserAnswer(int index)
+    {
+        for (int i = 0; i < UserAnswers.Count; i++)
+        {
+            UserAnswers[i] = (i == index);
+        }
+    }
+
+    private async Task SubmitAnswer()
+    {
+        IsCorrect = CheckAnswer();
+
+        if (QuizData.ShowValidationFeedback)
+        {
+            ValidationMessage = IsCorrect.GetValueOrDefault() ? "Bonne réponse !" : "Mauvaise réponse. Consultez l'explication ci-dessous.";
+        }
+
+        IsAnswered = true;
+
+        // Notifier le parent que le quiz est complété
+        if (OnQuizCompleted.HasDelegate)
+        {
+            await OnQuizCompleted.InvokeAsync(IsCorrect.GetValueOrDefault());
+        }
+    }
+
+    private bool CheckAnswer()
+    {
+        if (QuizData.Type == "multiple-select")
+        {
+            // Pour les choix multiples, toutes les bonnes réponses doivent être sélectionnées
+            for (int i = 0; i < QuizData.Options.Count; i++)
+            {
+                if (QuizData.Options[i].IsCorrect != UserAnswers[i])
+                    return false;
+            }
+            return true;
+        }
+        else
+        {
+            // Pour le choix simple, une seule bonne réponse doit être sélectionnée
+            for (int i = 0; i < QuizData.Options.Count; i++)
+            {
+                if (UserAnswers[i] && QuizData.Options[i].IsCorrect)
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    private bool HasUserAnswer()
+    {
+        return UserAnswers != null && UserAnswers.Any(a => a);
+    }
 }

@@ -47,7 +47,6 @@
                 <InputSelect class="form-select" @bind-Value="QuizData.Type" @onchange="OnQuizTypeChanged">
                     <option value="multiple-choice">Choix multiple (une seule réponse)</option>
                     <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
-                    <option value="true-false">Vrai/Faux</option>
                 </InputSelect>
             </div>
 
@@ -191,7 +190,7 @@
                 @if (IsAnswered && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback && !string.IsNullOrEmpty(ValidationMessage))
                 {
                     <div class="alert alert-warning">
-                        <strong>Feedback :</strong> @ValidationMessage
+                        <strong>Résultat</strong> @ValidationMessage
                     </div>
                 }
 

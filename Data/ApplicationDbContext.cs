@@ -8,6 +8,8 @@ namespace Mooc.Data
         public DbSet<Session> Sessions { get; set; } = null!;
         public DbSet<Cours> Courses { get; set; }
 
+        public DbSet<CourseProgress> CourseProgresses { get; set; } = null!;
+
         // Vous pouvez également configurer des détails supplémentaires si nécessaire
         protected override void OnModelCreating(ModelBuilder builder)
         {
