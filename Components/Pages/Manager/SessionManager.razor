@@ -34,7 +34,6 @@
                         <tr>
                             <th>Image</th>
                             <th>Titre</th>
-                            <th>Description</th>
                             <th>Date de début</th>
                             <th>Date de fin</th>
                             <th>Statut actuel</th>
@@ -56,8 +55,7 @@
                                         <span>Aucune image</span>
                                     }
                                 </td>
-                                <td>@session.Title</td>
-                                <td>@(session.Description?.Length > 30 ? session.Description.Substring(0, 30) + "..." : session.Description)</td>
+                                <td>@(session.Title?.Length > 15 ? session.Title.Substring(0, 15) + "..." : session.Title)</td>
                                 <td>@session.StartDate.ToShortDateString()</td>
                                 <td>@session.EndDate.ToShortDateString()</td>
                                 <td>

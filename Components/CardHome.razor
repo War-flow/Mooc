@@ -12,112 +12,254 @@
 
 @if (availableSessions != null && availableSessions.Any())
 {
-    <div class="row row-cols-1 row-cols-md-3 g-4">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
         @foreach (var session in availableSessions)
         {
             <div class="col">
-                <div class="card mooc">
-                    <img src="@session.Image" class="card-img-top" alt="Image of @session.Title">
-                    <div class="card-body">
-                        <h5 class="card-title">@session.Title</h5>
-
-                        <p>@session.Description</p>
-
-                        @if (IsSessionAvailableForEnrollment(session))
+                <div class="card mooc h-100 position-relative overflow-hidden">
+                    <!-- Badge de statut -->
+                    <div class="position-absolute top-0 end-0 p-2" style="z-index: 10;">
+                        @if (IsUserEnrolledInSession(session.Id))
                         {
-                            @if (IsUserEnrolledInSession(session.Id))
-                            {
-                                <a href="/mes-sessions" class="btn btn-primary m-lg-1">Voir cours</a>
-                            }
-                            else
-                            {
-                                <a href="/inscription/@session.Id" class="btn m-lg-1">S'inscrire</a>
-                            }
+                            <span class="badge bg-success rounded-pill">
+                                <i class="bi bi-check-circle me-1"></i>Inscrit
+                            </span>
                         }
-                        else
+                        else if (GetDaysUntilEnd(session) <= 7)
                         {
-                            @if (IsUserEnrolledInSession(session.Id))
-                            {
-                                <a href="/mes-sessions" class="btn btn-primary m-lg-1">Voir cours</a>
-                            }
-                            else
-                            {
-                                <button class="btn btn-secondary" disabled>
-                                    @if (DateTime.Now < session.StartDate)
-                                    {
-                                        <span>Bientôt disponible</span>
-                                    }
-                                    else
-                                    {
-                                        <span>Session terminée</span>
-                                    }
-                                </button>
-                            }
+                            <span class="badge bg-warning text-dark rounded-pill">
+                                <i class="bi bi-clock me-1"></i>@GetDaysUntilEnd(session)j restants
+                            </span>
                         }
-
-                        <!-- Button trigger modal -->
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-@session.Id">
-                            Voir plus
-                        </button>
                     </div>
-                </div>
 
-                <!-- Modal -->
-                <div class="modal fade" id="modal-@session.Id" tabindex="-1" aria-labelledby="modal-label-@session.Id" aria-hidden="true">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h1 class="modal-title fs-5" id="modal-label-@session.Id">@session.Title</h1>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <!-- Image avec overlay gradient -->
+                    <div class="position-relative">
+                        <img src="@session.Image" class="card-img-top" alt="Image of @session.Title">
+                        <div class="position-absolute bottom-0 start-0 end-0 bg-gradient-to-top p-3">
+                            <div class="d-flex align-items-center text-white">
+                                <i class="bi bi-calendar-event me-2"></i>
+                                <small>@session.StartDate.ToString("dd MMM") - @session.EndDate.ToString("dd MMM yyyy")</small>
                             </div>
-                            <div class="modal-body">
-                                <p class="card-text">@(session.Description?.Length > 30 ? session.Description.Substring(0, 30) + "..." : session.Description)</p>
-                                @if (session.Courses != null && session.Courses.Any())
-                                {
-                                    <ul class="list-group">
-                                        <li class="list-group-item hl">Programme de formation</li>
-                                        @foreach (var course in session.Courses)
-                                        {
-                                            <li class="list-group-item list-group-item-action">@course.Title</li>
-                                        }
-                                    </ul>
-                                }
-                                <div class="pt-3">
-                                    <p>Date de début : @session.StartDate.ToString("dd/MM/yyyy")</p>
-                                    <p>Date de fin : @session.EndDate.ToString("dd/MM/yyyy")</p>
-                                    <p>Effort estimé : @GetEstimatedEffort(session.Work) h</p>
-                                    
-                                    @if (!IsSessionAvailableForEnrollment(session))
-                                    {
-                                        <div class="alert alert-warning">
-                                            @if (DateTime.Now < session.StartDate)
+                        </div>
+                    </div>
+
+                    <div class="card-body d-flex flex-column">
+                        <div class="mb-3">
+                            <h5 class="card-title fw-bold text-primary">@session.Title</h5>
+                            <p class="card-text text-muted">@GetTruncatedDescription(session.Description, 100)</p>
+                        </div>
+
+                        <!-- Informations de la session -->
+                        <div class="mb-3">
+                            <div class="row g-2 text-sm">
+                                <div class="col-6">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-people-fill text-info me-2"></i>
+                                        <span class="small">
+                                            @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
+                                            @if (IsCountUpdating(session.Id))
                                             {
-                                                <span>Inscriptions ouvertes le @session.StartDate.ToString("dd/MM/yyyy")</span>
+                                                <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
                                             }
-                                            else
-                                            {
-                                                <span>Session terminée le @session.EndDate.ToString("dd/MM/yyyy")</span>
-                                            }
-                                        </div>
-                                    }
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-clock-fill text-warning me-2"></i>
+                                        <span class="small">@GetEstimatedEffort(session.Work) h</span>
+                                    </div>
+                                </div>
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-book-fill text-success me-2"></i>
+                                        <span class="small">@(session.Courses?.Count ?? 0) cours</span>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+                        </div>
+                        <!-- Boutons d'action -->
+                        <div class="mt-auto">
+                            <div class="d-flex gap-2 mb-2">
                                 @if (IsSessionAvailableForEnrollment(session))
                                 {
                                     @if (IsUserEnrolledInSession(session.Id))
                                     {
-                                        <a href="/mes-sessions" class="btn btn-primary m-lg-2">Voir cours</a>
+                                        <a href="/session/@session.Id" class="btn btn-success flex-fill">
+                                            <i class="bi bi-play-circle me-2"></i>Voir cours
+                                        </a>
                                     }
                                     else
                                     {
-                                        <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+                                        <a href="/inscription/@session.Id" class="btn btn-primary flex-fill">
+                                            <i class="bi bi-plus-circle me-2"></i>S'inscrire
+                                        </a>
                                     }
                                 }
                                 else
                                 {
-                                    <button class="btn btn-secondary" disabled>Inscription fermée</button>
+                                    @if (IsUserEnrolledInSession(session.Id))
+                                    {
+                                        <a href="/mes-sessions" class="btn btn-success flex-fill">
+                                            <i class="bi bi-play-circle me-2"></i>Voir cours
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <button class="btn btn-secondary flex-fill" disabled>
+                                            @if (DateTime.Now < session.StartDate)
+                                            {
+                                                <i class="bi bi-hourglass me-2"></i><span>Bientôt disponible</span>
+                                            }
+                                            else
+                                            {
+                                                <i class="bi bi-x-circle me-2"></i><span>Session terminée</span>
+                                            }
+                                        </button>
+                                    }
+                                }
+
+                                <!-- Button trigger modal -->
+                                <button type="button" class="btn btn-outline-primary" 
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modal-@session.Id"
+                                        title="Voir plus d'informations">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal améliorée -->
+                <div class="modal fade" id="modal-@session.Id" tabindex="-1" aria-labelledby="modal-label-@session.Id" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h1 class="modal-title fs-5" id="modal-label-@session.Id">
+                                    <i class="bi bi-mortarboard me-2"></i>@session.Title
+                                </h1>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <img src="@session.Image" class="img-fluid rounded mb-3" alt="Image de @session.Title">
+                                    </div>
+                                    <div class="col-md-8">
+                                        <h6 class="text-primary">Description</h6>
+                                        <p class="mb-3">@session.Description</p>
+                                        
+                                        <div class="row g-3 mb-3">
+                                            <div class="col-6">
+                                                <div class="bg-light p-3 rounded text-center">
+                                                    <i class="bi bi-calendar-event text-primary fs-4"></i>
+                                                    <div class="mt-2">
+                                                        <strong>@session.StartDate.ToString("dd/MM/yyyy")</strong>
+                                                        <br><small class="text-muted">Date de début</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="bg-light p-3 rounded text-center">
+                                                    <i class="bi bi-calendar-check text-success fs-4"></i>
+                                                    <div class="mt-2">
+                                                        <strong>@session.EndDate.ToString("dd/MM/yyyy")</strong>
+                                                        <br><small class="text-muted">Date de fin</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="bg-light p-3 rounded text-center">
+                                                    <i class="bi bi-clock text-warning fs-4"></i>
+                                                    <div class="mt-2">
+                                                        <strong>@GetEstimatedEffort(session.Work) h</strong>
+                                                        <br><small class="text-muted">Effort estimé</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="bg-light p-3 rounded text-center">
+                                                    <i class="bi bi-book text-info fs-4"></i>
+                                                    <div class="mt-2">
+                                                        <strong>@(session.Courses?.Count ?? 0)</strong>
+                                                        <br><small class="text-muted">Cours</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (session.Courses != null && session.Courses.Any())
+                                {
+                                    <hr>
+                                    <h6 class="text-primary mb-3">
+                                        <i class="bi bi-list-ul me-2"></i>Programme de formation
+                                    </h6>
+                                    <div class="list-group">
+                                        @foreach (var course in session.Courses.OrderBy(c => c.Order))
+                                        {
+                                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="mb-1">@course.Title</h6>
+                                                    @if (!string.IsNullOrEmpty(course.Description))
+                                                    {
+                                                        <p class="mb-1 text-muted small">@GetTruncatedDescription(course.Description, 80)</p>
+                                                    }
+                                                </div>
+                                                <div class="text-end">
+                                                    <span class="badge bg-info">@course.Duration min</span>
+                                                    @if (course.IsRequired)
+                                                    {
+                                                        <br><span class="badge bg-warning text-dark small mt-1">Obligatoire</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                                
+                                @if (!IsSessionAvailableForEnrollment(session))
+                                {
+                                    <div class="alert alert-warning mt-3">
+                                        <i class="bi bi-exclamation-triangle me-2"></i>
+                                        @if (DateTime.Now < session.StartDate)
+                                        {
+                                            <span>Inscriptions ouvertes le @session.StartDate.ToString("dd/MM/yyyy")</span>
+                                        }
+                                        else
+                                        {
+                                            <span>Session terminée le @session.EndDate.ToString("dd/MM/yyyy")</span>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                    <i class="bi bi-x-lg me-2"></i>Fermer
+                                </button>
+                                @if (IsSessionAvailableForEnrollment(session))
+                                {
+                                    @if (IsUserEnrolledInSession(session.Id))
+                                    {
+                                        <a href="/mes-sessions" class="btn btn-success">
+                                            <i class="bi bi-play-circle me-2"></i>Voir cours
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <a href="/inscription/@session.Id" class="btn btn-primary">
+                                            <i class="bi bi-plus-circle me-2"></i>S'inscrire
+                                        </a>
+                                    }
+                                }
+                                else
+                                {
+                                    <button class="btn btn-secondary" disabled>
+                                        <i class="bi bi-lock me-2"></i>Inscription fermée
+                                    </button>
                                 }
                             </div>
                         </div>
@@ -129,15 +271,27 @@
 }
 else
 {
-    <p>Aucune session disponible pour inscription pour le moment.</p>
+    <div class="text-center py-5">
+        <i class="bi bi-inbox display-1 text-muted"></i>
+        <h4 class="text-muted mt-3">Aucune session disponible</h4>
+        <p class="text-muted">Aucune session n'est disponible pour inscription pour le moment.</p>
+    </div>
 }
 
 @code {
     [Parameter]
     public List<Session>? Sessions { get; set; }
     
+    [Parameter]
+    public EventCallback OnEnrollmentChanged { get; set; }
+    
     private string? currentUserId;
     private List<int> enrolledSessionIds = new();
+    private Dictionary<int, int> enrolledCounts = new();
+    private Timer? refreshTimer;
+    private HashSet<int> updatingCounts = new();
+    private string? errorMessage;
+    private bool hasError;
 
     protected override async Task OnInitializedAsync()
     {
@@ -146,44 +300,204 @@ else
         {
             await LoadUserEnrollments();
         }
+        await LoadEnrollmentCountsWithErrorHandling();
+        
+        // Mise à jour automatique toutes les 30 secondes
+        refreshTimer = new Timer(async _ => await RefreshEnrollmentData(), 
+                               null, 
+                               TimeSpan.FromSeconds(30), 
+                               TimeSpan.FromSeconds(30));
     }
 
+    // Méthode pour obtenir l'ID de l'utilisateur actuel
     private async Task GetCurrentUserId()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         if (authState.User.Identity?.IsAuthenticated == true)
         {
-            currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            currentUserId = authState.User.FindFirst("sub")?.Value 
+                           ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
         }
     }
 
+    // Méthode pour charger les inscriptions de l'utilisateur
     private async Task LoadUserEnrollments()
     {
-        if (string.IsNullOrEmpty(currentUserId)) return;
+        if (string.IsNullOrEmpty(currentUserId))
+            return;
 
         using var context = DbContextFactory.CreateDbContext();
-        var user = await context.Users
-            .Include(u => u.EnrolledSessions)
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Id == currentUserId);
-
-        enrolledSessionIds = user?.EnrolledSessions?.Select(s => s.Id).ToList() ?? new List<int>();
+        enrolledSessionIds = await context.Users
+            .Where(u => u.Id == currentUserId)
+            .SelectMany(u => u.EnrolledSessions)
+            .Select(s => s.Id)
+            .ToListAsync();
     }
 
+    // Méthode pour charger les compteurs d'inscription
+    private async Task LoadEnrollmentCounts()
+    {
+        if (Sessions == null) return;
+
+        using var context = DbContextFactory.CreateDbContext();
+        var sessionIds = Sessions.Select(s => s.Id).ToList();
+        
+        var counts = await context.Sessions
+            .Where(s => sessionIds.Contains(s.Id))
+            .Select(s => new { s.Id, Count = s.EnrolledUsers.Count() })
+            .ToListAsync();
+
+        enrolledCounts = counts.ToDictionary(x => x.Id, x => x.Count);
+    }
+
+    // Méthode pour actualiser les données d'inscription
+    public async Task RefreshEnrollmentData()
+    {
+        var previousEnrolledIds = enrolledSessionIds.ToList();
+        var previousCounts = enrolledCounts.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await LoadUserEnrollments();
+        }
+        await LoadEnrollmentCountsWithErrorHandling();
+        
+        // Vérifier si des changements ont eu lieu
+        bool hasChanges = !enrolledSessionIds.SequenceEqual(previousEnrolledIds) ||
+                         enrolledCounts.Any(kvp => !previousCounts.ContainsKey(kvp.Key) || 
+                                                  previousCounts[kvp.Key] != kvp.Value);
+        
+        if (hasChanges)
+        {
+            await InvokeAsync(StateHasChanged);
+            if (OnEnrollmentChanged.HasDelegate)
+            {
+                await OnEnrollmentChanged.InvokeAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Force la mise à jour des données d'inscription
+    /// </summary>
+    public async Task ForceRefresh()
+    {
+        await RefreshEnrollmentData();
+    }
+
+    /// <summary>
+    /// Met à jour spécifiquement le compteur d'une session
+    /// </summary>
+    public async Task UpdateSessionEnrollmentCount(int sessionId)
+    {
+        using var context = DbContextFactory.CreateDbContext();
+        var count = await context.Sessions
+            .Where(s => s.Id == sessionId)
+            .SelectMany(s => s.EnrolledUsers)
+            .CountAsync();
+        
+        enrolledCounts[sessionId] = count;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private bool IsCountUpdating(int sessionId)
+    {
+        return updatingCounts.Contains(sessionId);
+    }
+    
+    private async Task UpdateSessionCountWithIndicator(int sessionId)
+    {
+        updatingCounts.Add(sessionId);
+        StateHasChanged();
+        
+        try
+        {
+            await UpdateSessionEnrollmentCount(sessionId);
+        }
+        finally
+        {
+            updatingCounts.Remove(sessionId);
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadEnrollmentCountsWithErrorHandling()
+    {
+        try
+        {
+            hasError = false;
+            errorMessage = null;
+            await LoadEnrollmentCounts();
+        }
+        catch (Exception ex)
+        {
+            hasError = true;
+            errorMessage = "Erreur lors du chargement des inscriptions";
+            Console.WriteLine($"Erreur LoadEnrollmentCounts: {ex.Message}");
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+
+    /// <summary>
+    /// Vérifie si la session est disponible pour inscription (entre les dates de début et de fin)
+    /// </summary>
+    private bool IsSessionAvailableForEnrollment(Session session)
+    {
+        var now = DateTime.Now;
+        return session.IsActive && now >= session.StartDate && now <= session.EndDate;
+    }
+
+    /// <summary>
+    /// Vérifie si l'utilisateur courant est inscrit à la session donnée
+    /// </summary>
     private bool IsUserEnrolledInSession(int sessionId)
     {
         return enrolledSessionIds.Contains(sessionId);
     }
 
-    private string GetEstimatedEffort(int hours)
+    /// <summary>
+    /// Retourne le nombre d'inscrits pour une session donnée
+    /// </summary>
+    private int GetEnrolledCount(int sessionId)
     {
-        return hours.ToString();
+        return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
     }
 
-    private bool IsSessionAvailableForEnrollment(Session session)
+    /// <summary>
+    /// Retourne le nombre de jours restants avant la fin de la session
+    /// </summary>
+    private int GetDaysUntilEnd(Session session)
     {
         var now = DateTime.Now;
-        // Les inscriptions sont disponibles pendant la période de la session
-        return now >= session.StartDate && now <= session.EndDate;
+        if (session.EndDate > now)
+        {
+            return (session.EndDate - now).Days;
+        }
+        return 0;
+    }
+
+    /// <summary>
+    /// Calcule l'effort estimé en heures basé sur le travail (supposé en minutes)
+    /// </summary>
+    private int GetEstimatedEffort(int work)
+    {
+        // Conversion du travail en heures (supposons que work est en minutes)
+        return work / 60;
+    }
+
+    /// <summary>
+    /// Tronque une description à une longueur maximale et ajoute "..." si nécessaire.
+    /// </summary>
+    private string GetTruncatedDescription(string? description, int maxLength)
+    {
+        if (string.IsNullOrEmpty(description))
+            return string.Empty;
+        if (description.Length <= maxLength)
+            return description;
+        return description.Substring(0, maxLength) + "...";
     }
 }
