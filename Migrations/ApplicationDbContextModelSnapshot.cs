@@ -302,15 +302,18 @@ namespace Mooc.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("UserId")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CoursId");
-
                     b.HasIndex("UserId");
 
-                    b.ToTable("CourseProgresses");
+                    b.HasIndex("CoursId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CourseProgress_CoursId_UserId");
+
+                    b.ToTable("CourseProgress", (string)null);
                 });
 
             modelBuilder.Entity("Mooc.Data.Session", b =>
@@ -335,7 +338,13 @@ namespace Mooc.Migrations
                     b.Property<bool>("IsActive")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("NotificationSent1h")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotificationSent24h")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("date");
@@ -356,6 +365,23 @@ namespace Mooc.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Session", (string)null);
+                });
+
+            modelBuilder.Entity("SessionEnrollments", b =>
+                {
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("SessionId", "UserId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("SessionEnrollments", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -430,7 +456,9 @@ namespace Mooc.Migrations
 
                     b.HasOne("Mooc.Data.ApplicationUser", "User")
                         .WithMany()
-                        .HasForeignKey("UserId");
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Cours");
 
@@ -440,15 +468,26 @@ namespace Mooc.Migrations
             modelBuilder.Entity("Mooc.Data.Session", b =>
                 {
                     b.HasOne("Mooc.Data.ApplicationUser", "User")
-                        .WithMany("EnrolledSessions")
-                        .HasForeignKey("UserId");
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Mooc.Data.ApplicationUser", b =>
+            modelBuilder.Entity("SessionEnrollments", b =>
                 {
-                    b.Navigation("EnrolledSessions");
+                    b.HasOne("Mooc.Data.Session", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Mooc.Data.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Mooc.Data.Session", b =>

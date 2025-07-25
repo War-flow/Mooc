@@ -5,15 +5,33 @@
 @using Microsoft.AspNetCore.Identity
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
-@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@using Mooc.Services
+@using Mooc.Components.Shared
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject INotificationService NotificationService
+@inject IJSRuntime JSRuntime
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @attribute [Authorize(Policy = "VoirCours")]
+@implements IDisposable
 
 <PageTitle>Mes Sessions</PageTitle>
 
 <div class="container mt-4">
     <h2>Mes Sessions</h2>
+    
+    <!-- Notifications en haut de page -->
+    @if (sessionNotifications.Any())
+    {
+        @foreach (var notification in sessionNotifications)
+        {
+            <div class="alert alert-@notification.Type alert-dismissible fade show" role="alert">
+                <i class="bi bi-@notification.Icon me-2"></i>
+                <strong>@notification.Title</strong> @notification.Message
+                <button type="button" class="btn-close" @onclick="() => DismissNotification(notification.Id)"></button>
+            </div>
+        }
+    }
     
     @if (enrolledSessions != null && enrolledSessions.Any())
     {
@@ -21,7 +39,7 @@
             @foreach (var session in enrolledSessions)
             {
                 <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card">
+                    <div class="card @GetCardClass(session)">
                         @if (!string.IsNullOrEmpty(session.Image))
                         {
                             <img src="@session.Image" class="card-img-top" alt="@session.Title">
@@ -33,24 +51,46 @@
                                 <small>Du @session.StartDate.ToString("dd/MM/yyyy") au @session.EndDate.ToString("dd/MM/yyyy")</small>
                             </p>
                             
+                            <!-- Indicateur de temps restant -->
                             @if (IsSessionActive(session))
                             {
+                                var timeRemaining = session.EndDate - DateTime.Now;
                                 <span class="badge bg-success mb-2">En cours</span>
+                                @if (timeRemaining.TotalHours <= 24)
+                                {
+                                    <div class="alert alert-warning alert-sm p-2 mt-2">
+                                        <i class="bi bi-clock me-1"></i>
+                                        Se termine dans @GetTimeRemainingText(timeRemaining)
+                                    </div>
+                                }
                                 <br>
                                 <a href="/session/@session.Id" class="btn btn-valid">Accéder à la session</a>
                             }
                             else if (IsSessionUpcoming(session))
                             {
                                 <span class="badge bg-warning mb-2">À venir</span>
+                                var timeToStart = session.StartDate - DateTime.Now;
+                                <div class="alert alert-info alert-sm p-2 mt-2">
+                                    <i class="bi bi-calendar me-1"></i>
+                                    Commence dans @GetTimeRemainingText(timeToStart)
+                                </div>
                             }
                             else
                             {
                                 <span class="badge bg-secondary mb-2">Terminée</span>
+                                @if (AllowUnsubscribeFromEndedSessions)
+                                {
+                                    <br>
+                                    <small class="text-muted">Session terminée - Vous pouvez toujours vous désinscrire</small>
+                                }
                             }
 
-                            <button class="btn btn-cancel m-lg-1" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
-                                Se désinscrire
-                            </button>
+                            @if (AllowUnsubscribeFromEndedSessions || !IsSessionEnded(session))
+                            {
+                                <button class="btn btn-cancel m-lg-1" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
+                                    Se désinscrire
+                                </button>
+                            }
                         </div>
                     </div>
                 </div>
@@ -101,6 +141,8 @@
     </div>
 }
 
+<NotificationToast @ref="notificationToast" />
+
 @code {
     private List<Session>? enrolledSessions;
     private bool isLoading = true;
@@ -108,6 +150,14 @@
     private string? currentUserId;
     private bool showUnsubscribeModal = false;
     private int sessionToUnsubscribe = 0;
+    private Timer? refreshTimer;
+    private NotificationToast notificationToast = null!;
+
+    // Paramètre pour contrôler si on permet la désinscription des sessions terminées
+    private bool AllowUnsubscribeFromEndedSessions = true;
+
+    // Liste des notifications à afficher
+    private List<SessionNotification> sessionNotifications = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -115,6 +165,10 @@
         {
             await LoadCurrentUser();
             await LoadEnrolledSessions();
+            await CheckForSessionNotifications();
+            
+            // Actualiser automatiquement toutes les 2 minutes
+            refreshTimer = new Timer(async _ => await RefreshSessions(), null, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2));
         }
         catch (Exception ex)
         {
@@ -123,6 +177,82 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+    }
+
+    private async Task RefreshSessions()
+    {
+        var previousCount = enrolledSessions?.Count ?? 0;
+        await LoadEnrolledSessions();
+        await CheckForSessionNotifications();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task CheckForSessionNotifications()
+    {
+        if (enrolledSessions == null) return;
+
+        sessionNotifications.Clear();
+        var now = DateTime.Now;
+
+        foreach (var session in enrolledSessions)
+        {
+            // Session se terminant dans les 24h
+            if (IsSessionActive(session))
+            {
+                var timeRemaining = session.EndDate - now;
+                
+                if (timeRemaining.TotalHours <= 1 && timeRemaining.TotalMinutes > 0)
+                {
+                    sessionNotifications.Add(new SessionNotification
+                    {
+                        Id = $"ending-1h-{session.Id}",
+                        Title = "⚠️ Session se termine bientôt !",
+                        Message = $"La session '{session.Title}' se termine dans moins d'une heure.",
+                        Type = "danger",
+                        Icon = "exclamation-triangle-fill"
+                    });
+
+                    // Notification toast
+                    if (notificationToast != null)
+                    {
+                        await notificationToast.ShowNotification(
+                            "Session se termine bientôt !",
+                            $"'{session.Title}' se termine dans {GetTimeRemainingText(timeRemaining)}",
+                            "danger",
+                            10000);
+                    }
+                }
+                else if (timeRemaining.TotalHours <= 24)
+                {
+                    sessionNotifications.Add(new SessionNotification
+                    {
+                        Id = $"ending-24h-{session.Id}",
+                        Title = "🔔 Session se termine demain",
+                        Message = $"La session '{session.Title}' se termine le {session.EndDate:dd/MM/yyyy à HH:mm}.",
+                        Type = "warning",
+                        Icon = "clock"
+                    });
+                }
+            }
+
+            // Session vient de se terminer
+            if (IsSessionEnded(session) && (now - session.EndDate).TotalHours <= 24)
+            {
+                sessionNotifications.Add(new SessionNotification
+                {
+                    Id = $"ended-{session.Id}",
+                    Title = "📋 Session terminée",
+                    Message = $"La session '{session.Title}' s'est terminée. Vous pouvez toujours consulter les cours.",
+                    Type = "info",
+                    Icon = "info-circle"
+                });
+            }
         }
     }
 
@@ -156,7 +286,7 @@
             await using var context = await DbContextFactory.CreateDbContextAsync();
             var user = await context.Users
                 .Include(u => u.EnrolledSessions)
-                .AsNoTracking() // Ajouter AsNoTracking pour les performances
+                .AsNoTracking()
                 .FirstOrDefaultAsync(u => u.Id == currentUserId);
 
             enrolledSessions = user?.EnrolledSessions?.ToList() ?? new List<Session>();
@@ -171,12 +301,17 @@
     private bool IsSessionActive(Session session)
     {
         var now = DateTime.Now;
-        return now >= session.StartDate && now <= session.EndDate;
+        return now >= session.StartDate && now <= session.EndDate && session.IsActive;
     }
 
     private bool IsSessionUpcoming(Session session)
     {
         return DateTime.Now < session.StartDate;
+    }
+
+    private bool IsSessionEnded(Session session)
+    {
+        return DateTime.Now > session.EndDate;
     }
 
     private void ShowUnsubscribeModal(int sessionId)
@@ -217,7 +352,17 @@
                     
                     // Recharger les sessions après la désinscription
                     await LoadEnrolledSessions();
-                    StateHasChanged(); // Forcer le re-rendu
+                    StateHasChanged();
+
+                    // Notification de succès
+                    if (notificationToast != null)
+                    {
+                        await notificationToast.ShowNotification(
+                            "Désinscription réussie",
+                            $"Vous avez été désinscrit de la session '{sessionToRemove.Title}'.",
+                            "success",
+                            5000);
+                    }
                 }
             }
         }
@@ -228,7 +373,53 @@
         finally
         {
             isProcessing = false;
-            CloseUnsubscribeModal();
+            showUnsubscribeModal = false;
+            sessionToUnsubscribe = 0;
         }
     }
+
+    private void DismissNotification(string notificationId)
+    {
+        var notification = sessionNotifications.FirstOrDefault(n => n.Id == notificationId);
+        if (notification != null)
+        {
+            sessionNotifications.Remove(notification);
+            StateHasChanged();
+        }
+    }
+
+    private string GetCardClass(Session session)
+    {
+        if (IsSessionActive(session))
+            return "border-success";
+        if (IsSessionUpcoming(session))
+            return "border-warning";
+        if (IsSessionEnded(session))
+            return "border-secondary";
+        return "";
+    }
+
+    /// <summary>
+    /// Retourne une chaîne lisible pour le temps restant (jours, heures, minutes).
+    /// </summary>
+    private string GetTimeRemainingText(TimeSpan timeSpan)
+    {
+        if (timeSpan.TotalMinutes < 1)
+            return "moins d'une minute";
+        if (timeSpan.TotalHours < 1)
+            return $"{(int)timeSpan.TotalMinutes} minute(s)";
+        if (timeSpan.TotalDays < 1)
+            return $"{(int)timeSpan.TotalHours} heure(s) et {timeSpan.Minutes} minute(s)";
+        return $"{(int)timeSpan.TotalDays} jour(s), {timeSpan.Hours} heure(s)";
+    }
+    // Ajoutez cette classe à la fin du fichier ou dans un fichier partagé approprié
+    public class SessionNotification
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Type { get; set; } = "info";
+        public string Icon { get; set; } = "info-circle";
+    }
 }
+

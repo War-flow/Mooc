@@ -46,8 +46,7 @@ namespace Mooc
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
-                options.UseNpgsql(connectionString, npgsqlOptions =>
-                    npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(3), null)));
+                options.UseSqlServer(connectionString));
 
             builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
@@ -157,6 +156,10 @@ namespace Mooc
 
             // Ajouter le logging et la configuration
             builder.Services.AddLogging();
+
+            // Configuration des notifications
+            builder.Services.AddScoped<INotificationService, NotificationService>();
+            builder.Services.AddHostedService<SessionExpiryService>();
 
             var app = builder.Build();
 

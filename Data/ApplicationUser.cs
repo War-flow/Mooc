@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Mooc.Data
 {
-    // Add profile data for application users by adding properties to the ApplicationUser class
     public class ApplicationUser : IdentityUser
     {
         [PersonalData]
@@ -22,7 +21,7 @@ namespace Mooc.Data
         [NotMapped]
         public string FullName => $"{FirstName} {LastName}";
 
-        // Navigation property pour les sessions auxquelles l'utilisateur est inscrit
-        public virtual ICollection<Session>? EnrolledSessions { get; set; }
+        // **Navigation property pour les sessions auxquelles l'utilisateur est inscrit**
+        public virtual ICollection<Session> EnrolledSessions { get; set; } = new List<Session>();
     }
 }

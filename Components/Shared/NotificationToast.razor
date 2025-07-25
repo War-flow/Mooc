@@ -1,0 +1,79 @@
+﻿@using Microsoft.AspNetCore.Components
+@inject IJSRuntime JSRuntime
+
+<div id="notification-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    @foreach (var notification in notifications)
+    {
+        <div class="toast @(notification.IsVisible ? "show" : "")" role="alert" id="toast-@notification.Id">
+            <div class="toast-header bg-@notification.Type text-white">
+                <strong class="me-auto">
+                    @if (notification.Type == "danger")
+                    {
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    }
+                    else if (notification.Type == "warning")
+                    {
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                    }
+                    else if (notification.Type == "success")
+                    {
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                    }
+                    else
+                    {
+                        <i class="bi bi-info-circle-fill me-2"></i>
+                    }
+                    @notification.Title
+                </strong>
+                <button type="button" class="btn-close btn-close-white" @onclick="() => RemoveNotification(notification.Id)"></button>
+            </div>
+            <div class="toast-body">
+                @notification.Message
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private List<NotificationItem> notifications = new();
+
+    public async Task ShowNotification(string title, string message, string type = "info", int duration = 5000)
+    {
+        var notification = new NotificationItem
+        {
+            Id = Guid.NewGuid().ToString(),
+            Title = title,
+            Message = message,
+            Type = type,
+            IsVisible = true
+        };
+
+        notifications.Add(notification);
+        StateHasChanged();
+
+        // Auto-remove after duration
+        _ = Task.Delay(duration).ContinueWith(async _ =>
+        {
+            await RemoveNotification(notification.Id);
+        });
+    }
+
+    private async Task RemoveNotification(string id)
+    {
+        var notification = notifications.FirstOrDefault(n => n.Id == id);
+        if (notification != null)
+        {
+            notifications.Remove(notification);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private class NotificationItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public string Type { get; set; } = "info"; // success, danger, warning, info
+        public bool IsVisible { get; set; }
+    }
+}

@@ -1,6 +1,9 @@
 ﻿@using Microsoft.AspNetCore.Components
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 
 @{
     // Filtrer pour n'afficher que les sessions qui sont en ligne ET disponibles selon les dates
@@ -22,20 +25,34 @@
 
                         @if (IsSessionAvailableForEnrollment(session))
                         {
-                            <a href="/inscription/@session.Id" class="btn m-lg-1">S'inscrire</a>
+                            @if (IsUserEnrolledInSession(session.Id))
+                            {
+                                <a href="/mes-sessions" class="btn btn-primary m-lg-1">Voir cours</a>
+                            }
+                            else
+                            {
+                                <a href="/inscription/@session.Id" class="btn m-lg-1">S'inscrire</a>
+                            }
                         }
                         else
                         {
-                            <button class="btn btn-secondary" disabled>
-                                @if (DateTime.Now < session.StartDate)
-                                {
-                                    <span>Bientôt disponible</span>
-                                }
-                                else
-                                {
-                                    <span>Session terminée</span>
-                                }
-                            </button>
+                            @if (IsUserEnrolledInSession(session.Id))
+                            {
+                                <a href="/mes-sessions" class="btn btn-primary m-lg-1">Voir cours</a>
+                            }
+                            else
+                            {
+                                <button class="btn btn-secondary" disabled>
+                                    @if (DateTime.Now < session.StartDate)
+                                    {
+                                        <span>Bientôt disponible</span>
+                                    }
+                                    else
+                                    {
+                                        <span>Session terminée</span>
+                                    }
+                                </button>
+                            }
                         }
 
                         <!-- Button trigger modal -->
@@ -89,7 +106,14 @@
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
                                 @if (IsSessionAvailableForEnrollment(session))
                                 {
-                                    <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+                                    @if (IsUserEnrolledInSession(session.Id))
+                                    {
+                                        <a href="/mes-sessions" class="btn btn-primary m-lg-2">Voir cours</a>
+                                    }
+                                    else
+                                    {
+                                        <a href="/inscription/@session.Id" class="btn">S'inscrire</a>
+                                    }
                                 }
                                 else
                                 {
@@ -111,6 +135,45 @@ else
 @code {
     [Parameter]
     public List<Session>? Sessions { get; set; }
+    
+    private string? currentUserId;
+    private List<int> enrolledSessionIds = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCurrentUserId();
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await LoadUserEnrollments();
+        }
+    }
+
+    private async Task GetCurrentUserId()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            currentUserId = authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        }
+    }
+
+    private async Task LoadUserEnrollments()
+    {
+        if (string.IsNullOrEmpty(currentUserId)) return;
+
+        using var context = DbContextFactory.CreateDbContext();
+        var user = await context.Users
+            .Include(u => u.EnrolledSessions)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+        enrolledSessionIds = user?.EnrolledSessions?.Select(s => s.Id).ToList() ?? new List<int>();
+    }
+
+    private bool IsUserEnrolledInSession(int sessionId)
+    {
+        return enrolledSessionIds.Contains(sessionId);
+    }
 
     private string GetEstimatedEffort(int hours)
     {

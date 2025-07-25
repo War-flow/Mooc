@@ -90,6 +90,14 @@
             return;
         }
 
+        // Assigner automatiquement le rôle "Utilisateur" au nouvel utilisateur
+        var roleResult = await UserManager.AddToRoleAsync(user, "Utilisateur");
+        if (!roleResult.Succeeded)
+        {
+            Logger.LogWarning("Impossible d'assigner le rôle 'Utilisateur' à l'utilisateur {Email}: {Errors}", 
+                Input.Email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+        }
+
         Logger.LogInformation("Inscription réussie");
 
         var userId = await UserManager.GetUserIdAsync(user);

@@ -1,5 +1,4 @@
 ﻿@page "/session/{SessionId:int}"
-
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
@@ -51,10 +50,33 @@ else if (session == null)
 else
 {
     <div class="container mt-4">
+        <!-- Ajout d'une alerte si la session est terminée -->
+        @if (IsSessionEnded())
+        {
+            <div class="alert alert-warning mb-4">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                <strong>Session terminée</strong> - Cette session s'est terminée le @session.EndDate.ToString("dd/MM/yyyy"). 
+                Vous pouvez toujours consulter les cours, mais les inscriptions sont fermées.
+            </div>
+        }
+        
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2>@session.Title</h2>
             <div class="text-muted">
                 <small>@coursList.Count cours disponible@(coursList.Count > 1 ? "s" : "")</small>
+                <!-- Ajout du statut de la session -->
+                @if (IsSessionEnded())
+                {
+                    <span class="badge bg-secondary ms-2">Session terminée</span>
+                }
+                else if (IsSessionActive())
+                {
+                    <span class="badge bg-success ms-2">Session en cours</span>
+                }
+                else
+                {
+                    <span class="badge bg-warning ms-2">À venir</span>
+                }
             </div>
         </div>
 
@@ -106,6 +128,15 @@ else
                                         <td>
                                             <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
                                                 @(cours.IsPublished ? "Disponible" : "À venir")
+
+                                            </span>
+                                            @if (IsSessionEnded())
+                                            {
+                                                <span class="badge bg-secondary ms-1">Session fermée</span>
+                                            }
+                                            <!-- Nouveau badge pour le statut de progression -->
+                                            <span class="badge @GetCourseStatusBadgeClass(cours.Id) ms-1">
+                                                @GetCourseCompletionStatus(cours.Id)
                                             </span>
                                         </td>
                                         <td>
@@ -124,34 +155,24 @@ else
                         </table>
                     </div>
                     
-                    <div class="mt-3">
+                    <div class="mt-1">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-10 mx-auto">
                                 <div class="card bg-light">
                                     <div class="card-body">
-                                        <h6 class="card-title">Progression</h6>
-                                        <div class="progress mb-2">
+                                        <h6 class="card-title">Progression des cours</h6>
+                                        <div class="progress mb-1">
                                             <div class="progress-bar" role="progressbar" 
                                                  style="width: @(progressPercentage)%" 
                                                  aria-valuenow="@progressPercentage" 
                                                  aria-valuemin="0" 
                                                  aria-valuemax="100">
-                                                @progressPercentage%
+                                                @progressPercentage
                                             </div>
                                         </div>
                                         <small class="text-muted">
-                                            @publishedCoursCount sur @coursList.Count cours disponibles
+                                            @completedCoursCount sur @coursList.Count cours terminés
                                         </small>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="card bg-light">
-                                    <div class="card-body">
-                                        <h6 class="card-title">Durée totale</h6>
-                                        <span class="h5">@totalDuration minutes</span>
-                                        <br>
-                                        <small class="text-muted">≈ @(totalDuration / 60)h @(totalDuration % 60)min</small>
                                     </div>
                                 </div>
                             </div>
@@ -177,23 +198,151 @@ else
     private List<Cours> coursList = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private Timer? refreshTimer;
+    private Timer? courseProgressTimer; // Nouveau timer pour les progrès des cours
+
+    // Nouveau dictionnaire pour tracker les progrès des cours
+    private Dictionary<int, Services.CourseProgress> courseProgresses = new();
+
+    // Injection du service
+    @inject CourseStateService CourseStateService
 
     // Propriétés calculées pour améliorer les performances
     private IEnumerable<Cours> orderedCoursList => coursList.OrderBy(c => c.Order);
     private int publishedCoursCount => coursList.Count(c => c.IsPublished);
     private int totalDuration => coursList.Sum(c => c.Duration);
-    private int progressPercentage => coursList.Any() ? (publishedCoursCount * 100) / coursList.Count : 0;
+    private int completedCoursCount => courseProgresses.Count(kvp => kvp.Value.IsCompleted);
+    private int progressPercentage => coursList.Any() ? (completedCoursCount * 100) / coursList.Count : 0;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSessionData();
+        await LoadCourseProgresses(); // Charger les progrès des cours
+        
+        // Démarrer un timer pour vérifier les changements de statut de session toutes les minutes
+        refreshTimer = new Timer(async _ => await CheckSessionStatus(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+        
+        // Nouveau timer pour vérifier les progrès des cours toutes les 30 secondes
+        courseProgressTimer = new Timer(async _ => await RefreshCourseProgresses(), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
     }
 
     protected override async Task OnParametersSetAsync()
     {
         // Recharger les données si SessionId change
         await LoadSessionData();
+        await LoadCourseProgresses();
     }
+
+    public void Dispose()
+    {
+        refreshTimer?.Dispose();
+        courseProgressTimer?.Dispose(); // Nouveau
+    }
+
+    // Nouvelle méthode pour charger les progrès des cours
+    private async Task LoadCourseProgresses()
+    {
+        try
+        {
+            courseProgresses.Clear();
+            
+            foreach (var cours in coursList)
+            {
+                var progress = await CourseStateService.GetOrCreateProgressAsync(cours.Id);
+                courseProgresses[cours.Id] = progress;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des progrès: {ex.Message}");
+        }
+    }
+
+    // Nouvelle méthode pour rafraîchir les progrès des cours
+    private async Task RefreshCourseProgresses()
+    {
+        if (coursList.Any())
+        {
+            var previousCompletedCount = completedCoursCount;
+            await LoadCourseProgresses();
+            
+            // Si le nombre de cours complétés a changé, rafraîchir l'interface
+            if (completedCoursCount != previousCompletedCount)
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    // Méthode pour obtenir le statut d'un cours spécifique
+    private string GetCourseCompletionStatus(int coursId)
+    {
+        if (courseProgresses.TryGetValue(coursId, out var progress))
+        {
+            if (progress.IsCompleted)
+            {
+                return "Terminé";
+            }
+            else if (progress.CompletedBlocks.Any())
+            {
+                return "En cours";
+            }
+        }
+        return "Non commencé";
+    }
+    
+    // Méthode pour obtenir la classe CSS du badge de statut
+    private string GetCourseStatusBadgeClass(int coursId)
+    {
+        return GetCourseCompletionStatus(coursId) switch
+        {
+            "Terminé" => "bg-success",
+            "En cours" => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+
+    private async Task CheckSessionStatus()
+    {
+        // Vérifier si le statut de la session a changé
+        if (session != null)
+        {
+            var currentTime = DateTime.Now;
+            var wasActive = IsSessionActive();
+            var wasEnded = IsSessionEnded();
+
+            // Recharger les données de session pour détecter les changements
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var updatedSession = await context.Sessions
+                .Include(s => s.Courses)
+                .FirstOrDefaultAsync(s => s.Id == SessionId);
+
+            if (updatedSession != null)
+            {
+                var sessionChanged = session.EndDate != updatedSession.EndDate || 
+                                   session.StartDate != updatedSession.StartDate ||
+                                   session.IsActive != updatedSession.IsActive;
+
+                if (sessionChanged)
+                {
+                    session = updatedSession;
+                    coursList = session.Courses?.ToList() ?? new List<Cours>();
+                    await LoadCourseProgresses(); // Recharger les progrès aussi
+                    await InvokeAsync(StateHasChanged);
+                }
+            }
+        }
+    }
+
+// Ajout de la méthode manquante pour tronquer la description
+ private string GetTruncatedDescription(string? description, int maxLength = 80)
+  {
+   if (string.IsNullOrWhiteSpace(description))
+   return string.Empty;
+   if (description.Length <= maxLength)
+   return description;
+   return description.Substring(0, maxLength) + "...";
+  }
 
     private async Task LoadSessionData()
     {
@@ -227,26 +376,29 @@ else
         }
     }
 
+    // Ajout de la méthode manquante pour vérifier si la session est terminée
+    private bool IsSessionEnded()
+    {
+        return session != null && DateTime.Now > session.EndDate;
+    }
+
+    // Ajout de la méthode pour vérifier si la session est active
+    private bool IsSessionActive()
+    {
+        return session != null && DateTime.Now >= session.StartDate && DateTime.Now <= session.EndDate && session.IsActive;
+    }
+
     private async Task ReloadData()
     {
+
         await LoadSessionData();
+        await LoadCourseProgresses();
     }
 
+    // Ajout de la méthode manquante pour corriger CS0103
     private void VoirCours(int coursId)
     {
-        if (session != null)
-        {
-            NavigationManager.NavigateTo($"/Cours/View/{coursId}");
-        }
-    }
-
-    private string GetTruncatedDescription(string? description)
-    {
-        if (string.IsNullOrEmpty(description))
-            return "Pas de description";
-        
-        return description.Length > 50 ? 
-            description.Substring(0, 50) + "..." : 
-            description;
+        // Redirige vers la page du cours avec la route correcte
+        NavigationManager.NavigateTo($"/Cours/View/{coursId}");
     }
 }

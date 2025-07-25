@@ -12,7 +12,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mooc.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250708174642_BaseV1")]
+    [Migration("20250725123339_BaseV1")]
     partial class BaseV1
     {
         /// <inheritdoc />
@@ -239,6 +239,27 @@ namespace Mooc.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Duration")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
                     b.Property<int>("SessionId")
                         .HasColumnType("integer");
 
@@ -247,6 +268,9 @@ namespace Mooc.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("varchar");
 
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.HasKey("Id");
 
                     b.HasIndex("SessionId");
@@ -254,7 +278,7 @@ namespace Mooc.Migrations
                     b.ToTable("Cours", (string)null);
                 });
 
-            modelBuilder.Entity("Mooc.Data.Quiz", b =>
+            modelBuilder.Entity("Mooc.Data.CourseProgress", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -262,20 +286,37 @@ namespace Mooc.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<string>("BlockInteractions")
+                        .HasColumnType("text");
+
+                    b.Property<string>("CompletedBlocks")
+                        .HasColumnType("text");
+
                     b.Property<int>("CoursId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Title")
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastAccessed")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("LastAccessedBlock")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserId")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("varchar");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CoursId")
-                        .IsUnique();
+                    b.HasIndex("UserId");
 
-                    b.ToTable("Quiz", (string)null);
+                    b.HasIndex("CoursId", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CourseProgress_CoursId_UserId");
+
+                    b.ToTable("CourseProgress", (string)null);
                 });
 
             modelBuilder.Entity("Mooc.Data.Session", b =>
@@ -287,11 +328,26 @@ namespace Mooc.Migrations
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
-                        .HasMaxLength(450)
+                        .HasMaxLength(300)
                         .HasColumnType("varchar");
 
-                    b.Property<DateTime?>("EndDate")
+                    b.Property<DateTime>("EndDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("Image")
+                        .IsRequired()
+                        .HasColumnType("varchar");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("NotificationSent1h")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NotificationSent24h")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("StartDate")
                         .HasColumnType("date");
@@ -304,11 +360,31 @@ namespace Mooc.Migrations
                     b.Property<string>("UserId")
                         .HasColumnType("text");
 
+                    b.Property<int>("Work")
+                        .HasColumnType("int");
+
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
 
                     b.ToTable("Session", (string)null);
+                });
+
+            modelBuilder.Entity("SessionEnrollments", b =>
+                {
+                    b.Property<int>("SessionId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("SessionId", "UserId");
+
+                    b.HasIndex("SessionId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("SessionEnrollments", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -373,34 +449,48 @@ namespace Mooc.Migrations
                     b.Navigation("Session");
                 });
 
-            modelBuilder.Entity("Mooc.Data.Quiz", b =>
+            modelBuilder.Entity("Mooc.Data.CourseProgress", b =>
                 {
                     b.HasOne("Mooc.Data.Cours", "Cours")
-                        .WithOne("Quiz")
-                        .HasForeignKey("Mooc.Data.Quiz", "CoursId")
+                        .WithMany()
+                        .HasForeignKey("CoursId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Mooc.Data.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Cours");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Mooc.Data.Session", b =>
                 {
                     b.HasOne("Mooc.Data.ApplicationUser", "User")
-                        .WithMany("EnrolledSessions")
-                        .HasForeignKey("UserId");
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("Mooc.Data.ApplicationUser", b =>
+            modelBuilder.Entity("SessionEnrollments", b =>
                 {
-                    b.Navigation("EnrolledSessions");
-                });
+                    b.HasOne("Mooc.Data.Session", null)
+                        .WithMany()
+                        .HasForeignKey("SessionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-            modelBuilder.Entity("Mooc.Data.Cours", b =>
-                {
-                    b.Navigation("Quiz");
+                    b.HasOne("Mooc.Data.ApplicationUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Mooc.Data.Session", b =>

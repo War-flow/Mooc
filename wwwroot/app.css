@@ -790,3 +790,46 @@ h1:focus {
             margin-top: 70px; /* Compenser la hauteur de la barre fixe */
         }
 }
+
+/* Styles pour les notifications toast */
+.toast {
+    min-width: 300px;
+}
+
+.alert-sm {
+    padding: 0.375rem 0.75rem;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.card.border-danger {
+    border-color: #dc3545 !important;
+    border-width: 2px;
+}
+
+.card.border-warning {
+    border-color: #ffc107 !important;
+    border-width: 2px;
+}
+
+.card.border-secondary {
+    border-color: #6c757d !important;
+    border-width: 1px;
+    opacity: 0.8;
+}
+
+/* Animation pour les nouvelles notifications */
+@keyframes slideInFromTop {
+    from {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.alert.fade.show {
+    animation: slideInFromTop 0.5s ease-out;
+}

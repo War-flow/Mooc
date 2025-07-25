@@ -10,7 +10,8 @@ namespace Mooc.Data
         public int CoursId { get; set; }
         public Cours? Cours { get; set; }
         
-        public string? UserId { get; set; }
+        [Required]
+        public string UserId { get; set; } = string.Empty; // Rendre obligatoire
         public ApplicationUser? User { get; set; }
         
         public int LastAccessedBlock { get; set; }

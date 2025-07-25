@@ -1,6 +1,8 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using Mooc.Data;
 using System.Text.Json;
+using Mooc.Data;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Mooc.Services
 {
@@ -14,24 +16,40 @@ namespace Mooc.Services
         public Dictionary<int, string> BlockInteractions { get; set; } = new();
         public DateTime LastAccessed { get; set; }
         public bool IsCompleted { get; set; }
-
-        // **NOUVELLE PROPRIÉTÉ**: Compteur des bonnes réponses
         public int CorrectAnswers { get; set; } = 0;
     }
 
     public class CourseStateService
     {
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly AuthenticationStateProvider _authenticationStateProvider;
         private readonly Dictionary<string, CourseProgress> _courseProgresses = new();
 
-        public CourseStateService(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public CourseStateService(
+            IDbContextFactory<ApplicationDbContext> contextFactory,
+            UserManager<ApplicationUser> userManager,
+            AuthenticationStateProvider authenticationStateProvider)
         {
             _contextFactory = contextFactory;
+            _userManager = userManager;
+            _authenticationStateProvider = authenticationStateProvider;
         }
 
+        // **MÉTHODE MISE À JOUR**: Récupération automatique de l'utilisateur connecté
         public async Task<CourseProgress> GetOrCreateProgressAsync(int coursId, string? userId = null)
         {
-            var key = $"{coursId}_{userId ?? "anonymous"}";
+            // Si userId n'est pas fourni, récupérer l'utilisateur connecté
+            if (string.IsNullOrEmpty(userId))
+            {
+                userId = await GetCurrentUserIdAsync();
+                if (string.IsNullOrEmpty(userId))
+                {
+                    throw new InvalidOperationException("Aucun utilisateur connecté trouvé");
+                }
+            }
+
+            var key = $"{coursId}_{userId}";
 
             if (!_courseProgresses.ContainsKey(key))
             {
@@ -42,16 +60,42 @@ namespace Mooc.Services
             return _courseProgresses[key];
         }
 
+        // **NOUVELLE MÉTHODE**: Récupérer l'ID de l'utilisateur connecté
+        private async Task<string?> GetCurrentUserIdAsync()
+        {
+            try
+            {
+                var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+                if (authState.User.Identity?.IsAuthenticated == true)
+                {
+                    var user = await _userManager.GetUserAsync(authState.User);
+                    return user?.Id;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la récupération de l'utilisateur connecté: {ex.Message}");
+            }
+            return null;
+        }
+
         public async Task SaveProgressAsync(CourseProgress progress)
         {
-            var key = $"{progress.CoursId}_{progress.UserId ?? "anonymous"}";
+            // S'assurer qu'on a un UserId valide
+            if (string.IsNullOrEmpty(progress.UserId))
+            {
+                progress.UserId = await GetCurrentUserIdAsync();
+                if (string.IsNullOrEmpty(progress.UserId))
+                {
+                    throw new InvalidOperationException("Impossible de sauvegarder le progrès sans utilisateur connecté");
+                }
+            }
+
+            var key = $"{progress.CoursId}_{progress.UserId}";
             
-            // **CORRECTION** : Recalculer les bonnes réponses avant la sauvegarde
             progress.CorrectAnswers = CalculateCorrectAnswersFromInteractions(progress.BlockInteractions);
-            
             _courseProgresses[key] = progress;
 
-            // Sauvegarder en base de données
             await SaveProgressToDatabaseAsync(progress);
         }
 
@@ -84,7 +128,7 @@ namespace Mooc.Services
             return default(T);
         }
 
-        private async Task<CourseProgress> LoadProgressFromDatabaseAsync(int coursId, string? userId)
+        private async Task<CourseProgress> LoadProgressFromDatabaseAsync(int coursId, string userId)
         {
             try
             {
@@ -104,7 +148,6 @@ namespace Mooc.Services
                         BlockInteractions = JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<int, string>(),
                         LastAccessed = progress.LastAccessed,
                         IsCompleted = progress.IsCompleted,
-                        // **NOUVEAU**: Calculer les bonnes réponses à partir des interactions
                         CorrectAnswers = CalculateCorrectAnswersFromInteractions(
                             JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<int, string>()
                         )
@@ -129,7 +172,6 @@ namespace Mooc.Services
             };
         }
 
-        // **NOUVELLE MÉTHODE**: Calculer les bonnes réponses à partir des interactions
         private int CalculateCorrectAnswersFromInteractions(Dictionary<int, string> interactions)
         {
             int correctCount = 0;
@@ -168,7 +210,7 @@ namespace Mooc.Services
                     dbProgress = new Data.CourseProgress
                     {
                         CoursId = progress.CoursId,
-                        UserId = progress.UserId
+                        UserId = progress.UserId!
                     };
                     context.CourseProgresses.Add(dbProgress);
                 }
