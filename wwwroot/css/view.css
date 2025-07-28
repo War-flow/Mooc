@@ -1,0 +1,140 @@
+﻿/* Cartes page d'accueil */
+
+.bg-gradient-to-top {
+    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+}
+
+.mooc {
+    border: none;
+    border-radius: 1rem;
+    overflow: hidden;
+    transition: all 0.8s ease;
+    width: 95%;
+    height: 95%;
+    box-shadow: 2px 0px 8px 4px #bcbcbc !important;
+}
+
+    .mooc:hover {
+        transform: translateY(-5px);
+        box-shadow: 2px 0px 8px 4px #0083f9 !important;
+        width: 100%;
+        height: 100%;
+    }
+
+.progress-bar.bg-gradient {
+    background: linear-gradient(90deg, #28a745, #20c997, #17a2b8);
+}
+
+.modal-dialog.modal-lg {
+    max-width: 900px;
+}
+
+.list-group-item {
+    border: none;
+    border-bottom: 1px solid #eee;
+    padding: 1rem;
+}
+
+    .list-group-item:last-child {
+        border-bottom: none;
+    }
+
+.bg-light.p-3.rounded {
+    transition: transform 0.2s ease;
+}
+
+    .bg-light.p-3.rounded:hover {
+        transform: translateY(-2px);
+    }
+
+.card-img-top {
+    width: 100% !important;
+    height: 225px !important;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.mooc:hover .card-img-top {
+    transform: scale(1.05);
+}
+
+/*MQ tableau pour mobile */
+
+@media (max-width: 768px) {
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-view {
+        box-shadow: none !important;
+        border-radius: 0;
+    }
+    .table th, .table td {
+        font-size: 0.95rem;
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .table th:nth-child(3),
+    .table td:nth-child(3) {
+        display: none; /* Masque la troisième colonne sur mobile */
+    }
+
+    .table th:nth-child(4),
+    .table td:nth-child(4) {
+        display: none; /* Masque la quatrième colonne sur mobile */
+    }
+
+    .btn {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+    }
+}
+
+/*@MQ tableau pour tablette */
+
+@media (max-width: 1024px) {
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .table-view {
+        box-shadow: none !important;
+        border-radius: 0;
+    }
+    .table th, .table td {
+        font-size: 0.95rem;
+        padding: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .table th:nth-child(3),
+    .table td:nth-child(3) {
+        display: none; /* Masque la quatrième colonne sur tablette */
+    }
+
+    .table th:nth-child(4),
+    .table td:nth-child(4) {
+         display: none; /* Masque la troisième colonne tablette */
+    }
+
+    .btn {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.6rem;
+    }
+}
+
+/* tableaux style de base */
+
+.table-view {
+    border-radius: 3px 4px;
+    box-shadow: 2px 2px 2px 5px #eeeeee !important;
+}
+
+
+/* Ajouter un formateur */
+
+.add-form {
+  height: 535px;
+  border-radius: 3px 4px;
+}

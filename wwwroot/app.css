@@ -59,22 +59,6 @@ h1:focus {
     text-align: start;
 }
 
-.hello {
-
-}
-
-.mooc {
-    box-shadow: 2px 0px 8px 1px #320a46;
-    transition-duration: 1s;
-    width: 97%;
-    height: 415px;
-}
-.mooc:hover {
-        box-shadow: 2px 0px 8px 4px #320a46;
-        width: 100%; 
-        height: 425px;
-}
-
 .btn {
     background: #0a3c46;
     color:snow;
@@ -83,17 +67,6 @@ h1:focus {
 .btn:hover {
         background: #460a3c;
         color: snow;
-}
-
-.card-img-top {
-    width: 100% !important;
-    height: 225px !important;
-    object-fit: cover;
-    transition: transform 0.3s ease;
-}
-
-.mooc:hover .card-img-top {
-    transform: scale(1.05);
 }
 
 /* Style pour le contenu affiché */
@@ -839,48 +812,6 @@ h1:focus {
     animation: slideInFromTop 0.5s ease-out;
 }
 
-/* Styles supplémentaires pour les cartes améliorées */
-.bg-gradient-to-top {
-    background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
-}
-
-.mooc {
-    border: none;
-    border-radius: 1rem;
-    overflow: hidden;
-    transition: all 0.3s ease;
-}
-
-.mooc:hover {
-   transform: translateY(-5px);
-   box-shadow: 2px 0px 8px 4px #320a46 !important;
- }
-
-.progress-bar.bg-gradient {
-    background: linear-gradient(90deg, #28a745, #20c997, #17a2b8);
-}
-
-.modal-dialog.modal-lg {
-    max-width: 900px;
-}
-
-.list-group-item {
-    border: none;
-    border-bottom: 1px solid #eee;
-    padding: 1rem;
-}
-
-.list-group-item:last-child {
-    border-bottom: none;
-}
-
-.bg-light.p-3.rounded {
-    transition: transform 0.2s ease;
-}
-
-.bg-light.p-3.rounded:hover {
-    transform: translateY(-2px);
-}
 
 /* Améliorations pour les icônes Bootstrap */
 .bi {
