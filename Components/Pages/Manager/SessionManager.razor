@@ -16,7 +16,7 @@
 
 <PageTitle>Gestion des Sessions</PageTitle>
 
-<h1>Gestion des Sessions</h1>
+<h1>Liste des Sessions</h1>
 
 <div class="container mt-4">
     <div class="row mb-4">
@@ -123,7 +123,7 @@
                                     </div>
                                 }
                                 <InputFile OnChange="OnImageFileSelected" class="form-control" accept=".jpg,.jpeg,.png,.gif" />
-                                <small class="form-text text-muted">Formats acceptés: JPG, PNG, GIF. Taille max: 2MB</small>
+                                <small class="form-text text-muted">Formats acceptés: JPG, PNG, GIF. Taille max: 3MB</small>
                             </div>
                         </div>
                         
@@ -274,7 +274,7 @@
     {
         // Stocke le fichier sélectionné pour l'upload lors de la soumission du formulaire
         selectedImageFile = e.File;
-        
+
         try
         {
             // Vérifie que c'est bien une image
@@ -286,16 +286,19 @@
                 return;
             }
 
-            // Vérifie la taille du fichier (max 2MB)
-            if (selectedImageFile.Size > 2 * 1024 * 1024)
+            // Vérifie la taille du fichier (max 3MB)
+            if (selectedImageFile.Size > 3 * 1024 * 1024)
             {
-                errorMessage = "La taille de l'image ne doit pas dépasser 2MB.";
+                errorMessage = "La taille de l'image ne doit pas dépasser 3MB.";
                 showError = true;
                 selectedImageFile = null;
                 return;
             }
 
             showError = false;
+
+            // Ajout d'un await pour respecter la signature async
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {

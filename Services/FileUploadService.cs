@@ -26,7 +26,7 @@ namespace Mooc.Services
         // Tailles maximales par type de fichier
         private readonly Dictionary<string, long> _maxFileSizes = new()
         {
-            { "image", 2 * 1024 * 1024 }, // 2MB
+            { "image", 3 * 1024 * 1024 }, // 3MB
             { "audio", 10 * 1024 * 1024 }, // 10MB
             { "file", 50 * 1024 * 1024 } // 50MB
         };

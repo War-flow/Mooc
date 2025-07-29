@@ -15,45 +15,43 @@
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Inscriptions</PageTitle>
-
-<h1>Inscription</h1>
-
-<div class="row">
-    <div class="col-lg-6">
+<PageTitle>Inscription</PageTitle>
+<div class="row register-body">
+    <div class="col-lg-6 register-contenant">
         <StatusMessage Message="@Message" />
         <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
-            <h2>Créer un nouveau compte.</h2>
+            <h2 class="mx-2" >Créer un nouveau compte</h2>
             <hr />
             <ValidationSummary class="text-danger" role="alert" />
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="nom@example.com" />
+                <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" />
                 <label for="Input.Email">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
             <div class="form-floating mb-3 position-relative">
-                <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Mot de passe" />
+                <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true"  />
                 <label for="Input.Password">Mot de passe</label>
                 <ValidationMessage For="() => Input.Password" class="text-danger" />
             </div>
             <div class="form-floating mb-3 position-relative">
-                <InputText type="@(showConfirmPassword ? "text" : "password")" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" placeholder="Confirmez le mot de passe" />
+                <InputText type="@(showConfirmPassword ? "text" : "password")" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" />
                 <label for="Input.ConfirmPassword">Confirmez le mot de passe</label>
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
             <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" aria-required="true" placeholder="Prénom" />
-                <label for="Input.FirstName">Prénom</label>
-                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" aria-required="true" placeholder="Nom" />
+                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" aria-required="true" />
                 <label for="Input.LastName">Nom</label>
                 <ValidationMessage For="() => Input.LastName" class="text-danger" />
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Valider</button>
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" aria-required="true" />
+                <label for="Input.FirstName">Prénom</label>
+                <ValidationMessage For="() => Input.FirstName" class="text-danger" />
+            </div>
+            <button type="submit" class="w-100 btn btn-lg btn-primary">VALIDER</button>
         </EditForm>
+        <a href="/Account/Login" class="link">SE CONNECTER</a>
     </div>
 </div>
 

@@ -33,9 +33,10 @@
         // Utilisation de IDbContextFactory pour obtenir une nouvelle instance de DbContext
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
         
-        // Récupération des sessions disponibles (pour tous les utilisateurs)
+        // Récupération des sessions disponibles (pas encore terminées et actives)
         availableSessions = await dbContext.Sessions
             .Include(s => s.Courses)
+            .Where(s => s.IsActive && DateTime.Now <= s.EndDate)
             .OrderBy(s => s.StartDate)
             .ToListAsync();
             
@@ -48,5 +49,11 @@
             var userName = user.Identity.Name;
             currentUser = await dbContext.Users.FirstOrDefaultAsync(u => u.UserName == userName);
         }
+    }
+
+    private bool IsSessionAvailableForEnrollment(Session session)
+    {
+        // Votre logique pour déterminer si la session est disponible à l'inscription
+        return true; // Par défaut, retourner vrai pour indiquer que la session est disponible
     }
 }

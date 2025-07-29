@@ -138,3 +138,52 @@
   height: 535px;
   border-radius: 3px 4px;
 }
+
+/*Formulaire d'inscription*/
+
+.register-body {
+  margin-left: 350px;
+  margin-top: 75px;
+}
+
+.register-contenant {
+  background-color: darkgray;
+  border-radius: 6px 8px;
+  box-shadow: 2px 2px 2px 5px #eeeeee !important;
+  height: 525px;
+}
+.link {
+  margin-top: 10px;
+  margin-left: 100px;
+  font-size: 25px;
+}
+
+.link:hover {
+  color:blueviolet;
+}
+
+/*Formulaire de connexion */
+
+.login-body {
+    margin-left: 350px;
+    margin-top: 75px;
+}
+
+.login-contenant {
+    background-color: darkgray;
+    border-radius: 6px 8px;
+    box-shadow: 2px 2px 2px 5px #eeeeee !important;
+    height: 400px;
+}
+.form-title {
+  margin-left: 100px;
+}
+
+.link-login {
+    margin-top: 10px;
+    font-size: 20px;
+}
+
+.link-login:hover {
+    color: blueviolet;
+}

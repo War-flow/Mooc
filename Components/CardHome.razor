@@ -443,12 +443,13 @@ else
     }
 
     /// <summary>
-    /// Vérifie si la session est disponible pour inscription (entre les dates de début et de fin)
+    /// Vérifie si la session est affichable (en cours ou à venir)
     /// </summary>
     private bool IsSessionAvailableForEnrollment(Session session)
     {
         var now = DateTime.Now;
-        return session.IsActive && now >= session.StartDate && now <= session.EndDate;
+        // Afficher les sessions actives qui ne sont pas encore terminées
+        return session.IsActive && now <= session.EndDate;
     }
 
     /// <summary>

@@ -12,22 +12,22 @@
 
 <PageTitle>Connexion</PageTitle>
 
-<h1>Connexion</h1>
-<div class="row">
-    <div class="col-lg-6">
+<div class="row login-body">
+    <div class="col-lg-6 login-contenant">
         <section>
             <StatusMessage Message="@errorMessage" />
             <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
                 <DataAnnotationsValidator />
+                <h2 class ="form-title">Se connecter</h2>
                 <hr />
                 <ValidationSummary class="text-danger" role="alert" />
                 <div class="form-floating mb-3">
-                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="nom@example.com" />
+                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" />
                     <label for="Input.Email" class="form-label">Email</label>
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
                 <div class="form-floating mb-3">
-                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" />
                     <label for="Input.Password" class="form-label">Mot de passe</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
@@ -38,17 +38,14 @@
                     </label>
                 </div>
                 <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">Valider</button>
+                    <button type="submit" class="w-100 btn btn-lg">VALIDER</button>
                 </div>
                 <div>
                     <p>
-                        <a href="Account/ForgotPassword">Mot de passe oublié ?</a>
+                        <a class="link-login" href="Account/ForgotPassword">Mot de passe oublié ?</a>
                     </p>
                     <p>
-                        <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">S'inscrire en tant que nouvel utilisateur</a>
-                    </p>
-                    <p>
-                        <a href="Account/ResendEmailConfirmation">Renvoyer l'e-mail de confirmation</a>
+                        <a class="link-login" href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">S'inscrire en tant que nouvel utilisateur</a>
                     </p>
                 </div>
             </EditForm>

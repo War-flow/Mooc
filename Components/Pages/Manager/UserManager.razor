@@ -1,4 +1,4 @@
-﻿@page "/Manager/user"
+﻿@page "/manager/user"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
@@ -9,9 +9,9 @@
 @attribute [Authorize(Roles = "Admin")]
 @attribute [StreamRendering]
 
-<PageTitle>Utilisateur</PageTitle>  
+<PageTitle>Gestion des Utilisateurs</PageTitle>
 
-<h1>Gestion des Utilisateurs</h1>  
+<h1>Liste des Utilisateurs</h1>  
 
 <!-- Bouton pour ajouter un formateur -->
 <div class="mb-4">
@@ -27,7 +27,7 @@ else
     <div class="table-responsive table-view">
         <table class="table table-hover">
             <thead>
-                <tr class="table-primary">
+                <tr>
                     <th>Nom</th>  
                     <th>Prénom</th>  
                     <th>Email</th>
