@@ -22,13 +22,25 @@
                         @if (IsUserEnrolledInSession(session.Id))
                         {
                             <span class="badge bg-success rounded-pill">
-                                <i class="bi bi-check-circle me-1"></i>Inscrit
+                                <i class="bi bi-check-circle me-1"> Inscrit</i>
+                            </span>
+                        }
+                        else if (!IsUserEnrolledInSession(session.Id) && DateTime.Now >= session.StartDate)
+                        {
+                            <span class="badge bg-info text-white rounded-pill">
+                                <i class="bi bi-unlock me-1"> Disponible</i>
+                            </span>
+                        }
+                        else if (GetDaysUntilStart(session) <= 14)
+                        {
+                            <span class="badge bg-warning text-dark rounded-pill">
+                                Démarrage dans : @GetDaysUntilStart(session) j restants 
                             </span>
                         }
                         else if (GetDaysUntilEnd(session) <= 7)
                         {
                             <span class="badge bg-warning text-dark rounded-pill">
-                                <i class="bi bi-clock me-1"></i>@GetDaysUntilEnd(session)j restants
+                                Fin dans : @GetDaysUntilEnd(session) j restants
                             </span>
                         }
                     </div>
@@ -466,6 +478,19 @@ else
     private int GetEnrolledCount(int sessionId)
     {
         return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
+    }
+
+    /// <summary>
+    /// Retourne le nombre de jours restants avant le début de la session
+    /// </summary>
+    private int GetDaysUntilStart(Session session)
+    {
+        var now = DateTime.Now;
+        if (session.StartDate > now)
+        {
+            return (session.StartDate - now).Days;
+        }
+        return 0;
     }
 
     /// <summary>
