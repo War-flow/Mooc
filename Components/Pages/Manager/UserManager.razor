@@ -6,110 +6,284 @@
 @using Microsoft.EntityFrameworkCore
 @inject UserManager<ApplicationUser> UserManagerService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
 @attribute [Authorize(Roles = "Admin")]
 @attribute [StreamRendering]
 
 <PageTitle>Gestion des Utilisateurs</PageTitle>
 
-<h1>Liste des Utilisateurs</h1>  
-
-<!-- Bouton pour ajouter un formateur -->
-<div class="mb-4">
-    <a href="/ajouter-formateur" class="btn btn-primary">Ajouter un formateur</a>
+<!-- En-tête de page avec design moderne -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">
+                    Gestion des Utilisateurs
+                </h1>
+                <p class="page-subtitle">Gérez les formateurs et administrateurs de la plateforme</p>
+            </div>
+            <div class="col-auto">
+                <a href="/ajouter-formateur" class="btn btn-primary btn-lg user-create-btn">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Ajouter un formateur
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
 
-@if (users == null)  
-{  
-    <p><em>Chargement...</em></p>  
-}  
-else  
-{  
-    <div class="table-responsive table-view">
-        <table class="table table-hover">
-            <thead>
-                <tr>
-                    <th>Nom</th>  
-                    <th>Prénom</th>  
-                    <th>Email</th>
-                    <th>Rôle</th>
-                    <th>Actions</th>  
-                </tr>  
-            </thead>  
-            <tbody>  
-                @foreach (var user in users)  
-                {  
-                    <tr>  
-                        <td>@user.LastName</td>  
-                        <td>@user.FirstName</td>  
-                        <td>@user.Email</td>
-                        <td>@GetUserRole(user)</td>
-                        <td>  
-                            <button class="btn" @onclick="() => EditUser(user.Id)">Modifier</button>  
-                            <button class="btn" @onclick="() => DeleteUser(user.Id)">Supprimer</button>  
-                        </td>  
-                    </tr>  
-                }  
-            </tbody>  
-        </table>  
-    </div>  
-}  
+<div class="container mt-4">
+    @if (users != null)
+    {
+        @if (users.Any())
+        {
+            <!-- Vue en cartes pour un meilleur design -->
+            <div class="users-grid">
+                @foreach (var user in users)
+                {
+                    <div class="user-card">
+                        <div class="user-avatar">
+                            <div class="avatar-placeholder">
+                                <i class="bi bi-person-circle"></i>
+                            </div>
+                            <div class="user-role-badge">
+                                <span class="badge @GetRoleBadgeClass(user)">
+                                    @GetUserRole(user)
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="user-content">
+                            <h5 class="user-name">@user.FirstName @user.LastName</h5>
+                            <p class="user-email">
+                                <i class="bi bi-envelope me-1"></i>
+                                @user.Email
+                            </p>
+                            
+                            <div class="user-meta">
+                                <div class="user-info">
+                                    <i class="bi bi-shield-check me-1"></i>
+                                    <small>@GetUserRole(user)</small>
+                                </div>
+                                <div class="user-status">
+                                    <i class="bi bi-circle-fill me-1 text-success"></i>
+                                    <small>Actif</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="user-actions">
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-outline-primary" @onclick="() => EditUser(user.Id)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <!-- <button class="btn btn-outline-info" @onclick="() => ViewUserSessions(user.Id)">
+                                    <i class="bi bi-calendar3"></i>
+                                </button>  -->
+                                <button class="btn btn-outline-danger" @onclick="() => DeleteUserConfirmation(user.Id)" 
+                                        disabled="@IsCurrentUserAdmin(user)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- État vide amélioré -->
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h3 class="empty-state-title">Aucun utilisateur trouvé</h3>
+                <p class="empty-state-text">Il n'y a actuellement aucun formateur ou administrateur enregistré.</p>
+                <a href="/ajouter-formateur" class="btn btn-primary btn-lg">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Ajouter le premier formateur
+                </a>
+            </div>
+        }
+    }
+    else
+    {
+        <!-- Loading state amélioré -->
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-3">Chargement des utilisateurs...</p>
+        </div>
+    }
+</div>
 
-@if (showError) {
-    <div class="alert alert-danger" role="alert">
+<!-- Modal d'erreur amélioré -->
+@if (showError)
+{
+    <div class="alert alert-danger alert-modern alert-dismissible fade show position-fixed" 
+         style="top: 20px; right: 20px; z-index: 1060; min-width: 300px;" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
         @errorMessage
+        <button type="button" class="btn-close" @onclick="() => showError = false"></button>
     </div>
 }
 
-<!-- Ajout du modal pour les détails -->
-@if (showEdit && selectedUserId != null)
+<!-- Modal de confirmation de suppression -->
+@if (showDeleteConfirmation)
 {
-    <Edit UserId="@selectedUserId" OnClose="CloseEdit" />
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-danger">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Confirmer la suppression
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeleteConfirmation = false"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="delete-icon mb-3">
+                        <i class="bi bi-person-x"></i>
+                    </div>
+                    <p class="lead">Êtes-vous sûr de vouloir supprimer cet utilisateur ?</p>
+                    <p class="text-muted">Cette action est irréversible et supprimera toutes les données associées.</p>
+                    @if (selectedUser != null)
+                    {
+                        <div class="user-to-delete mt-3 p-3 bg-light rounded">
+                            <strong>@selectedUser.FirstName @selectedUser.LastName</strong><br>
+                            <small class="text-muted">@selectedUser.Email</small>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showDeleteConfirmation = false">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteUser">
+                        <i class="bi bi-trash me-1"></i>
+                        Supprimer définitivement
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 }
 
-@code {  
-    private List<ApplicationUser>? users;  
+<!-- Modal d'édition d'utilisateur -->
+@if (showEdit && selectedUserId != null)
+{
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-modern">
+                    <h5 class="modal-title">
+                        <i class="bi bi-person-gear me-2"></i>
+                        Modifier l'utilisateur
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseEdit"></button>
+                </div>
+                <div class="modal-body">
+                    <Edit UserId="@selectedUserId" OnClose="CloseEdit" />
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+<!-- Modal des sessions utilisateur -->
+@if (showUserSessions && selectedUser != null)
+{
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-info">
+                    <h5 class="modal-title">
+                        <i class="bi bi-calendar3 me-2"></i>
+                        Sessions de @selectedUser.FirstName @selectedUser.LastName
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showUserSessions = false"></button>
+                </div>
+                <div class="modal-body">
+                    @if (userSessions != null && userSessions.Any())
+                    {
+                        <div class="row">
+                            @foreach (var session in userSessions)
+                            {
+                                <div class="col-md-6 mb-3">
+                                    <div class="card session-preview-card">
+                                        <div class="card-body">
+                                            <h6 class="card-title">@session.Title</h6>
+                                            <p class="card-text small">@session.Description</p>
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="badge @(session.IsActive ? "bg-success" : "bg-secondary")">
+                                                    @(session.IsActive ? "En ligne" : "Hors ligne")
+                                                </span>
+                                                <small class="text-muted">
+                                                    @session.StartDate.ToString("dd/MM/yyyy")
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-4">
+                            <i class="bi bi-calendar-x display-4 text-muted"></i>
+                            <p class="mt-2">Aucune session associée à cet utilisateur.</p>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => showUserSessions = false">
+                        Fermer
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<ApplicationUser>? users;
     private string? selectedUserId;
+    private ApplicationUser? selectedUser;
     private bool showEdit = false;
     private bool showError = false;
+    private bool showDeleteConfirmation = false;
+    private bool showUserSessions = false;
     private string errorMessage = string.Empty;
-
-    // Ajoutez un dictionnaire pour stocker les rôles des utilisateurs
     private Dictionary<string, string> userRoles = new Dictionary<string, string>();
+    private List<Session>? userSessions;
 
-    protected override async Task OnInitializedAsync()  
-    {  
-        // Récupérer tous les utilisateurs  
-        await RefreshUsers();  
-    }  
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshUsers();
+    }
 
     private async Task RefreshUsers()
     {
-        // Création d'un nouveau contexte pour cette opération
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
-        
-        // Récupération de tous les utilisateurs
         var allUsers = await dbContext.Users.ToListAsync();
         
-        // Liste qui contiendra uniquement les utilisateurs ayant les rôles souhaités
         users = new List<ApplicationUser>();
-        userRoles.Clear(); // Réinitialiser le dictionnaire des rôles
+        userRoles.Clear();
         
-        // Pour chaque utilisateur, vérifier s'il a un des rôles requis
         foreach (var user in allUsers)
         {
-            if (user.Id == null)
-            {
-                continue; // Ignorer les utilisateurs sans ID valide
-            }
+            if (user.Id == null) continue;
             
-            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
+                bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
             bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
             
             if (isFormateur || isAdmin)
             {
                 users.Add(user);
                 
-                // Stocker le rôle le plus important
                 if (isAdmin)
                     userRoles[user.Id] = "Admin";
                 else if (isFormateur)
@@ -124,53 +298,120 @@ else
     {
         showEdit = false;
         selectedUserId = null;
+        // Rafraîchir la liste après modification
+        InvokeAsync(RefreshUsers);
     }
 
-    private void EditUser(string userId)  
-    {  
+    private void EditUser(string userId)
+    {
         showEdit = true;
         selectedUserId = userId;
-    }  
+    }
 
-    private async Task DeleteUser(string userId)  
-    {  
-        var user = await UserManagerService.FindByIdAsync(userId);  
-        if (user != null)  
+// private async Task ViewUserSessions(string userId)
+//  {
+//    selectedUser = users?.FirstOrDefault(u => u.Id == userId);
+//   if (selectedUser != null)
+//  {
+//      using var dbContext = await DbContextFactory.CreateDbContextAsync();
+//       userSessions = await dbContext.Sessions
+//          .Where(s => s.EnrolledUsers.Any(u => u.Id == userId))
+//           .ToListAsync();
+//       showUserSessions = true;
+//   }
+// } 
+
+    private void DeleteUserConfirmation(string userId)
+    {
+        selectedUser = users?.FirstOrDefault(u => u.Id == userId);
+        if (selectedUser != null && !IsCurrentUserAdmin(selectedUser))
         {
-            // Vérifier si l'utilisateur est un admin
+            showDeleteConfirmation = true;
+        }
+    }
+
+    private async Task ConfirmDeleteUser()
+    {
+        if (selectedUser?.Id != null)
+        {
+            var user = await UserManagerService.FindByIdAsync(selectedUser.Id);
+            if (user != null)
+            {
+                var isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+                
+                if (isAdmin)
+                {
+                    errorMessage = "Impossible de supprimer un administrateur.";
+                    showError = true;
+                    showDeleteConfirmation = false;
+                    return;
+                }
+                
+                var result = await UserManagerService.DeleteAsync(user);
+                if (result.Succeeded)
+                {
+                    await RefreshUsers();
+                    showError = false;
+                    errorMessage = string.Empty;
+                }
+                else
+                {
+                    errorMessage = "Erreur lors de la suppression de l'utilisateur.";
+                    showError = true;
+                }
+            }
+        }
+        
+        showDeleteConfirmation = false;
+        selectedUser = null;
+    }
+
+    private async Task DeleteUser(string userId)
+    {
+        var user = await UserManagerService.FindByIdAsync(userId);
+        if (user != null)
+        {
             var isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
             
             if (isAdmin)
             {
-                // Afficher un message d'erreur
                 errorMessage = "Impossible de supprimer Super Admin.";
                 showError = true;
                 return;
             }
             
-            // Vous pourriez ajouter une confirmation avant suppression  
             var result = await UserManagerService.DeleteAsync(user);
             if (result.Succeeded)
             {
-                // Rafraîchir la liste seulement si la suppression a réussi
                 await RefreshUsers();
-                // Réinitialiser le message d'erreur
                 showError = false;
                 errorMessage = string.Empty;
             }
-        }  
-    }  
+        }
+    }
 
-    // Méthode pour récupérer le rôle d'un utilisateur
     private string GetUserRole(ApplicationUser user)
     {
-        if (user?.Id == null)
-        {
-            return "Non défini";
-        }
+        if (user?.Id == null) return "Non défini";
 
         if (userRoles.TryGetValue(user.Id!, out string role))
             return role;
         return "Non défini";
+    }
+
+    private string GetRoleBadgeClass(ApplicationUser user)
+    {
+        var role = GetUserRole(user);
+        return role switch
+        {
+            "Admin" => "bg-danger",
+            "Formateur" => "bg-primary",
+            _ => "bg-secondary"
+        };
+    }
+
+    private bool IsCurrentUserAdmin(ApplicationUser user)
+    {
+        return GetUserRole(user) == "Admin";
     }
 }

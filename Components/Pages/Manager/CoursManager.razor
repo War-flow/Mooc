@@ -18,122 +18,166 @@
 
 @if (session != null)
 {
-    <div class="container mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>@session.Title</h2>
-            <div>
-                <button class="btn btn-primary" @onclick="() => CreerCours(session.Id)">
-                    <i class="bi bi-plus-circle me-2"></i>Nouveau module
-                </button>
-                <a class="btn btn-outline-secondary ms-2" href="/Manager/Session">
-                    <i class="bi bi-arrow-left me-2"></i>Retour aux sessions
-                </a>
+    <!-- En-tête de page avec design moderne -->
+    <div class="page-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h1 class="page-title">
+                        Modules de formation
+                    </h1>
+                    <p class="page-subtitle">@session.Title - Gérez vos modules de cours</p>
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary btn-lg session-create-btn" @onclick="() => CreerCours(session.Id)">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        Nouveau Module
+                    </button>
+                    <a class="btn btn-primary btn-lg session-create-btn" href="/Manager/Session">
+                        <i class="bi bi-arrow-left me-2"></i>
+                        Retour aux sessions
+                    </a>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div class="card">
-            <div class="card-header bg-light">
-                <h3 class="mb-0">Module de cette session</h3>
-            </div>
-            <div class="card-body">
-                @if (coursList.Any())
+    <div class="container mt-4">
+        @if (coursList.Any())
+        {
+            <!-- Vue en cartes pour un meilleur design -->
+            <div class="courses-grid">
+                @foreach (var cours in coursList.OrderBy(c => c.Order))
                 {
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Titre</th>
-                                    <th>Description</th>
-                                    <th>Durée</th>
-                                    <th>Statut</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var cours in coursList.OrderBy(c => c.Order))
+                    <div class="course-card">
+                        <div class="course-header">
+                            <div class="course-status">
+                                <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
+                                    @(cours.IsPublished ? "Publié" : "Brouillon")
+                                </span>
+                                @if (cours.IsRequired)
                                 {
-                                    <tr>
-                                        <td>@cours.Title</td>
-                                        <td>@(cours.Description?.Length > 50 ? cours.Description.Substring(0, 50) + "..." : cours.Description)</td>
-                                        <td>@(cours.Duration) min</td>
-                                        <td>
-                                            <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
-                                                @(cours.IsPublished ? "Publié" : "Brouillon")
-                                            </span>
-                                            @if (cours.IsRequired)
-                                            {
-                                                <span class="badge bg-warning ms-1">Obligatoire</span>
-                                            }
-                                        </td>
-                                        <td>
-                                            <div class="btn-group">
-                                                <button class="btn" @onclick="() => VoirCours(cours.Id)">
-                                                    <i class="bi bi-eye"></i>
-                                                </button>
-                                                <button class="btn" @onclick="() => EditerCours(cours.Id)">
-                                                    <i class="bi bi-pencil"></i>
-                                                </button>
-                                                <button class="btn" @onclick="() => SupprimerCoursConfirmation(cours.Id)">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
+                                    <span class="badge bg-warning ms-1">Obligatoire</span>
                                 }
-                            </tbody>
-                        </table>
-                    </div>
-                }
-                else
-                {
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Aucun cours n'est disponible pour cette session. Créez votre premier cours en cliquant sur "Nouveau module".
+                            </div>
+                        </div>
+                        
+                        <div class="course-content">
+                            <h5 class="course-title">@cours.Title</h5>
+                            <p class="course-description">
+                                @(cours.Description?.Length > 100 ? cours.Description.Substring(0, 100) + "..." : cours.Description ?? "Aucune description")
+                            </p>
+                            
+                            <div class="course-meta">
+                                <div class="course-duration">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <small>@cours.Duration minutes</small>
+                                </div>
+                                <div class="course-updated">
+                                    <i class="bi bi-calendar-check me-1"></i>
+                                    <small>Mis à jour le @cours.UpdatedAt.ToString("dd/MM/yyyy")</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="course-actions">
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-outline-info" @onclick="() => VoirCours(cours.Id)" title="Voir le module">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                                <button class="btn btn-outline-primary" @onclick="() => EditerCours(cours.Id)" title="Modifier le module">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn @(cours.IsPublished ? "btn-success" : "btn-outline-secondary")" 
+                                        @onclick="() => ToggleCourseStatus(cours.Id)" 
+                                        title="@(cours.IsPublished ? "Dépublier" : "Publier")">
+                                    <i class="bi @(cours.IsPublished ? "bi-eye-slash" : "bi-eye")"></i>
+                                </button>
+                                <button class="btn btn-outline-danger" @onclick="() => SupprimerCoursConfirmation(cours.Id)" title="Supprimer le module">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 }
             </div>
-        </div>
+        }
+        else
+        {
+            <!-- État vide amélioré -->
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-book"></i>
+                </div>
+                <h3 class="empty-state-title">Aucun module créé</h3>
+                <p class="empty-state-text">Créez votre premier module de cours pour cette session.</p>
+                <button class="btn btn-primary btn-lg" @onclick="() => CreerCours(session.Id)">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Créer mon premier module
+                </button>
+            </div>
+        }
     </div>
 }
 else if (sessionId != null)
 {
+    <!-- Loading state amélioré -->
     <div class="container mt-4">
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">Chargement...</span>
             </div>
+            <p class="mt-3">Chargement des modules...</p>
         </div>
     </div>
 }
 else
 {
+    <!-- État d'erreur amélioré -->
     <div class="container mt-4">
-        <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            Veuillez sélectionner une session pour voir ses cours.
+        <div class="empty-state">
+            <div class="empty-state-icon text-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <h3 class="empty-state-title">Session non sélectionnée</h3>
+            <p class="empty-state-text">Veuillez sélectionner une session pour voir ses modules.</p>
+            <a href="/Manager/Session" class="btn btn-primary btn-lg">
+                <i class="bi bi-arrow-left me-2"></i>
+                Voir les sessions
+            </a>
         </div>
-        <a href="/Manager/Session" class="btn btn-primary">
-            <i class="bi bi-arrow-left me-2"></i>Voir les sessions
-        </a>
     </div>
 }
 
+<!-- Modal amélioré avec de meilleurs styles -->
 @if (showDeleteConfirmation)
 {
-    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmer la suppression</h5>
-                    <button type="button" class="btn-close" @onclick="() => showDeleteConfirmation = false"></button>
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-danger">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Confirmer la suppression
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeleteConfirmation = false"></button>
                 </div>
-                <div class="modal-body">
-                    <p>Êtes-vous sûr de vouloir supprimer ce cours ?</p>
-                    <p class="text-danger">Cette action est irréversible.</p>
+                <div class="modal-body text-center">
+                    <div class="delete-icon mb-3">
+                        <i class="bi bi-trash3"></i>
+                    </div>
+                    <p class="lead">Êtes-vous sûr de vouloir supprimer ce module ?</p>
+                    <p class="text-muted">Cette action est irréversible et supprimera tout le contenu du module.</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="() => showDeleteConfirmation = false">Annuler</button>
-                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteCours">Supprimer</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showDeleteConfirmation = false">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmDeleteCours">
+                        <i class="bi bi-trash me-1"></i>
+                        Supprimer définitivement
+                    </button>
                 </div>
             </div>
         </div>
@@ -183,8 +227,35 @@ else
 
     private void VoirCours(int coursId)
     {
-        // Rediriger vers une page de visualisation du cours
         NavigationManager.NavigateTo($"/Cours/View/{coursId}");
+    }
+
+    private async Task ToggleCourseStatus(int coursId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var cours = await context.Courses.FindAsync(coursId);
+
+            if (cours != null)
+            {
+                cours.IsPublished = !cours.IsPublished;
+                cours.UpdatedAt = DateTime.Now;
+                await context.SaveChangesAsync();
+
+                // Mettre à jour la liste locale
+                var localCours = coursList.FirstOrDefault(c => c.Id == coursId);
+                if (localCours != null)
+                {
+                    localCours.IsPublished = cours.IsPublished;
+                    localCours.UpdatedAt = cours.UpdatedAt;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Gérer les erreurs silencieusement ou afficher un message
+        }
     }
 
     private void SupprimerCoursConfirmation(int coursId)
@@ -206,14 +277,7 @@ else
                 await context.SaveChangesAsync();
 
                 // Rafraîchir la liste
-                if (session?.Courses != null)
-                {
-                    var coursToRemove = session.Courses.FirstOrDefault(c => c.Id == courseIdToDelete);
-                    if (coursToRemove != null)
-                    {
-                        coursList.Remove(coursToRemove);
-                    }
-                }
+                coursList.RemoveAll(c => c.Id == courseIdToDelete);
             }
 
             showDeleteConfirmation = false;

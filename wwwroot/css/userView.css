@@ -1,0 +1,388 @@
+﻿
+/* === STYLES POUR USER MANAGER === */
+
+/* En-tête de page */
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+.page-title {
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    font-size: 2.5rem;
+}
+
+.page-subtitle {
+    opacity: 0.9;
+    font-size: 1.1rem;
+    margin-bottom: 0;
+}
+
+.user-create-btn {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+}
+
+    .user-create-btn:hover {
+        background: rgba(255, 255, 255, 0.3);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-2px);
+    }
+
+/* Grille des utilisateurs */
+.users-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+/* Carte d'utilisateur */
+.user-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+    .user-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    }
+
+/* Avatar utilisateur */
+.user-avatar {
+    position: relative;
+    height: 120px;
+    background: linear-gradient(45deg, #f8f9fa, #e9ecef);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-placeholder {
+    font-size: 4rem;
+    color: #6c757d;
+    opacity: 0.6;
+}
+
+.user-role-badge {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+}
+
+    .user-role-badge .badge {
+        font-size: 0.7rem;
+        padding: 0.4rem 0.8rem;
+        border-radius: 15px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+/* Contenu utilisateur */
+.user-content {
+    padding: 1.5rem;
+}
+
+.user-name {
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 0.5rem;
+    font-size: 1.25rem;
+    line-height: 1.3;
+}
+
+.user-email {
+    color: #718096;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    word-break: break-word;
+}
+
+.user-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: #a0aec0;
+}
+
+    .user-meta i {
+        color: #667eea;
+    }
+
+/* Actions utilisateur */
+.user-actions {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+    .user-actions .btn {
+        border: none;
+        font-weight: 600;
+        transition: all 0.2s ease;
+    }
+
+        .user-actions .btn:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .user-actions .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+/* État vide */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+.empty-state-icon {
+    font-size: 5rem;
+    color: #dee2e6;
+    margin-bottom: 1.5rem;
+}
+
+.empty-state-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.empty-state-text {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* État de chargement */
+.loading-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+}
+
+/* Modal moderne */
+.modal-backdrop-custom {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+}
+
+.modal-modern {
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header-modern {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-header-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-header-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-modern .modal-body {
+    padding: 2rem;
+}
+
+.modal-modern .modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem 2rem;
+    background: #f8f9fa;
+}
+
+/* Alertes modernes */
+.alert-modern {
+    border: none;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    border-left: 4px solid currentColor;
+    animation: slideInFromRight 0.3s ease-out;
+}
+
+@keyframes slideInFromRight {
+    from {
+        opacity: 0;
+        transform: translateX(100%);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Utilisateur à supprimer */
+.user-to-delete {
+    border-left: 4px solid #dc3545;
+}
+
+/* Icône de suppression */
+.delete-icon {
+    font-size: 4rem;
+    color: #dc3545;
+    opacity: 0.8;
+}
+
+/* Cartes de prévisualisation des sessions */
+.session-preview-card {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+    .session-preview-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .page-title {
+        font-size: 2rem;
+    }
+
+    .users-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+
+    .user-card {
+        margin: 0 1rem;
+    }
+
+    .modal-modern .modal-body {
+        padding: 1.5rem;
+    }
+
+    .user-meta {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .user-actions .btn-group {
+        flex-direction: column;
+    }
+
+    .user-actions .btn {
+        border-radius: 0.375rem !important;
+        margin-bottom: 0.25rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .page-header {
+        padding: 1.5rem 0;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        text-align: center;
+    }
+
+    .page-subtitle {
+        text-align: center;
+        margin-bottom: 1rem;
+    }
+
+    .user-create-btn {
+        width: 100%;
+    }
+
+    .empty-state {
+        padding: 2rem 1rem;
+    }
+
+    .empty-state-icon {
+        font-size: 3.5rem;
+    }
+
+    .user-avatar {
+        height: 100px;
+    }
+
+    .avatar-placeholder {
+        font-size: 3rem;
+    }
+}
+
+/* Animation d'entrée pour les cartes */
+.user-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Styles pour les badges de rôle */
+.badge.bg-danger {
+    background: linear-gradient(45deg, #dc3545, #c82333) !important;
+}
+
+.badge.bg-primary {
+    background: linear-gradient(45deg, #0d6efd, #0b5ed7) !important;
+}
+
+.badge.bg-secondary {
+    background: linear-gradient(45deg, #6c757d, #5a6268) !important;
+}
+
+/* Amélioration des tooltips Bootstrap si utilisés */
+.tooltip-inner {
+    background-color: #2d3748;
+    border-radius: 8px;
+}
+
+/* États hover pour les éléments interactifs */
+.user-email:hover {
+    color: #667eea;
+    cursor: pointer;
+}
+
+/* Style pour les modals en cascade */
+.modal.show ~ .modal {
+    z-index: 1070;
+}
+
+    .modal.show ~ .modal .modal-backdrop {
+        z-index: 1065;
+    }

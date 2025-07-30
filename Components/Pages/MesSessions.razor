@@ -17,9 +17,20 @@
 
 <PageTitle>Mes Sessions</PageTitle>
 
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">Mes Sessions</h1>
+                <p class="page-subtitle">Retrouvez vos sessions de formation en cours et passées</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="container mt-4">
-    <h2>Mes Sessions</h2>
     
+
     <!-- Notifications en haut de page -->
     @if (sessionNotifications.Any())
     {
@@ -33,62 +44,64 @@
         }
     }
     
-    @if (enrolledSessions != null && enrolledSessions.Any())
+    @if (isLoading)
     {
-        <div class="row">
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-3">Chargement de vos sessions...</p>
+        </div>
+    }
+    else if (enrolledSessions != null && enrolledSessions.Any())
+    {
+        <div class="sessions-grid">
             @foreach (var session in enrolledSessions)
             {
-                <div class="col-md-6 col-lg-4 mb-4">
-                    <div class="card @GetCardClass(session)">
+                <div class="session-card @(IsSessionEnded(session) ? "border-secondary" : IsSessionActive(session) ? "border-success" : "border-warning")">
+                    <div class="session-image">
                         @if (!string.IsNullOrEmpty(session.Image))
                         {
-                            <img src="@session.Image" class="card-img-top" alt="@session.Title">
+                            <img src="@session.Image" alt="@session.Title" />
                         }
-                        <div class="card-body">
-                            <h5 class="card-title">@session.Title</h5>
-                            <p class="card-text">@session.Description</p>
-                            <p class="text-muted">
+                        else
+                        {
+                            <div class="session-image-placeholder">
+                                <i class="bi bi-image"></i>
+                            </div>
+                        }
+                        <div class="session-status">
+                            <span class="badge @(IsSessionActive(session) ? "bg-success" : IsSessionUpcoming(session) ? "bg-warning" : "bg-secondary")">
+                                @(IsSessionActive(session) ? "En cours" : IsSessionUpcoming(session) ? "À venir" : "Terminée")
+                            </span>
+                        </div>
+                    </div>
+                    <div class="session-content">
+                        <h5 class="session-title">@session.Title</h5>
+                        <p class="session-description">@session.Description</p>
+                        <div class="session-meta">
+                            <div>
+                                <i class="bi bi-calendar3 me-1"></i>
                                 <small>Du @session.StartDate.ToString("dd/MM/yyyy") au @session.EndDate.ToString("dd/MM/yyyy")</small>
-                            </p>
-                            
-                            <!-- Indicateur de temps restant -->
+                            </div>
+                            <div>
+                                <i class="bi bi-clock me-1"></i>
+                                <small>@session.Work heures</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="session-actions">
+                        <div class="btn-group w-100" role="group">
                             @if (IsSessionActive(session))
                             {
-                                var timeRemaining = session.EndDate - DateTime.Now;
-                                <span class="badge bg-success mb-2">En cours</span>
-                                @if (timeRemaining.TotalHours <= 24)
-                                {
-                                    <div class="alert alert-warning alert-sm p-2 mt-2">
-                                        <i class="bi bi-clock me-1"></i>
-                                        Se termine dans @GetTimeRemainingText(timeRemaining)
-                                    </div>
-                                }
-                                <br>
-                                <a href="/session/@session.Id" class="btn btn-valid">Accéder à la session</a>
+                                <a href="/session/@session.Id" class="btn btn-success flex-fill">
+                                    <i class="bi bi-play-circle me-2"></i> Accéder à la session
+                                </a>
                             }
-                            else if (IsSessionUpcoming(session))
-                            {
-                                <span class="badge bg-warning mb-2">À venir</span>
-                                var timeToStart = session.StartDate - DateTime.Now;
-                                <div class="alert alert-info alert-sm p-2 mt-2">
-                                    <i class="bi bi-calendar me-1"></i>
-                                    Commence dans @GetTimeRemainingText(timeToStart)
-                                </div>
-                            }
-                            else
-                            {
-                                <span class="badge bg-secondary mb-2">Terminée</span>
-                                @if (AllowUnsubscribeFromEndedSessions)
-                                {
-                                    <br>
-                                    <small class="text-muted">Session terminée - Vous pouvez toujours vous désinscrire</small>
-                                }
-                            }
-
                             @if (AllowUnsubscribeFromEndedSessions || !IsSessionEnded(session))
                             {
-                                <button class="btn btn-cancel m-lg-1" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
-                                    Se désinscrire
+                                <button class="btn btn-outline-danger flex-fill" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
+                                    <i class="bi bi-x-circle me-2"></i> Se désinscrire
                                 </button>
                             }
                         </div>
@@ -97,42 +110,48 @@
             }
         </div>
     }
-    else if (isLoading)
-    {
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Chargement...</span>
-            </div>
-        </div>
-    }
     else
     {
-        <div class="alert alert-info">
-            <p>Vous n'êtes inscrit à aucune session pour le moment.</p>
-            <a href="/" class="btn btn-primary">Découvrir les sessions disponibles</a>
+        <div class="empty-state">
+            <div class="empty-state-icon">
+                <i class="bi bi-inbox"></i>
+            </div>
+            <h3 class="empty-state-title">Aucune session</h3>
+            <p class="empty-state-text">Vous n'êtes inscrit à aucune session pour le moment.</p>
+            <a href="/" class="btn btn-primary btn-lg">Découvrir les sessions disponibles</a>
         </div>
     }
 </div>
 
 @if (showUnsubscribeModal)
 {
-    <div class="modal fade show" style="display: block; background-color: rgba(0,0,0,0.5);" aria-modal="true" role="dialog">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Confirmer la désinscription</h5>
-                    <button type="button" class="btn-close" @onclick="CloseUnsubscribeModal"></button>
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-danger">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Confirmer la désinscription
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="CloseUnsubscribeModal"></button>
                 </div>
-                <div class="modal-body">
-                    <p>Êtes-vous sûr de vouloir vous désinscrire de cette session ?</p>
+                <div class="modal-body text-center">
+                    <div class="delete-icon mb-3">
+                        <i class="bi bi-trash3"></i>
+                    </div>
+                    <p class="lead">Êtes-vous sûr de vouloir vous désinscrire de cette session ?</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" @onclick="CloseUnsubscribeModal">Annuler</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="CloseUnsubscribeModal">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Annuler
+                    </button>
                     <button type="button" class="btn btn-danger" @onclick="UnsubscribeFromSession" disabled="@isProcessing">
                         @if (isProcessing)
                         {
                             <span class="spinner-border spinner-border-sm me-2"></span>
                         }
+                        <i class="bi bi-trash me-1"></i>
                         Confirmer
                     </button>
                 </div>

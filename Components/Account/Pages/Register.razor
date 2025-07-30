@@ -16,42 +16,51 @@
 @inject IdentityRedirectManager RedirectManager
 
 <PageTitle>Inscription</PageTitle>
-<div class="row register-body">
-    <div class="col-lg-6 register-contenant">
+
+<div class="auth-container">
+    <div class="auth-card">
         <StatusMessage Message="@Message" />
         <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
-            <h2 class="mx-2" >Créer un nouveau compte</h2>
-            <hr />
-            <ValidationSummary class="text-danger" role="alert" />
-            <div class="form-floating mb-3">
+            <h2 class="auth-title">Créer un compte</h2>
+            <ValidationSummary class="text-danger validation-summary" role="alert" />
+            
+            <div class="form-floating">
                 <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" />
                 <label for="Input.Email">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
-            <div class="form-floating mb-3 position-relative">
-                <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true"  />
-                <label for="Input.Password">Mot de passe</label>
-                <ValidationMessage For="() => Input.Password" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3 position-relative">
-                <InputText type="@(showConfirmPassword ? "text" : "password")" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true" />
-                <label for="Input.ConfirmPassword">Confirmez le mot de passe</label>
-                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
-                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" aria-required="true" />
-                <label for="Input.LastName">Nom</label>
-                <ValidationMessage For="() => Input.LastName" class="text-danger" />
-            </div>
-            <div class="form-floating mb-3">
+            
+            <div class="form-floating">
                 <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" aria-required="true" />
                 <label for="Input.FirstName">Prénom</label>
                 <ValidationMessage For="() => Input.FirstName" class="text-danger" />
             </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">VALIDER</button>
+            
+            <div class="form-floating">
+                <InputText @bind-Value="Input.LastName" id="Input.LastName" class="form-control" aria-required="true" />
+                <label for="Input.LastName">Nom</label>
+                <ValidationMessage For="() => Input.LastName" class="text-danger" />
+            </div>
+            
+            <div class="form-floating">
+                <InputText type="@(showPassword ? "text" : "password")" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="new-password" aria-required="true" />
+                <label for="Input.Password">Mot de passe</label>
+                <ValidationMessage For="() => Input.Password" class="text-danger" />
+            </div>
+            
+            <div class="form-floating">
+                <InputText type="@(showConfirmPassword ? "text" : "password")" @bind-Value="Input.ConfirmPassword" id="Input.ConfirmPassword" class="form-control" autocomplete="new-password" aria-required="true"/>
+                <label for="Input.ConfirmPassword">Confirmer le mot de passe</label>
+                <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
+            </div>
+            
+            <button type="submit" class="w-100 btn btn-auth">Créer le compte</button>
+            
+            <div class="auth-links">
+                <a href="/Account/Login" class="auth-link">Déjà un compte ? Se connecter</a>
+            </div>
         </EditForm>
-        <a href="/Account/Login" class="link">SE CONNECTER</a>
     </div>
 </div>
 
@@ -66,7 +75,7 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    private string? Message => identityErrors is null ? null : $"Erreur : {string.Join(", ", identityErrors.Select(error => error.Description))}";
 
     public async Task RegisterUser(EditContext editContext)
     {
@@ -142,12 +151,12 @@
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "L'email est requis")]
+        [EmailAddress(ErrorMessage = "Format d'email invalide")]
         [Display(Name = "Email")]
         public string Email { get; set; } = "";
 
-        [Required]
+        [Required(ErrorMessage = "Le mot de passe est requis")]
         [StringLength(100, ErrorMessage = "Le {0} doit comporter au moins {2} et au maximum {1} caractères.", MinimumLength = 6)]
         [DataType(DataType.Password)]
         [Display(Name = "Password")]
@@ -157,7 +166,6 @@
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "Le mot de passe et le mot de passe de confirmation ne correspondent pas.")]
         public string ConfirmPassword { get; set; } = "";
-
 
         [Required(ErrorMessage = "Le prénom est obligatoire")]
         [StringLength(50, ErrorMessage = "Le prénom ne peut pas dépasser {1} caractères")]
