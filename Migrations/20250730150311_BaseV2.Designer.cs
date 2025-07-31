@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Mooc.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250725123339_BaseV1")]
-    partial class BaseV1
+    [Migration("20250730150311_BaseV2")]
+    partial class BaseV2
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -342,6 +342,9 @@ namespace Mooc.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
+
+                    b.Property<int>("LimitUser")
+                        .HasColumnType("int");
 
                     b.Property<bool>("NotificationSent1h")
                         .HasColumnType("boolean");

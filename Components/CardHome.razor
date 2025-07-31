@@ -18,29 +18,34 @@
             <div class="col">
                 <div class="card mooc h-100 position-relative overflow-hidden">
                     <!-- Badge de statut -->
+                    @{
+                        var isEnrolled = IsUserEnrolledInSession(session.Id);
+                        var daysUntilStart = GetDaysUntilStart(session);
+                        var daysUntilEnd = GetDaysUntilEnd(session);
+                    }
                     <div class="position-absolute top-0 end-0 p-2" style="z-index: 10;">
-                        @if (IsUserEnrolledInSession(session.Id))
+                        @if (isEnrolled)
                         {
                             <span class="badge bg-success rounded-pill">
                                 <i class="bi bi-check-circle me-1"> Inscrit</i>
                             </span>
                         }
-                        else if (!IsUserEnrolledInSession(session.Id) && DateTime.Now >= session.StartDate)
+                        else if (DateTime.Now >= session.StartDate)
                         {
                             <span class="badge bg-info text-white rounded-pill">
                                 <i class="bi bi-unlock me-1"> Disponible</i>
                             </span>
                         }
-                        else if (GetDaysUntilStart(session) <= 14)
+                        else if (daysUntilStart <= 14)
                         {
                             <span class="badge bg-warning text-dark rounded-pill">
-                                Démarrage dans : @GetDaysUntilStart(session) j restants 
+                                Démarrage dans : @daysUntilStart j restants 
                             </span>
                         }
-                        else if (GetDaysUntilEnd(session) <= 7)
+                        else if (daysUntilEnd <= 7)
                         {
                             <span class="badge bg-warning text-dark rounded-pill">
-                                Fin dans : @GetDaysUntilEnd(session) j restants
+                                Fin dans : @daysUntilEnd j restants
                             </span>
                         }
                     </div>
@@ -67,26 +72,14 @@
                             <div class="row g-2 text-sm">
                                 <div class="col-6">
                                     <div class="d-flex align-items-center">
-                                        <i class="bi bi-people-fill text-info me-2"></i>
-                                        <span class="small">
-                                            @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
-                                            @if (IsCountUpdating(session.Id))
-                                            {
-                                                <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
-                                            }
-                                        </span>
+                                        <i class="bi bi-clock-fill text-warning me-2"></i>
+                                        <span class="small">Effort estimé @GetEstimatedEffort(session.Work) h</span>
                                     </div>
                                 </div>
                                 <div class="col-6">
                                     <div class="d-flex align-items-center">
-                                        <i class="bi bi-clock-fill text-warning me-2"></i>
-                                        <span class="small">@GetEstimatedEffort(session.Work) h</span>
-                                    </div>
-                                </div>
-                                <div class="col-12">
-                                    <div class="d-flex align-items-center">
                                         <i class="bi bi-book-fill text-success me-2"></i>
-                                        <span class="small">@(session.Courses?.Count ?? 0) cours</span>
+                                        <span class="small">@(session.Courses?.Count ?? 0) Module</span>
                                     </div>
                                 </div>
                             </div>
@@ -196,7 +189,7 @@
                                                     <i class="bi bi-book text-info fs-4"></i>
                                                     <div class="mt-2">
                                                         <strong>@(session.Courses?.Count ?? 0)</strong>
-                                                        <br><small class="text-muted"> Cours</small>
+                                                        <br><small class="text-muted"> Module</small>
                                                     </div>
                                                 </div>
                                             </div>
@@ -221,8 +214,7 @@
                                                         <p class="mb-1 text-muted small">@GetTruncatedDescription(course.Description, 80)</p>
                                                     }
                                                 </div>
-                                                <div class="text-end">
-                                                    <span class="badge bg-info">@course.Duration min</span>
+                                                <div class="text-end">  
                                                     @if (course.IsRequired)
                                                     {
                                                         <br><span class="badge bg-warning text-dark small mt-1"> Obligatoire</span>
@@ -412,10 +404,7 @@ else
         await InvokeAsync(StateHasChanged);
     }
 
-    private bool IsCountUpdating(int sessionId)
-    {
-        return updatingCounts.Contains(sessionId);
-    }
+
     
     private async Task UpdateSessionCountWithIndicator(int sessionId)
     {
@@ -473,14 +462,6 @@ else
     }
 
     /// <summary>
-    /// Retourne le nombre d'inscrits pour une session donnée
-    /// </summary>
-    private int GetEnrolledCount(int sessionId)
-    {
-        return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
-    }
-
-    /// <summary>
     /// Retourne le nombre de jours restants avant le début de la session
     /// </summary>
     private int GetDaysUntilStart(Session session)
@@ -512,7 +493,7 @@ else
     private int GetEstimatedEffort(int work)
     {
         // Conversion du travail en heures (supposons que work est en minutes)
-        return work / 60;
+        return work;
     }
 
     /// <summary>

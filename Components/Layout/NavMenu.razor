@@ -19,31 +19,31 @@
 
 <div class="nav" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
-        <div class="nav-item px-3">
+        <div class="nav-item px-2">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Accueil
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"> </span> Accueil
             </NavLink>
         </div>
         <AuthorizeView>
             <Authorized>
                 @if (currentUser != null)
                 {
-                    <div class="nav-item px-3">
+                    <div class="nav-item px-2">
                         <NavLink class="nav-link" href="Account/Manage">
-                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @currentUser.LastName @currentUser.FirstName
+                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"> </span> @currentUser.LastName @currentUser.FirstName
                         </NavLink>
                     </div>
                 }
                 else
                 {
-                    <div class="nav-item px-3">
+                    <div class="nav-item px-2">
                         <NavLink class="nav-link" href="Account/Manage">
                             <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
                         </NavLink>
                     </div>
                 }
                 <AuthorizeView Policy="GérerUtilisateurs" Context="adminContext">
-                    <div class="nav-item px-3">
+                    <div class="nav-item px-2">
                         <NavLink class="nav-link" href="/manager/user">
                            Gestion des utilisateurs
                         </NavLink>
@@ -65,7 +65,7 @@
                         </NavLink>
                     </div>
                 </AuthorizeView>
-                <div class="nav-item px-3">
+                <div class="nav-item px-2">
                     <form action="Account/Logout" method="post">
                         <AntiforgeryToken />
                         <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -76,9 +76,9 @@
                 </div>
             </Authorized>
             <NotAuthorized>
-                <div class="nav-item px-3">
+                <div class="nav-item px-2">
                     <NavLink class="nav-link" href="Account/Login">
-                       Connexion
+                           Connexion
                     </NavLink>
                 </div>
             </NotAuthorized>

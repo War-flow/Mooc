@@ -221,7 +221,6 @@
                     IsPublished = cours.IsPublished,
                     IsRequired = cours.IsRequired,
                     Order = cours.Order,
-                    Duration = cours.Duration
                 };
 
                 // Charger les blocs de contenu
@@ -334,7 +333,6 @@
                     cours.IsPublished = coursModel.IsPublished;
                     cours.IsRequired = coursModel.IsRequired;
                     cours.Order = coursModel.Order;
-                    cours.Duration = coursModel.Duration;
                     cours.Content = blocksJson;
                     cours.UpdatedAt = DateTime.UtcNow;
 
@@ -353,7 +351,6 @@
                     IsPublished = coursModel.IsPublished,
                     IsRequired = coursModel.IsRequired,
                     Order = coursModel.Order,
-                    Duration = coursModel.Duration,
                     Content = blocksJson,
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow

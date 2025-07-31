@@ -161,6 +161,9 @@ namespace Mooc
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddHostedService<SessionExpiryService>();
 
+            // Ajout des services SignalR
+            builder.Services.AddSignalR();
+
             var app = builder.Build();
 
             // Configuration du pipeline de requêtes HTTP
@@ -210,6 +213,9 @@ namespace Mooc
 
             // Ajout d'un health check
             app.MapHealthChecks("/health");
+
+            // Ajout des hubs SignalR
+            app.MapHub<SessionHub>("/sessionHub");
 
             using (var scope = app.Services.CreateScope())
             {

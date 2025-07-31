@@ -58,8 +58,17 @@
                                 </div>
                             }
                             <div class="session-status">
-                                <span class="badge @(session.IsActive ? "bg-success" : "bg-secondary")">
-                                    @(session.IsActive ? "En ligne" : "Hors ligne")
+                                <span class="badge @(session.IsActive ? "bg-success" : "bg-danger")">
+                                    <i class="bi bi-reception-4"></i>  @(session.IsActive ? "En ligne" : "Hors ligne")
+                                </span>
+
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-people-fill text-info me-2"></i>
+                                    @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
+                                    @if (IsCountUpdating(session.Id))
+                                    {
+                                        <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
+                                    }
                                 </span>
                             </div>
                         </div>
@@ -78,6 +87,10 @@
                                 <div class="session-work">
                                     <i class="bi bi-clock me-1"></i>
                                     <small>@session.Work heures</small>
+                                </div>
+                                <div class="session-work">
+                                    <i class="bi bi-people"></i>
+                                    <small>@session.LimitUser places</small>
                                 </div>
                             </div>
                         </div>
@@ -193,7 +206,7 @@
                             </div>
                         </div>
                         
-                        <div class="row">
+                        <div class="row mt-1">
                             <div class="col-md-6">
                                 <div class="form-floating mb-3">
                                     <InputDate @bind-Value="sessionModel.StartDate" class="form-control" />
@@ -216,6 +229,11 @@
                                     <InputNumber @bind-Value="sessionModel.Work" class="form-control" />
                                     <label>Durée (heures)</label>
                                     <ValidationMessage For="@(() => sessionModel.Work)" />
+                                </div>
+                                <div class="form-floating mb-3">
+                                    <InputNumber @bind-Value="sessionModel.LimitUser" class="form-control" />
+                                    <label>Nombres de places disponibles</label>
+                                    <ValidationMessage For="@(() => sessionModel.LimitUser)" />
                                 </div>
                             </div>
                             <div class="col-md-6 d-flex align-items-center">
@@ -291,16 +309,38 @@
     private bool showDeleteConfirmation = false;
     private IBrowserFile? selectedImageFile;
     private string? oldImagePath;
+    private Dictionary<int, int> enrolledCounts = new();
+    private HashSet<int> updatingCounts = new();
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSessions();
+        await LoadEnrolledCounts();
     }
 
     private async Task LoadSessions()
     {
         using var context = await DbContextFactory.CreateDbContextAsync();
         sessions = await context.Sessions.ToListAsync();
+        await LoadEnrolledCounts();
+    }
+
+    private async Task LoadEnrolledCounts()
+    {
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        enrolledCounts.Clear();
+        if (sessions != null)
+        {
+            foreach (var session in sessions)
+            {
+                // Compte les utilisateurs inscrits à chaque session
+                var count = await context.Entry(session)
+                    .Collection(s => s.EnrolledUsers)
+                    .Query()
+                    .CountAsync();
+                enrolledCounts[session.Id] = count;
+            }
+        }
     }
 
     private async Task ToggleSessionStatus(int sessionId)
@@ -352,6 +392,7 @@
                 StartDate = session.StartDate,
                 EndDate = session.EndDate,
                 Work = session.Work,
+                LimitUser = session.LimitUser,
                 IsActive = session.IsActive
             };
 
@@ -450,17 +491,18 @@
                 if (session != null)
                 {
                     session.Title = sessionModel.Title;
-                    
+
                     if (selectedImageFile != null && !string.IsNullOrEmpty(oldImagePath) && oldImagePath.StartsWith("/uploads/"))
                     {
                         FileUploadService.DeleteFile(oldImagePath);
                     }
-                    
+
                     session.Image = imagePath;
                     session.Description = sessionModel.Description;
                     session.StartDate = sessionModel.StartDate;
                     session.EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30);
                     session.Work = sessionModel.Work;
+                    session.LimitUser = sessionModel.LimitUser;
                     session.IsActive = sessionModel.IsActive;
 
                     await context.SaveChangesAsync();
@@ -476,6 +518,7 @@
                     StartDate = sessionModel.StartDate,
                     EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30),
                     Work = sessionModel.Work,
+                    LimitUser = sessionModel.LimitUser,
                     IsActive = sessionModel.IsActive
                 };
 
@@ -493,10 +536,22 @@
         }
     }
 
+    /// <summary>
+    /// Retourne le nombre d'inscrits pour une session donnée
+    /// </summary>
+    private int GetEnrolledCount(int sessionId)
+    {
+        return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
+    }
     private void CloseModal()
     {
         showModal = false;
         selectedImageFile = null;
+    }
+
+    private bool IsCountUpdating(int sessionId)
+    {
+        return updatingCounts.Contains(sessionId);
     }
 
     private class SessionModel
@@ -519,6 +574,10 @@
         [Required(ErrorMessage = "Le temps de travail est requis")]
         [Range(1, 1000, ErrorMessage = "Le temps de travail doit être entre 1 et 1000 heures")]
         public int Work { get; set; } = 10;
+
+        [Required(ErrorMessage = "le nombre de places est requis")]
+        [Range(1, 100, ErrorMessage = "Le nombre maximal de place par session est de 100")]
+        public int LimitUser { get; set; } = 12;
 
         public bool IsActive { get; set; } = false;
     }

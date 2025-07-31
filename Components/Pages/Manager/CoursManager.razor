@@ -67,12 +67,7 @@
                             <p class="course-description">
                                 @(cours.Description?.Length > 100 ? cours.Description.Substring(0, 100) + "..." : cours.Description ?? "Aucune description")
                             </p>
-                            
                             <div class="course-meta">
-                                <div class="course-duration">
-                                    <i class="bi bi-clock me-1"></i>
-                                    <small>@cours.Duration minutes</small>
-                                </div>
                                 <div class="course-updated">
                                     <i class="bi bi-calendar-check me-1"></i>
                                     <small>Mis à jour le @cours.UpdatedAt.ToString("dd/MM/yyyy")</small>

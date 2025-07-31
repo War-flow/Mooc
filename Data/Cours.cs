@@ -14,10 +14,7 @@ namespace Mooc.Data
         public string? Description { get; set; }
         
         // Contenu du cours au format JSON (liste de CoursBlock)
-        public string? Content { get; set; }
-        
-        // Durée estimée en minutes
-        public int Duration { get; set; } = 30;
+        public string? Content { get; set; }    
         
         // Ordre d'affichage dans la session
         public int Order { get; set; } = 1;

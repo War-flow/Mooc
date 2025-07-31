@@ -96,9 +96,6 @@ else
                         <div class="course-title">@cours.Title</div>
                         <div class="course-description">@GetTruncatedDescription(cours.Description)</div>
                         <div class="course-meta">
-                            <div class="course-duration">
-                                <i class="bi bi-clock me-1"></i> @cours.Duration min
-                            </div>
                             <div class="course-updated">
                                 <i class="bi bi-calendar me-1"></i> Mise à jour : @cours.UpdatedAt.ToString("dd/MM/yyyy")
                             </div>
@@ -171,7 +168,6 @@ else
     // Propriétés calculées pour améliorer les performances
     private IEnumerable<Cours> orderedCoursList => coursList.OrderBy(c => c.Order);
     private int publishedCoursCount => coursList.Count(c => c.IsPublished);
-    private int totalDuration => coursList.Sum(c => c.Duration);
     private int completedCoursCount => courseProgresses.Count(kvp => kvp.Value.IsCompleted);
     private int progressPercentage => coursList.Any() ? (completedCoursCount * 100) / coursList.Count : 0;
 
