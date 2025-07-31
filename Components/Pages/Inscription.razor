@@ -55,6 +55,13 @@
                             </div>
                             <a href="/mes-sessions" class="btn btn-primary m-lg-2">Voir mes sessions</a>
                         }
+                        else if (isSessionFull)
+                        {
+                            <div class="alert alert-warning">
+                                <i class="fas fa-users"></i> Cette session a atteint sa limite de @session.LimitUser participants.
+                            </div>
+                            <a href="/" class="btn btn-secondary m-2">Retour à l'accueil</a>
+                        }
                         else
                         {
                             @if (showError)
@@ -66,6 +73,7 @@
                             
                             <div class="alert alert-info">
                                 <strong>Confirmez-vous votre inscription à cette session ?</strong>
+                                <br><small class="text-muted">Places disponibles : @GetAvailablePlaces() sur @session.LimitUser</small>
                             </div>
                             
                             <div class="d-flex gap-2">
@@ -102,7 +110,7 @@ else
 
 @code {
     [Parameter] public int SessionId { get; set; }
-    
+
     private Session? session;
     private bool isAlreadyEnrolled = false;
     private bool isLoading = true;
@@ -110,18 +118,19 @@ else
     private bool showError = false;
     private string errorMessage = string.Empty;
     private string? currentUserId;
+    private int currentEnrolledCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            // Exécuter les opérations séquentiellement pour éviter les conflits de threading
             await LoadCurrentUser();
             
-            // Utiliser un seul contexte pour les deux opérations restantes
             await using var context = await DbContextFactory.CreateDbContextAsync();
             await LoadSession(context);
             await CheckEnrollmentStatus(context);
+            await CheckSessionLimit(context);
+            await LoadEnrolledCount(context);
         }
         catch (Exception ex)
         {
@@ -167,9 +176,32 @@ else
     private bool IsSessionAvailable()
     {
         if (session == null) return false;
-        
+
         var now = DateTime.Now;
         return now >= session.StartDate && now <= session.EndDate;
+    }
+
+    private async Task<bool> IsLimite(ApplicationDbContext context)
+    {
+        if (session == null) return false;
+
+        // Compter le nombre d'utilisateurs actuellement inscrits à la session
+        var currentEnrolledCount = await context.Sessions
+            .Where(s => s.Id == SessionId)
+            .SelectMany(s => s.EnrolledUsers)
+            .CountAsync();
+
+        // Vérifier si la limite n'est pas atteinte
+        return currentEnrolledCount < session.LimitUser;
+    }
+
+    private bool isSessionFull = false;
+
+    private async Task CheckSessionLimit(ApplicationDbContext context)
+    {
+        if (session == null) return;
+        
+        isSessionFull = !await IsLimite(context);
     }
 
     private async Task EnrollToSession()
@@ -183,7 +215,15 @@ else
         try
         {
             await using var context = await DbContextFactory.CreateDbContextAsync();
-            
+
+            // Vérifier la limite d'inscription
+            if (isSessionFull)
+            {
+                showError = true;
+                errorMessage = "Cette session est complète.";
+                return;
+            }
+
             var user = await context.Users
                 .Include(u => u.EnrolledSessions)
                 .FirstOrDefaultAsync(u => u.Id == currentUserId);
@@ -200,7 +240,7 @@ else
                     {
                         user.EnrolledSessions.Add(sessionToEnroll);
                         await context.SaveChangesAsync();
-                        
+
                         NavigationManager.NavigateTo("/mes-sessions");
                     }
                 }
@@ -215,5 +255,21 @@ else
         {
             isProcessing = false;
         }
+    }
+
+    private async Task LoadEnrolledCount(ApplicationDbContext context)
+    {
+        if (session == null) return;
+        
+        currentEnrolledCount = await context.Sessions
+            .Where(s => s.Id == SessionId)
+            .SelectMany(s => s.EnrolledUsers)
+            .CountAsync();
+    }
+
+    private int GetAvailablePlaces()
+    {
+        if (session == null) return 0;
+        return Math.Max(0, session.LimitUser - currentEnrolledCount);
     }
 }
