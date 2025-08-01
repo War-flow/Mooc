@@ -57,7 +57,10 @@
                             <h5 class="user-name">@user.FirstName @user.LastName</h5>
                             <p class="user-email">
                                 <i class="bi bi-envelope me-1"></i>
-                                @user.Email
+                                @user.Email <br />
+                                <i class="bi bi-telephone me-1"></i>
+                                @user.PhoneNumber
+
                             </p>
                             
                             <div class="user-meta">
@@ -77,9 +80,9 @@
                                 <button class="btn btn-outline-primary" @onclick="() => EditUser(user.Id)">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <!-- <button class="btn btn-outline-info" @onclick="() => ViewUserSessions(user.Id)">
+                                <button class="btn btn-outline-info" @onclick="() => ViewUserSessions(user.Id)">
                                     <i class="bi bi-calendar3"></i>
-                                </button>  -->
+                                </button>
                                 <button class="btn btn-outline-danger" @onclick="() => DeleteUserConfirmation(user.Id)" 
                                         disabled="@IsCurrentUserAdmin(user)">
                                     <i class="bi bi-trash"></i>
@@ -277,10 +280,12 @@
         {
             if (user.Id == null) continue;
             
-                bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
+            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
             bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+            bool isUser = await UserManagerService.IsInRoleAsync(user, "Utilisateur");
             
-            if (isFormateur || isAdmin)
+            // Modification pour inclure tous les utilisateurs avec des rôles
+            if (isFormateur || isAdmin || isUser)
             {
                 users.Add(user);
                 
@@ -308,18 +313,18 @@
         selectedUserId = userId;
     }
 
-// private async Task ViewUserSessions(string userId)
-//  {
-//    selectedUser = users?.FirstOrDefault(u => u.Id == userId);
-//   if (selectedUser != null)
-//  {
-//      using var dbContext = await DbContextFactory.CreateDbContextAsync();
-//       userSessions = await dbContext.Sessions
-//          .Where(s => s.EnrolledUsers.Any(u => u.Id == userId))
-//           .ToListAsync();
-//       showUserSessions = true;
-//   }
-// } 
+private async Task ViewUserSessions(string userId)
+{
+selectedUser = users?.FirstOrDefault(u => u.Id == userId);
+if (selectedUser != null)
+{
+ using var dbContext = await DbContextFactory.CreateDbContextAsync();
+ userSessions = await dbContext.Sessions
+ .Where(s => s.EnrolledUsers.Any(u => u.Id == userId))
+.ToListAsync();
+ showUserSessions = true;
+}
+} 
 
     private void DeleteUserConfirmation(string userId)
     {

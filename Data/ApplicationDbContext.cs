@@ -39,10 +39,7 @@ namespace Mooc.Data
                       
                 entity.Property(e => e.Work)
                       .HasColumnType("int");
-
-                entity.Property(e => e.LimitUser)
-                      .HasColumnType("int");
-                      
+                     
                 entity.Property(e => e.IsActive)
                       .HasColumnType("boolean")
                       .HasDefaultValue(true);

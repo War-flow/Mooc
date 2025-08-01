@@ -1,36 +1,236 @@
 ﻿@page "/Error"
+@page "/Error/{StatusCode:int?}"
 @using System.Diagnostics
+@using System.Net
 
-<PageTitle>Error</PageTitle>
+@inject ILogger<Error> Logger
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">Une erreur s'est produite lors du traitement de votre demande.</h2>
+<PageTitle>@GetPageTitle()</PageTitle>
 
-@if (ShowRequestId)
-{
-    <p>
-        <strong>Request ID:</strong> <code>@RequestId</code>
-    </p>
-}
+<div class="error-container">
+    <div class="error-content">
+        <!-- Icône d'erreur -->
+        <div class="error-icon">
+            <i class="@GetErrorIcon()"></i>
+        </div>
 
-<h3>Development Mode</h3>
-<p>
-    Le passage à l'environnement de <strong>développement</strong> affichera des informations plus détaillées sur l'erreur qui s'est produite.
-</p>
-<p>
-    <strong>L'environnement de développement ne doit pas être activé pour les applications déployées.</strong>
-    Cela peut entraîner l’affichage d’informations sensibles provenant d’exceptions aux utilisateurs finaux.
-    Pour le débogage local, activez le<strong>Développement</strong> environnement en définissant le <strong>ASPNETCORE_ENVIRONMENT</strong> variable d'environnement à <strong>Développement</strong>
-    et redémarrer l'application.
-</p>
+        <!-- Titre principal -->
+        <h1 class="error-title">@GetErrorTitle()</h1>
+        
+        <!-- Message d'erreur personnalisé -->
+        <div class="error-message">
+            <h2>@GetErrorMessage()</h2>
+            
+            @if (!string.IsNullOrEmpty(CustomMessage))
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    @CustomMessage
+                </div>
+            }
+        </div>
+
+        <!-- Détails techniques (uniquement en développement) -->
+        @if (IsDevelopment && ShowRequestId)
+        {
+            <div class="error-details">
+                <details class="mt-3">
+                    <summary class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Détails techniques
+                    </summary>
+                    <div class="mt-2 p-3 bg-light rounded">
+                        <p><strong>Request ID:</strong> <code>@RequestId</code></p>
+                        <p><strong>Timestamp:</strong> @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")</p>
+                        <p><strong>Status Code:</strong> @(StatusCode ?? 500)</p>
+                        @if (!string.IsNullOrEmpty(ExceptionDetails))
+                        {
+                            <p><strong>Exception:</strong></p>
+                            <pre class="bg-danger text-white p-2 rounded">@ExceptionDetails</pre>
+                        }
+                    </div>
+                </details>
+            </div>
+        }
+
+        <!-- Actions utilisateur -->
+        <div class="error-actions mt-4">
+            <button class="btn btn-primary me-2" @onclick="GoHome">
+                <i class="bi bi-house me-1"></i>
+                Retour à l'accueil
+            </button>
+            
+            <button class="btn btn-outline-secondary me-2" @onclick="GoBack">
+                <i class="bi bi-arrow-left me-1"></i>
+                Page précédente
+            </button>
+            
+            <button class="btn btn-outline-info" @onclick="RefreshPage">
+                <i class="bi bi-arrow-clockwise me-1"></i>
+                Actualiser
+            </button>
+        </div>
+
+        <!-- Suggestions d'aide -->
+        <div class="error-help mt-4">
+            <h5>Que puis-je faire ?</h5>
+            <ul class="list-unstyled">
+                @foreach (var suggestion in GetSuggestions())
+                {
+                    <li><i class="bi bi-check-circle text-success me-2"></i>@suggestion</li>
+                }
+            </ul>
+        </div>
+
+        <!-- Informations de contact (optionnel) -->
+        @if (ShowContactInfo)
+        {
+            <div class="error-contact mt-4 p-3 bg-light rounded">
+                <h6>Besoin d'aide ?</h6>
+                <p class="mb-1">
+                    <i class="bi bi-envelope me-2"></i>
+                    Contactez notre support : <a href="mailto:contact@cfa-pcom.fr">contact@cfa-pcom.fr</a>
+                </p>
+            </div>
+        }
+    </div>
+</div>
 
 @code {
-    [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
+    [Parameter] public int? StatusCode { get; set; }
+    [Parameter] public string? CustomMessage { get; set; }
+    [Parameter] public string? ExceptionDetails { get; set; }
+    [Parameter] public bool ShowContactInfo { get; set; } = true;
+
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    private bool IsDevelopment => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
 
-    protected override void OnInitialized() =>
+    protected override void OnInitialized()
+    {
         RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+        
+        // Extraire le code de statut depuis le contexte HTTP si disponible
+        if (StatusCode == null && HttpContext?.Response != null)
+        {
+            StatusCode = HttpContext.Response.StatusCode;
+        }
+
+        // Logger l'erreur
+        LogError();
+    }
+
+    private void LogError()
+    {
+        var errorInfo = new
+        {
+            RequestId,
+            StatusCode = StatusCode ?? 500,
+            Timestamp = DateTime.Now,
+            UserAgent = HttpContext?.Request.Headers.UserAgent.ToString(),
+            Path = HttpContext?.Request.Path.ToString(),
+            CustomMessage
+        };
+
+        Logger.LogError("Page d'erreur affichée: {@ErrorInfo}", errorInfo);
+    }
+
+    private string GetPageTitle()
+    {
+        return StatusCode switch
+        {
+            404 => "Page non trouvée - Erreur 404",
+            403 => "Accès refusé - Erreur 403",
+            401 => "Non autorisé - Erreur 401",
+            500 => "Erreur serveur - Erreur 500",
+            _ => "Une erreur s'est produite"
+        };
+    }
+
+    private string GetErrorIcon()
+    {
+        return StatusCode switch
+        {
+            404 => "bi bi-search text-warning",
+            403 => "bi bi-shield-x text-danger",
+            401 => "bi bi-person-x text-warning",
+            500 => "bi bi-exclamation-triangle text-danger",
+            _ => "bi bi-exclamation-circle text-danger"
+        };
+    }
+
+    private string GetErrorTitle()
+    {
+        return StatusCode switch
+        {
+            404 => "Page non trouvée",
+            403 => "Accès refusé",
+            401 => "Authentification requise",
+            500 => "Erreur serveur",
+            _ => "Une erreur s'est produite"
+        };
+    }
+
+    private string GetErrorMessage()
+    {
+        return StatusCode switch
+        {
+            404 => "La page que vous recherchez n'existe pas ou a été déplacée.",
+            403 => "Vous n'avez pas les permissions nécessaires pour accéder à cette ressource.",
+            401 => "Vous devez vous connecter pour accéder à cette page.",
+            500 => "Une erreur technique s'est produite sur le serveur. Nos équipes ont été notifiées.",
+            _ => "Une erreur inattendue s'est produite lors du traitement de votre demande."
+        };
+    }
+
+    private List<string> GetSuggestions()
+    {
+        return StatusCode switch
+        {
+            404 => [
+                "Vérifiez l'adresse URL saisie",
+                "Utilisez le menu de navigation pour accéder aux pages",
+                "Retournez à la page d'accueil et naviguez depuis là"
+            ],
+            403 => [
+                "Vérifiez que vous êtes connecté avec le bon compte",
+                "Contactez votre administrateur pour obtenir les permissions",
+                "Retournez à votre espace personnel"
+            ],
+            401 => [
+                "Connectez-vous à votre compte",
+                "Vérifiez que votre session n'a pas expiré",
+                "Créez un compte si vous n'en avez pas"
+            ],
+            500 => [
+                "Réessayez dans quelques minutes",
+                "Vérifiez votre connexion internet",
+                "Contactez le support si le problème persiste"
+            ],
+            _ => [
+                "Actualisez la page",
+                "Retournez à la page précédente",
+                "Contactez le support technique"
+            ]
+        };
+    }
+
+    private async Task GoHome()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+
+    private async Task GoBack()
+    {
+        await JSRuntime.InvokeVoidAsync("history.back");
+    }
+
+    private async Task RefreshPage()
+    {
+        await JSRuntime.InvokeVoidAsync("location.reload");
+    }
 }

@@ -15,76 +15,194 @@
 
 @if (session != null)
 {
+    <!-- En-tête moderne avec gradient -->
+    <div class="page-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <h1 class="page-title">
+                        <i class="bi bi-person-plus-fill me-3"></i>
+                        Inscription à la session
+                    </h1>
+                    <p class="page-subtitle">Rejoignez cette formation et développez vos compétences</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="container mt-4">
         <div class="row justify-content-center">
-            <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>Inscription à la session</h3>
-                    </div>
-                    <div class="card-body">
-                        <h4>@session.Title</h4>
-                        <p>@session.Description</p>
-                        
-                        <div class="row mb-3">
-                            <div class="col-md-6">
-                                <strong>Date de début :</strong> @session.StartDate.ToString("dd/MM/yyyy")
+            <div class="col-lg-9 col-xl-8">
+                <!-- Carte principale modernisée -->
+                <div class="course-card shadow-lg">
+                    <!-- En-tête de la carte avec statut -->
+                    <div class="course-header">
+                        <div class="d-flex align-items-center">
+                            <div>
+                                <h2 class="course-title mb-1 mx-2">@session.Title</h2>
+                                <div class="course-status">
+                                    @if (IsSessionAvailable())
+                                    {
+                                        <span class="badge bg-success mx-2">
+                                            <i class="bi bi-check-circle-fill"> Inscription ouverte</i>
+                                        </span>
+                                    }
+                                    else if (DateTime.Now < session.StartDate)
+                                    {
+                                        <span class="badge bg-warning mx-2">
+                                            <i class="bi bi-clock-fill me-1"> Bientôt disponible</i>
+                                        </span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge bg-secondary mx-2">
+                                            <i class="bi bi-x-circle-fill me-1"> Session terminée</i>
+                                        </span>
+                                    }
+                                </div>
                             </div>
-                            <div class="col-md-6">
-                                <strong>Date de fin :</strong> @session.EndDate.ToString("dd/MM/yyyy")
+                        </div>
+                    </div>
+                    
+                    <!-- Contenu de la carte -->
+                    <div class="course-content">
+                        @if (!string.IsNullOrEmpty(session.Description))
+                        {
+                            <div class="course-description mb-4 mx-2">
+                                <p class="lead">@session.Description</p>
+                            </div>
+                        }
+                        
+                        <!-- Métadonnées de la session -->
+                        <div class="course-meta mb-4">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-calendar-check text-primary me-2"></i>
+                                        <div>
+                                            <small class="text-muted">Date de début</small>
+                                            <div class="fw-semibold">@session.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-calendar-x text-danger me-2"></i>
+                                        <div>
+                                            <small class="text-muted">Date de fin</small>
+                                            <div class="fw-semibold">@session.EndDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @if (session.Courses?.Count > 0)
+                                {
+                                    <div class="col-md-6">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-book text-info me-2"></i>
+                                            <div>
+                                                <small class="text-muted">Nombre de cours</small>
+                                                <div class="fw-semibold">@session.Courses.Count module@(session.Courses.Count > 1 ? "s" : "")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                         
+                        <!-- Messages d'état avec animations -->
                         @if (!IsSessionAvailable())
                         {
-                            <div class="alert alert-warning">
-                                @if (DateTime.Now < session.StartDate)
-                                {
-                                    <span>Cette session n'est pas encore ouverte aux inscriptions. Elle commencera le @session.StartDate.ToString("dd/MM/yyyy").</span>
-                                }
-                                else if (DateTime.Now > session.EndDate)
-                                {
-                                    <span>Cette session est terminée depuis le @session.EndDate.ToString("dd/MM/yyyy").</span>
-                                }
+                            <div class="alert alert-warning alert-modern fade show">
+                                <div class="d-flex align-items-center">
+                                    @if (DateTime.Now < session.StartDate)
+                                    {
+                                        <i class="bi bi-clock-history fs-4 me-3 text-warning"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Session pas encore ouverte</h6>
+                                            <p class="mb-0">Les inscriptions ouvriront le <strong>@session.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>.</p>
+                                        </div>
+                                    }
+                                    else if (DateTime.Now > session.EndDate)
+                                    {
+                                        <i class="bi bi-calendar-x fs-4 me-3 text-warning"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Session terminée</h6>
+                                            <p class="mb-0">Cette session s'est terminée le <strong>@session.EndDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>.</p>
+                                        </div>
+                                    }
+                                </div>
                             </div>
                         }
                         else if (isAlreadyEnrolled)
                         {
-                            <div class="alert alert-info">
-                                <i class="fas fa-check-circle"></i> Vous êtes déjà inscrit à cette session.
+                            <div class="alert alert-success alert-modern fade show">
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-check-circle-fill fs-4 me-3 text-success"></i>
+                                    <div class="flex-grow-1">
+                                        <h6 class="alert-heading mb-1">Inscription confirmée !</h6>
+                                        <p class="mb-0">Vous êtes déjà inscrit à cette session. Accédez à vos formations depuis votre tableau de bord.</p>
+                                    </div>
+                                </div>
                             </div>
-                            <a href="/mes-sessions" class="btn btn-primary m-lg-2">Voir mes sessions</a>
-                        }
-                        else if (isSessionFull)
-                        {
-                            <div class="alert alert-warning">
-                                <i class="fas fa-users"></i> Cette session a atteint sa limite de @session.LimitUser participants.
-                            </div>
-                            <a href="/" class="btn btn-secondary m-2">Retour à l'accueil</a>
                         }
                         else
                         {
                             @if (showError)
                             {
-                                <div class="alert alert-danger">
-                                    @errorMessage
+                                <div class="alert alert-danger alert-modern fade show">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-danger"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Erreur d'inscription</h6>
+                                            <p class="mb-0">@errorMessage</p>
+                                        </div>
+                                    </div>
                                 </div>
                             }
-                            
-                            <div class="alert alert-info">
-                                <strong>Confirmez-vous votre inscription à cette session ?</strong>
-                                <br><small class="text-muted">Places disponibles : @GetAvailablePlaces() sur @session.LimitUser</small>
+                        }
+                    </div>
+                    
+                    <!-- Actions -->
+                    <div class="course-actions">
+                        @if (isAlreadyEnrolled)
+                        {
+                            <div class="btn-group w-100" role="group">
+                                <a href="/mes-sessions" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-arrow-right-circle me-2"></i>
+                                    Accéder à mes sessions
+                                </a>
+                                <a href="/" class="btn btn-outline-secondary">
+                                    <i class="bi bi-house"></i>
+                                </a>
                             </div>
-                            
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-success m-2" @onclick="EnrollToSession" disabled="@isProcessing">
+                        }
+                        else if (IsSessionAvailable())
+                        {
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-success btn-lg" @onclick="EnrollToSession" disabled="@isProcessing">
                                     @if (isProcessing)
                                     {
                                         <span class="spinner-border spinner-border-sm me-2"></span>
+                                        <span>Inscription en cours...</span>
                                     }
-                                    Confirmer l'inscription
+                                    else
+                                    {
+                                        <i class="bi bi-person-plus-fill me-2"></i>
+                                        <span>Confirmer l'inscription</span>
+                                    }
                                 </button>
-                                <a href="/" class="btn btn-secondary m-2">Annuler</a>
+                                <a href="/" class="btn btn-outline-secondary fs-4" title="Retour à l'accueil">
+                                    <i class="bi bi-arrow-left"></i>
+                                </a>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="btn-group w-100" role="group">
+                                <a href="/" class="btn btn-primary btn-lg">
+                                    <i class="bi bi-arrow-left me-2"></i>
+                                    Retour à l'accueil
+                                </a>
                             </div>
                         }
                     </div>
@@ -95,16 +213,27 @@
 }
 else if (isLoading)
 {
-    <div class="d-flex justify-content-center mt-5">
-        <div class="spinner-border" role="status">
+    <div class="loading-state">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
             <span class="visually-hidden">Chargement...</span>
         </div>
+        <p class="mt-3">Chargement des informations de la session...</p>
     </div>
 }
 else
 {
-    <div class="alert alert-danger">
-        Session non trouvée.
+    <div class="empty-state">
+        <div class="empty-state-icon">
+            <i class="bi bi-exclamation-triangle"></i>
+        </div>
+        <h3 class="empty-state-title">Session introuvable</h3>
+        <p class="empty-state-text">
+            La session demandée n'existe pas ou n'est plus disponible.
+        </p>
+        <a href="/" class="btn btn-primary btn-lg">
+            <i class="bi bi-house me-2"></i>
+            Retour à l'accueil
+        </a>
     </div>
 }
 
@@ -129,7 +258,6 @@ else
             await using var context = await DbContextFactory.CreateDbContextAsync();
             await LoadSession(context);
             await CheckEnrollmentStatus(context);
-            await CheckSessionLimit(context);
             await LoadEnrolledCount(context);
         }
         catch (Exception ex)
@@ -181,29 +309,6 @@ else
         return now >= session.StartDate && now <= session.EndDate;
     }
 
-    private async Task<bool> IsLimite(ApplicationDbContext context)
-    {
-        if (session == null) return false;
-
-        // Compter le nombre d'utilisateurs actuellement inscrits à la session
-        var currentEnrolledCount = await context.Sessions
-            .Where(s => s.Id == SessionId)
-            .SelectMany(s => s.EnrolledUsers)
-            .CountAsync();
-
-        // Vérifier si la limite n'est pas atteinte
-        return currentEnrolledCount < session.LimitUser;
-    }
-
-    private bool isSessionFull = false;
-
-    private async Task CheckSessionLimit(ApplicationDbContext context)
-    {
-        if (session == null) return;
-        
-        isSessionFull = !await IsLimite(context);
-    }
-
     private async Task EnrollToSession()
     {
         if (session == null || string.IsNullOrEmpty(currentUserId) || !IsSessionAvailable() || isProcessing)
@@ -215,14 +320,6 @@ else
         try
         {
             await using var context = await DbContextFactory.CreateDbContextAsync();
-
-            // Vérifier la limite d'inscription
-            if (isSessionFull)
-            {
-                showError = true;
-                errorMessage = "Cette session est complète.";
-                return;
-            }
 
             var user = await context.Users
                 .Include(u => u.EnrolledSessions)
@@ -265,11 +362,5 @@ else
             .Where(s => s.Id == SessionId)
             .SelectMany(s => s.EnrolledUsers)
             .CountAsync();
-    }
-
-    private int GetAvailablePlaces()
-    {
-        if (session == null) return 0;
-        return Math.Max(0, session.LimitUser - currentEnrolledCount);
     }
 }

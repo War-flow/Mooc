@@ -164,6 +164,9 @@ namespace Mooc
             // Ajout des services SignalR
             builder.Services.AddSignalR();
 
+            // Ajout du service d'erreurs
+            builder.Services.AddScoped<IErrorHandlingService, ErrorHandlingService>();
+
             var app = builder.Build();
 
             // Configuration du pipeline de requêtes HTTP

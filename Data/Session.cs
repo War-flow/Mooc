@@ -12,7 +12,6 @@ namespace Mooc.Data
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
         public int Work { get; set; }
-        public int LimitUser { get; set; }
         public bool IsActive { get; set; } = true;
         
         // Propriété pour le créateur de la session

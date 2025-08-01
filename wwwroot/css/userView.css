@@ -45,7 +45,7 @@
 
 /* Carte d'utilisateur */
 .user-card {
-    background: white;
+    background: #eeeeee;
     border-radius: 15px;
     overflow: hidden;
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
@@ -123,7 +123,7 @@
 /* Actions utilisateur */
 .user-actions {
     padding: 1rem 1.5rem;
-    background: #f8f9fa;
+    background: #eeeeee;
     border-top: 1px solid rgba(0, 0, 0, 0.05);
 }
 

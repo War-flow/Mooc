@@ -378,3 +378,93 @@
         transform: translateY(0);
     }
 }
+/* Styles supplémentaires pour la page Inscription */
+
+/* Alertes modernes avec animations */
+.alert-modern {
+    border: none;
+    border-radius: 12px;
+    padding: 1.25rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+    .alert-modern .alert-heading {
+        font-weight: 600;
+        color: inherit;
+    }
+
+.lead {
+    text-align: justify;
+}
+
+/* Badges de statut */
+.badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+/* Amélioration des boutons */
+.btn-lg {
+    padding: 0.875rem 1.5rem;
+    font-size: 1.1rem;
+    border-radius: 8px;
+    font-weight: 500;
+}
+
+.btn-group .btn:first-child {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.btn-group .btn:last-child {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+}
+
+/* Métadonnées de session */
+.course-meta .text-muted {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
+
+.course-meta .fw-semibold {
+    font-size: 0.95rem;
+    color: #2d3748;
+}
+
+/* Amélioration du responsive */
+@media (max-width: 768px) {
+    .page-header {
+        padding: 2rem 0;
+    }
+
+    .page-title {
+        font-size: 2rem;
+    }
+
+    .course-meta .row {
+        --bs-gutter-x: 1rem;
+    }
+
+    .course-meta .col-md-6 {
+        margin-bottom: 1rem;
+    }
+
+    .btn-group {
+        flex-direction: column;
+    }
+
+        .btn-group .btn {
+            border-radius: 8px !important;
+            margin-bottom: 0.5rem;
+        }
+
+            .btn-group .btn:last-child {
+                margin-bottom: 0;
+            }
+
+}

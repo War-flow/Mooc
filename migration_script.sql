@@ -199,7 +199,6 @@ BEGIN
         [StartDate] date NOT NULL,
         [EndDate] date NOT NULL,
         [Work] int NOT NULL,
-        [LimitUser] int NOT NULL,
         [IsActive] boolean NOT NULL,
         [UserId] nvarchar(450) NULL,
         CONSTRAINT [PK_Session] PRIMARY KEY ([Id]),
