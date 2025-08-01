@@ -548,3 +548,19 @@ h1:focus {
             width: 100%;
         }
 }
+/* Styles pour ErrorBoundary */
+.error-boundary-container {
+    margin: 2rem;
+    max-width: 800px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+    .error-boundary-container .alert {
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .error-boundary-container .alert-heading {
+        font-weight: 600;
+    }

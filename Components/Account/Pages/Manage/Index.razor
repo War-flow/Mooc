@@ -70,6 +70,12 @@
             }
             needRefresh = true;
         }
+        
+        if (Input.PhoneNumber != null && !new PhoneAttribute().IsValid(Input.PhoneNumber))
+        {
+            RedirectManager.RedirectToCurrentPageWithStatus("Erreur : numéro de téléphone invalide.", HttpContext);
+            return;
+        }
 
         if (Input.FirstName != user.FirstName || Input.LastName != user.LastName)
         {
@@ -83,7 +89,7 @@
             }
             needRefresh = true;
         }
-
+        
         if (needRefresh)
         {
             await SignInManager.RefreshSignInAsync(user);

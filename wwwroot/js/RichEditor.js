@@ -14,7 +14,7 @@ function throttle(func, limit) {
         }
     }
 }
-
+// Fonction d'initialisation de l'éditeur
 export function initializeEditor(editorId, dotNetRef, options) {
     const element = document.getElementById(editorId);
     if (!element) {
@@ -58,7 +58,7 @@ export function initializeEditor(editorId, dotNetRef, options) {
             element.focus();
         }
     });
-
+    // Assurer que le focus est sur l'éditeur au chargement
     if (options.enableStickyToolbar !== false) {
         initializeStickyToolbar(editorId);
     }
@@ -66,11 +66,13 @@ export function initializeEditor(editorId, dotNetRef, options) {
     console.log(`Éditeur ${editorId} initialisé avec succès`);
 }
 
+// Fonction pour créer les gestionnaires d'événements
 function createEventHandlers(element, options, dotNetRef) {
     const hasRichContent = (content) =>
         /<(?:img|video|iframe|audio|b|i|u|a|ul|ol|strong|em)\b/.test(content) ||
         content.includes('data-video-element');
 
+    // Vérifie si le contenu contient des éléments riches
     const handleInput = () => {
         let content = element.innerHTML;
         const textLength = element.textContent.length;
@@ -82,14 +84,15 @@ function createEventHandlers(element, options, dotNetRef) {
             content = element.innerHTML;
         }
 
+        // Supprimer les espaces superflus
         const hasRealContent = content.trim() &&
             textLength > 0 || isRich;
 
-        if (textLength > options.maxLength && !isRich) {
-            element.textContent = element.textContent.substring(0, options.maxLength);
-            return;
+        // Si le contenu est vide ou ne contient que des espaces, remettre le placeholder
+        if (!hasRealContent) {
+            setPlaceholder(element, options.placeholder);
         }
-
+        // Appeler la méthode .NET avec le contenu et la longueur du texte
         dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength);
     };
 
@@ -140,10 +143,12 @@ function createEventHandlers(element, options, dotNetRef) {
     };
 }
 
+// Fonction pour définir le placeholder
 function setPlaceholder(element, placeholder) {
     element.innerHTML = `<div class="placeholder-text" style="color: #6c757d; font-style: italic; pointer-events: none;">${placeholder}</div>`;
 }
 
+// Fonction pour supprimer le placeholder
 function clearPlaceholder(element) {
     const placeholderEl = element.querySelector('.placeholder-text');
     if (placeholderEl) {
@@ -169,7 +174,7 @@ const VIDEO_PLATFORMS = {
         idRegex: /^.+dailymotion.com\/(video|hub)\/([^_]+)[^#]*(#video=([^_&]+))?/
     }
 };
-
+// Types MIME pour les vidéos et audios
 const MIME_TYPES = {
     video: { mp4: 'video/mp4', webm: 'video/webm', ogg: 'video/ogg', mov: 'video/quicktime', avi: 'video/x-msvideo', mkv: 'video/x-matroska' },
     audio: { mp3: 'audio/mpeg', ogg: 'audio/ogg', wav: 'audio/wav', m4a: 'audio/mp4' }
@@ -180,10 +185,12 @@ export function executeCommand(editorId, command) {
     executeEditorCommand(editorId, command);
 }
 
+// Exécute une commande avec une valeur optionnelle
 export function executeCommandWithValue(editorId, command, value) {
     executeEditorCommand(editorId, command, value);
 }
 
+// Exécute une commande de l'éditeur avec un ID spécifique
 function executeEditorCommand(editorId, command, value = null) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
@@ -191,13 +198,14 @@ function executeEditorCommand(editorId, command, value = null) {
         if (editor.element.querySelector('.placeholder-text')) {
             clearPlaceholder(editor.element);
         }
-
+        // Exécuter la commande
         editor.element.focus();
         document.execCommand(command, false, value);
         editor.element.dispatchEvent(new Event('input', { bubbles: true }));
     }
 }
 
+// Insertion d'image optimisée
 export function insertLink(editorId) {
     const url = prompt('Entrez l\'URL du lien:');
     if (url) executeEditorCommand(editorId, 'createLink', url);
@@ -208,7 +216,7 @@ export function insertVideo(editorId) {
     const url = prompt("URL de la vidéo (YouTube, Vimeo, ou lien direct mp4/webm) :");
     if (url) insertMediaElement(editorId, url, 'video');
 }
-
+// Insertion d'audio optimisée
 function insertMediaElement(editorId, url, type) {
     const editor = window.richTextEditors[editorId];
     if (!editor) return;
@@ -221,7 +229,7 @@ function insertMediaElement(editorId, url, type) {
         console.error(`Erreur insertion ${type}:`, error);
     }
 }
-
+// Création d'un élément vidéo optimisé
 function createVideoElement(url) {
     const urlObj = new URL(url);
 
@@ -242,6 +250,7 @@ function createVideoElement(url) {
     throw new Error("Format non supporté");
 }
 
+// Création d'un élément audio optimisé
 function createEmbed(src, platform) {
     const iframe = Object.assign(document.createElement('iframe'), {
         src, frameBorder: '0', allowFullscreen: true
@@ -249,6 +258,7 @@ function createEmbed(src, platform) {
     return wrapMedia(iframe, platform);
 }
 
+// Création d'une vidéo directe optimisée
 function createDirectVideo(url) {
     const video = Object.assign(document.createElement('video'), {
         controls: true, preload: 'metadata'
@@ -260,6 +270,7 @@ function createDirectVideo(url) {
     return wrapMedia(video, 'direct');
 }
 
+// Création d'un élément audio optimisé
 function wrapMedia(element, platform) {
     const container = document.createElement('div');
     container.className = `video-container video-${platform}`;
@@ -285,6 +296,7 @@ function wrapMedia(element, platform) {
     return container;
 }
 
+// Fonction pour obtenir le type MIME basé sur l'URL
 function getMimeType(url, type) {
     const ext = url.split('.').pop().toLowerCase().split('?')[0];
     return MIME_TYPES[type]?.[ext] || (type === 'video' ? 'video/mp4' : 'audio/mpeg');
@@ -295,14 +307,17 @@ export function insertVideoFromUrl(editorId, videoUrl) {
     insertMediaFromUrl(editorId, videoUrl, 'video');
 }
 
+// Fonction pour insérer un audio à partir d'une URL
 export function insertAudioFromUrl(editorId, audioUrl) {
     insertMediaFromUrl(editorId, audioUrl, 'audio');
 }
 
+// Fonction pour insérer une image à partir d'une URL
 export function insertImageFromUrl(editorId, imageUrl) {
     insertMediaFromUrl(editorId, imageUrl, 'image');
 }
 
+// Fonction pour insérer un média à partir d'une URL
 function insertMediaFromUrl(editorId, url, type) {
     const editor = window.richTextEditors[editorId];
     if (!editor) return;
@@ -311,6 +326,7 @@ function insertMediaFromUrl(editorId, url, type) {
     insertIntoEditor(editor, element);
 }
 
+// Fonction pour créer un élément média basé sur le type
 function createMediaElement(url, type) {
     switch (type) {
         case 'video': return createDirectVideo(url);
@@ -320,6 +336,7 @@ function createMediaElement(url, type) {
     }
 }
 
+// Fonction pour créer un élément audio
 function createAudioElement(url) {
     return Object.assign(document.createElement('audio'), {
         controls: true, src: url,
@@ -327,6 +344,7 @@ function createAudioElement(url) {
     });
 }
 
+// Fonction pour créer un élément image
 function createImageElement(url) {
     return Object.assign(document.createElement('img'), {
         src: url, alt: 'Image insérée', loading: 'lazy',
@@ -334,6 +352,7 @@ function createImageElement(url) {
     });
 }
 
+// Fonction pour insérer un élément dans l'éditeur
 function insertIntoEditor(editor, element) {
     // Supprimer le placeholder
     if (editor.element.querySelector('.placeholder-text')) {
@@ -369,7 +388,7 @@ export function setContent(editorId, content) {
         enhanceDisplay();
     }
 }
-
+// Fonction pour obtenir le contenu de l'éditeur
 export function getContent(editorId) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
@@ -382,6 +401,7 @@ export function getContent(editorId) {
     return '';
 }
 
+// Fonction pour détruire l'éditeur
 export function destroyEditor(editorId) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
@@ -415,6 +435,7 @@ function enhanceDisplay() {
     });
 }
 
+// Fonction pour configurer les gestionnaires d'événements pour les médias
 function setupMediaHandlers(element) {
     if (element.tagName === 'IMG') {
         element.addEventListener('load', () => element.classList.add('loaded'));
@@ -468,10 +489,12 @@ export function insertFileFromUrl(editorId, fileUrl, fileName) {
     }
 }
 
+// Fonction pour déclencher le clic sur un input de fichier
 export function triggerFileInputClick(selector) {
     document.querySelector(selector)?.click();
 }
 
+// Fonction pour initialiser les toolbars collantes
 export function reinitializeStickyToolbars() {
     stickyToolbars.forEach((data, editorId) => {
         window.removeEventListener('scroll', data.scrollListener);
@@ -596,6 +619,7 @@ function setupTableEditHandlers(table) {
     });
 }
 
+// Fonction pour afficher le menu contextuel du tableau
 function showTableContextMenu(e, table) {
     // Retirer les anciens menus
     document.querySelectorAll('.table-context-menu').forEach(menu => menu.remove());
@@ -665,6 +689,7 @@ function addTableRow(table) {
     tbody.appendChild(newRow);
 }
 
+// Fonction pour ajouter une colonne au tableau
 function addTableColumn(table) {
     const rows = table.querySelectorAll('tr');
 
@@ -679,6 +704,7 @@ function addTableColumn(table) {
     });
 }
 
+// Fonctions pour supprimer des lignes, colonnes ou le tableau entier
 function deleteTableRow(table, targetCell) {
     const row = targetCell.closest('tr');
     const tbody = table.querySelector('tbody');
@@ -690,6 +716,7 @@ function deleteTableRow(table, targetCell) {
     }
 }
 
+// Fonction pour supprimer une colonne du tableau
 function deleteTableColumn(table, targetCell) {
     const cellIndex = Array.from(targetCell.parentElement.children).indexOf(targetCell);
     const rows = table.querySelectorAll('tr');
@@ -705,6 +732,7 @@ function deleteTableColumn(table, targetCell) {
     }
 }
 
+// Fonction pour supprimer le tableau entier
 function deleteTable(table) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce tableau ?')) {
         table.remove();

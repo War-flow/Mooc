@@ -75,14 +75,17 @@
         Input.NewEmail ??= email;
     }
 
+    // Étape 2: Vérifier si l'utilisateur a un mot de passe
     private async Task OnValidSubmitAsync()
     {
+
         if (Input.NewEmail is null || Input.NewEmail == email)
         {
-            message = "Your email is unchanged.";
+            message = "Votre email est inchangé.";
             return;
         }
 
+        // Étape 3: Vérifier si l'email est déjà utilisé
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateChangeEmailTokenAsync(user, Input.NewEmail);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
@@ -95,6 +98,7 @@
         message = "Confirmation link to change email sent. Please check your email.";
     }
 
+    // Étape 4: Envoyer un e-mail de vérification
     private async Task OnSendEmailVerificationAsync()
     {
         if (email is null)
@@ -114,6 +118,7 @@
         message = "Verification email sent. Please check your email.";
     }
 
+    // Étape 5: Modèle d'entrée pour le changement d'e-mail
     private sealed class InputModel
     {
         [Required]

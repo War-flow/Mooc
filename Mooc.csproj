@@ -24,6 +24,9 @@
 
   <ItemGroup>
     <Folder Include="Data\Migrations\" />
+    <Folder Include="wwwroot\uploads\audio\" />
+    <Folder Include="wwwroot\uploads\files\" />
+    <Folder Include="wwwroot\uploads\images\" />
   </ItemGroup>
 
 </Project>

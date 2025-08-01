@@ -1,0 +1,66 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+@using Mooc.Services
+@inherits ErrorBoundary
+@inject IErrorHandlingService ErrorHandlingService
+@inject ILogger<GlobalErrorBoundary> Logger
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="error-boundary-container">
+        <div class="alert alert-danger" role="alert">
+            <h4 class="alert-heading">
+                <i class="bi bi-exclamation-triangle me-2"></i>
+                Une erreur inattendue s'est produite
+            </h4>
+            <p>L'application a rencontré une erreur technique. Nos équipes ont été automatiquement notifiées.</p>
+            <hr>
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="NavigateToErrorPage">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Voir les détails
+                </button>
+                <button class="btn btn-outline-secondary" @onclick="Recover">
+                    <i class="bi bi-arrow-clockwise me-1"></i>
+                    Réessayer
+                </button>
+                <button class="btn btn-outline-primary" @onclick="GoHome">
+                    <i class="bi bi-house me-1"></i>
+                    Retour à l'accueil
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        // Log l'erreur
+        Logger.LogError(exception, "Erreur capturée par ErrorBoundary global: {Message}", exception.Message);
+        
+        return Task.CompletedTask;
+    }
+
+    private void NavigateToErrorPage()
+    {
+        // Utilise votre service existant pour naviguer vers la page d'erreur
+        ErrorHandlingService.NavigateToError(CurrentException!, "Erreur capturée par le système de gestion d'erreurs");
+    }
+
+    private void Recover()
+    {
+        // Réinitialise l'ErrorBoundary pour réessayer
+        Recover();
+    }
+
+    private void GoHome()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+}

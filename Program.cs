@@ -173,21 +173,18 @@ namespace Mooc
             if (app.Environment.IsDevelopment())
             {
                 app.UseMigrationsEndPoint();
-
-                // Configuration spécifique aux WebSockets pour le développement
+                // Ajouter la gestion d'erreurs même en développement pour les erreurs serveur
+                app.UseExceptionHandler("/Error", createScopeForErrors: true);
+                
                 app.UseWebSockets(new WebSocketOptions
                 {
                     KeepAliveInterval = TimeSpan.FromMinutes(2),
-                    // Dans .NET 9, ReceiveBufferSize est obsolète et a été supprimé
                 });
-
             }
             else
             {
                 app.UseExceptionHandler("/Error", createScopeForErrors: true);
                 app.UseHsts();
-
-                // Configuration plus simple pour la production
                 app.UseWebSockets();
             }
 
