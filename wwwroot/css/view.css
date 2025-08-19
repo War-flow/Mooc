@@ -359,50 +359,247 @@
     }
 }
 
-/* Responsive */
+/* Styles pour la page Access Denied */
+.access-denied-card {
+    background: #ffffff;
+    border-radius: 20px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    width: 100%;
+    max-width: 500px;
+    padding: 50px 40px;
+    position: relative;
+    text-align: center;
+    animation: slideInUp 0.6s ease-out;
+}
+
+.access-denied-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, #e53e3e, #c53030);
+}
+
+.access-denied-icon {
+    margin-bottom: 30px;
+    animation: shake 0.8s ease-in-out;
+}
+
+.access-denied-content {
+    margin-bottom: 40px;
+}
+
+.access-denied-title {
+    color: #2d3748;
+    font-weight: 700;
+    margin-bottom: 20px;
+    font-size: 2rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.access-denied-message {
+    color: #4a5568;
+    font-size: 1.1rem;
+    font-weight: 500;
+    margin-bottom: 15px;
+    line-height: 1.6;
+}
+
+.access-denied-submessage {
+    color: #718096;
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 0;
+}
+
+.access-denied-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    align-items: center;
+}
+
+.access-denied-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-weight: 600;
+    padding: 15px 30px;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 200px;
+}
+
+.access-denied-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    color: white;
+    text-decoration: none;
+}
+
+.access-denied-btn-secondary {
+    background: transparent;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    color: #4a5568;
+    font-weight: 500;
+    padding: 12px 25px;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 200px;
+}
+
+.access-denied-btn-secondary:hover {
+    border-color: #667eea;
+    color: #667eea;
+    background-color: rgba(102, 126, 234, 0.05);
+    transform: translateY(-1px);
+}
+
+/* Animation shake pour l'icône */
+@keyframes shake {
+    0%, 20%, 40%, 60%, 80%, 100% {
+        transform: translateX(0);
+    }
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-5px);
+    }
+}
+
+/* Responsive pour Access Denied */
 @media (max-width: 768px) {
-    .auth-container {
-        padding: 15px;
-    }
-    
-    .auth-card {
-        padding: 30px 25px;
+    .access-denied-card {
+        padding: 40px 30px;
         max-width: 100%;
+        margin: 20px;
     }
     
-    .auth-title {
-        font-size: 1.5rem;
+    .access-denied-title {
+        font-size: 1.75rem;
+    }
+    
+    .access-denied-message {
+        font-size: 1rem;
+    }
+    
+    .access-denied-actions {
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .access-denied-btn-primary,
+    .access-denied-btn-secondary {
+        min-width: 100%;
     }
 }
 
 @media (max-width: 480px) {
-    .auth-card {
-        padding: 25px 20px;
+    .access-denied-card {
+        padding: 30px 25px;
     }
     
-    .form-control {
-        padding: 14px 16px;
+    .access-denied-title {
+        font-size: 1.5rem;
     }
     
-    .btn-auth {
-        padding: 12px;
-        font-size: 1rem;
+    .access-denied-icon svg {
+        width: 60px;
+        height: 60px;
+    }
+    
+    .access-denied-btn-primary,
+    .access-denied-btn-secondary {
+        padding: 12px 20px;
+        font-size: 0.9rem;
     }
 }
 
-/* Supprimer les anciens styles */
-.register-body,
-.login-body {
-    margin: 0;
+/* Page de certification */
+.certification-row {
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
 }
 
-.register-contenant,
-.login-contenant {
-    background: none;
-    border-radius: 0;
-    box-shadow: none;
-    height: auto;
-    padding: 0;
+    .certification-row:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+        border-left-color: #0d6efd;
+        transform: translateX(2px);
+    }
+
+.certification-icon {
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(13, 110, 253, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
 }
 
-/* Préserver les autres styles existants pour les cartes MOOC et tableaux */
+.certification-row:hover .certification-icon {
+    background-color: rgba(13, 110, 253, 0.2);
+    transform: scale(1.05);
+}
+
+.btn {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+}
+
+    .btn:hover {
+        transform: translateY(-1px);
+    }
+
+.table thead th {
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge {
+    font-weight: 600;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.card {
+    border-radius: 15px;
+    overflow: hidden;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+@media (max-width: 768px) {
+    .certification-icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .btn {
+        padding: 0.375rem 0.5rem;
+    }
+
+    h1.h2 {
+        font-size: 1.5rem;
+    }
+}

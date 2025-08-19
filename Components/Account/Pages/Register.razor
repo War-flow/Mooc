@@ -55,7 +55,17 @@
                 <ValidationMessage For="() => Input.ConfirmPassword" class="text-danger" />
             </div>
             
-            <button type="submit" class="w-100 btn btn-auth">Créer le compte</button>
+            <button type="submit" class="w-100 btn btn-auth" disabled="@isProcessing">
+                @if (isProcessing)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <text> Traitement...</text>
+                }
+                else
+                {
+                    <text>Créer le compte</text>
+                }
+            </button>
             
             <div class="auth-links">
                 <a href="/Account/Login" class="auth-link">Déjà un compte ? Se connecter</a>
@@ -68,6 +78,7 @@
     private IEnumerable<IdentityError>? identityErrors;
     private bool showPassword = false;
     private bool showConfirmPassword = false;
+    private bool isProcessing = false;
 
     [SupplyParameterFromForm]
     private InputModel Input { get; set; } = new();
@@ -79,52 +90,78 @@
 
     public async Task RegisterUser(EditContext editContext)
     {
-        var user = CreateUser();
-
-        await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
-        var emailStore = GetEmailStore();
-        await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
-
-        // Ajout des propriétés nom et prénom
-        user.FirstName = Input.FirstName;
-        user.LastName = Input.LastName;
-
-        var result = await UserManager.CreateAsync(user, Input.Password);
-
-        if (!result.Succeeded)
+        isProcessing = true;
+        try
         {
-            identityErrors = result.Errors;
-            return;
-        }
+            var user = CreateUser();
 
-        // Assigner automatiquement le rôle "Utilisateur" au nouvel utilisateur
-        var roleResult = await UserManager.AddToRoleAsync(user, "Utilisateur");
-        if (!roleResult.Succeeded)
+            await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
+            var emailStore = GetEmailStore();
+            await emailStore.SetEmailAsync(user, Input.Email, CancellationToken.None);
+
+            // Ajout des propriétés nom et prénom
+            user.FirstName = Input.FirstName;
+            user.LastName = Input.LastName;
+
+            var result = await UserManager.CreateAsync(user, Input.Password);
+
+            if (!result.Succeeded)
+            {
+                identityErrors = result.Errors;
+                return;
+            }
+
+            // Assigner automatiquement le rôle "Utilisateur" au nouvel utilisateur
+            var roleResult = await UserManager.AddToRoleAsync(user, "Utilisateur");
+            if (!roleResult.Succeeded)
+            {
+                Logger.LogWarning("Impossible d'assigner le rôle 'Utilisateur' à l'utilisateur {Email}: {Errors}", 
+                    Input.Email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+            }
+
+            Logger.LogInformation("Inscription réussie pour {Email}", Input.Email);
+
+            // Envoi de l'email de confirmation
+            try
+            {
+                var userId = await UserManager.GetUserIdAsync(user);
+                var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
+                code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
+                var callbackUrl = NavigationManager.GetUriWithQueryParameters(
+                    NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+                    new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+
+                await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+                Logger.LogInformation("Email de confirmation envoyé à {Email}", Input.Email);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Erreur lors de l'envoi de l'email de confirmation à {Email}", Input.Email);
+                // Continuer même si l'email échoue
+            }
+
+            // Gérer la redirection selon les options
+            if (UserManager.Options.SignIn.RequireConfirmedAccount)
+            {
+                RedirectManager.RedirectTo(
+                    "Account/RegisterConfirmation",
+                    new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+            }
+            else
+            {
+                await SignInManager.SignInAsync(user, isPersistent: false);
+                RedirectManager.RedirectTo(ReturnUrl);
+            }
+        }
+        catch (Exception ex)
         {
-            Logger.LogWarning("Impossible d'assigner le rôle 'Utilisateur' à l'utilisateur {Email}: {Errors}", 
-                Input.Email, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+            Logger.LogError(ex, "Erreur lors de l'inscription pour {Email}", Input.Email);
+            identityErrors = new[] { new IdentityError { Description = "Une erreur s'est produite lors de l'inscription. Veuillez réessayer." } };
         }
-
-        Logger.LogInformation("Inscription réussie");
-
-        var userId = await UserManager.GetUserIdAsync(user);
-        var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-        code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-            new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
-
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
-
-        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        finally
         {
-            RedirectManager.RedirectTo(
-                "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+            isProcessing = false;
         }
-
-        await SignInManager.SignInAsync(user, isPersistent: false);
-        RedirectManager.RedirectTo(ReturnUrl);
     }
 
     private ApplicationUser CreateUser()

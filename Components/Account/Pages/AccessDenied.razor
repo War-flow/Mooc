@@ -2,7 +2,39 @@
 
 <PageTitle>Accès refusé</PageTitle>
 
-<header>
-    <h1 class="text-danger">Accès refusé</h1>
-    <p class="text-danger">Vous n'avez pas accès à cette ressource.</p>
-</header>
+<div class="auth-container">
+    <div class="access-denied-card">
+        <div class="access-denied-icon">
+            <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="12" cy="12" r="10" stroke="#e53e3e" stroke-width="2" />
+                <path d="M15 9l-6 6M9 9l6 6" stroke="#e53e3e" stroke-width="2" stroke-linecap="round" />
+            </svg>
+        </div>
+
+        <div class="access-denied-content">
+            <h1 class="access-denied-title">Accès refusé</h1>
+            <p class="access-denied-message">
+                Désolé, vous n'avez pas les permissions nécessaires pour accéder à cette ressource.
+            </p>
+            <p class="access-denied-submessage">
+                Veuillez contacter votre administrateur si vous pensez qu'il s'agit d'une erreur.
+            </p>
+        </div>
+
+        <div class="access-denied-actions">
+            <a href="/" class="btn btn-auth access-denied-btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <polyline points="9,22 9,12 15,12 15,22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                Retour à l'accueil
+            </a>
+            <button onclick="history.back()" class="btn access-denied-btn-secondary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="margin-right: 8px;">
+                    <polyline points="15,18 9,12 15,6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                Page précédente
+            </button>
+        </div>
+    </div>
+</div>

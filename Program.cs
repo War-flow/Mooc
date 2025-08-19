@@ -71,14 +71,10 @@ namespace Mooc
                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
                 options.User.RequireUniqueEmail = true;
 
-                // Ne pas inclure les configurations Cookies ici
-
-                // Ajouter la configuration pour la confirmation d'email
+                // Configuration pour requérir la confirmation d'email
                 options.SignIn.RequireConfirmedEmail = true;
 
-                // Configuration des tokens
-                options.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
-                options.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider;
+                // Ne pas inclure les configurations Cookies ici
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
@@ -121,35 +117,38 @@ namespace Mooc
             builder.Services.AddMemoryCache();
 
             // Configuration des services additionnels
+            builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(EmailSettings.SectionName));
+            
+            // IMPORTANT: Enregistrer le service d'email AVANT d'autres services qui pourraient l'utiliser
             builder.Services.AddScoped<IEmailSender<ApplicationUser>, EmailSender>();
+            
             builder.Services.AddSingleton<IUserCacheService, UserCacheService>();
 
-            // Ajout de la compression des réponses
-            builder.Services.AddResponseCompression(options =>
+            // Configuration conditionnelle de la compression
+            if (!builder.Environment.IsDevelopment())
             {
-                options.Providers.Add<BrotliCompressionProvider>();
-                options.Providers.Add<GzipCompressionProvider>();
-
-                // Inclure uniquement les types MIME spécifiques pour les fichiers statiques
-                options.MimeTypes = new[]
+                builder.Services.AddResponseCompression(options =>
                 {
-                    "text/css",
-                    "text/html",
-                    "text/javascript",
-                    "application/javascript",
-                    "application/wasm",
-                    "application/font-woff2",
-                    "image/svg+xml"
-                };
-                options.EnableForHttps = true;
-
-                // Exclure clairement tous les types MIME WebSocket
-                options.ExcludedMimeTypes = new[] {
-                    "application/octet-stream",
-                    "application/json",
-                    "application/json; charset=utf-8"
-                };
-            });
+                    options.Providers.Add<BrotliCompressionProvider>();
+                    options.Providers.Add<GzipCompressionProvider>();
+                    options.MimeTypes = new[]
+                    {
+                        "text/css",
+                        "text/html", 
+                        "text/javascript",
+                        "application/javascript",
+                        "application/wasm",
+                        "application/font-woff2",
+                        "image/svg+xml"
+                    };
+                    options.EnableForHttps = true;
+                    options.ExcludedMimeTypes = new[] {
+                        "application/octet-stream",
+                        "application/json",
+                        "application/json; charset=utf-8"
+                    };
+                });
+            }
 
             // Amélioration de la sérialisation JSON
             builder.Services.AddControllers()
@@ -180,23 +179,25 @@ namespace Mooc
             if (app.Environment.IsDevelopment())
             {
                 app.UseMigrationsEndPoint();
-                // Ajouter la gestion d'erreurs même en développement pour les erreurs serveur
                 app.UseExceptionHandler("/Error", createScopeForErrors: true);
                 
                 app.UseWebSockets(new WebSocketOptions
                 {
                     KeepAliveInterval = TimeSpan.FromMinutes(2),
                 });
+                
+                // Pas de compression en développement pour éviter les conflits avec Browser Link
             }
             else
             {
                 app.UseExceptionHandler("/Error", createScopeForErrors: true);
                 app.UseHsts();
                 app.UseWebSockets();
+                
+                // Compression uniquement en production
+                app.UseResponseCompression();
             }
 
-            // Important: ResponseCompression après WebSockets
-            app.UseResponseCompression();
             app.UseHttpsRedirection();
             app.UseStaticFiles(new StaticFileOptions
             {
