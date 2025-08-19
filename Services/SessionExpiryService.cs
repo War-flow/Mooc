@@ -16,6 +16,8 @@ namespace Mooc.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
+            _logger.LogInformation("SessionExpiryService démarré");
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 try
@@ -27,8 +29,8 @@ namespace Mooc.Services
                     _logger.LogError(ex, "Erreur lors de la vérification des sessions");
                 }
 
-                // Vérifier toutes les 30 minutes
-                await Task.Delay(TimeSpan.FromMinutes(30), stoppingToken);
+                // Vérifier toutes les 5 minutes pour plus de réactivité
+                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
             }
         }
 
@@ -36,16 +38,50 @@ namespace Mooc.Services
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            var notificationService = scope.ServiceProvider.GetRequiredService<INotificationService>();
-
+            
             var now = DateTime.Now;
 
-            // 1. Notifier les sessions qui se terminent dans 24h
+            // **PRINCIPAL : Désactiver les sessions expirées**
+            var expiredSessions = await context.Sessions
+                .Where(s => s.IsActive && s.EndDate < now)
+                .ToListAsync();
+
+            if (expiredSessions.Any())
+            {
+                foreach (var session in expiredSessions)
+                {
+                    session.IsActive = false;
+                    _logger.LogInformation($"Session '{session.Title}' (ID: {session.Id}) automatiquement mise hors ligne - terminée le {session.EndDate:dd/MM/yyyy HH:mm}");
+                }
+
+                await context.SaveChangesAsync();
+                _logger.LogInformation($"{expiredSessions.Count} session(s) mise(s) hors ligne automatiquement");
+            }
+
+            // Optionnel : Notifier les sessions qui vont se terminer
+            try
+            {
+                var notificationService = scope.ServiceProvider.GetService<INotificationService>();
+                if (notificationService != null)
+                {
+                    await SendExpirationNotifications(context, notificationService, now);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Erreur lors de l'envoi des notifications");
+                // Ne pas faire échouer le processus principal
+            }
+        }
+
+        private async Task SendExpirationNotifications(ApplicationDbContext context, INotificationService notificationService, DateTime now)
+        {
+            // Sessions se terminant dans 24h
             var sessionsEndingIn24h = await context.Sessions
                 .Where(s => s.IsActive && 
                            s.EndDate > now && 
                            s.EndDate <= now.AddHours(24) &&
-                           !s.NotificationSent24h) // Supposons qu'on ajoute ce champ
+                           !s.NotificationSent24h)
                 .ToListAsync();
 
             foreach (var session in sessionsEndingIn24h)
@@ -54,12 +90,12 @@ namespace Mooc.Services
                 session.NotificationSent24h = true;
             }
 
-            // 2. Notifier les sessions qui se terminent dans 1h
+            // Sessions se terminant dans 1h
             var sessionsEndingIn1h = await context.Sessions
                 .Where(s => s.IsActive && 
                            s.EndDate > now && 
                            s.EndDate <= now.AddHours(1) &&
-                           !s.NotificationSent1h) // Supposons qu'on ajoute ce champ
+                           !s.NotificationSent1h)
                 .ToListAsync();
 
             foreach (var session in sessionsEndingIn1h)
@@ -68,19 +104,7 @@ namespace Mooc.Services
                 session.NotificationSent1h = true;
             }
 
-            // 3. Désactiver et notifier les sessions expirées
-            var expiredSessions = await context.Sessions
-                .Where(s => s.IsActive && s.EndDate < now)
-                .ToListAsync();
-
-            foreach (var session in expiredSessions)
-            {
-                session.IsActive = false;
-                await notificationService.NotifySessionEndedAsync(session.Id);
-                _logger.LogInformation($"Session '{session.Title}' (ID: {session.Id}) automatiquement désactivée");
-            }
-
-            if (sessionsEndingIn24h.Any() || sessionsEndingIn1h.Any() || expiredSessions.Any())
+            if (sessionsEndingIn24h.Any() || sessionsEndingIn1h.Any())
             {
                 await context.SaveChangesAsync();
             }

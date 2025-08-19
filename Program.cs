@@ -72,6 +72,13 @@ namespace Mooc
                 options.User.RequireUniqueEmail = true;
 
                 // Ne pas inclure les configurations Cookies ici
+
+                // Ajouter la configuration pour la confirmation d'email
+                options.SignIn.RequireConfirmedEmail = true;
+
+                // Configuration des tokens
+                options.Tokens.EmailConfirmationTokenProvider = TokenOptions.DefaultEmailProvider;
+                options.Tokens.PasswordResetTokenProvider = TokenOptions.DefaultEmailProvider;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
@@ -114,7 +121,7 @@ namespace Mooc
             builder.Services.AddMemoryCache();
 
             // Configuration des services additionnels
-            builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+            builder.Services.AddScoped<IEmailSender<ApplicationUser>, EmailSender>();
             builder.Services.AddSingleton<IUserCacheService, UserCacheService>();
 
             // Ajout de la compression des réponses

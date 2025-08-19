@@ -63,8 +63,9 @@
                                         </div>
                                     }
                                     <div class="session-status">
-                                        <span class="badge @(session.IsActive ? "bg-success" : "bg-danger")">
-                                            <i class="bi bi-reception-4"></i>  @(session.IsActive ? "En ligne" : "Hors ligne")
+                                        <span class="badge @GetSessionStatusClass(session)">
+                                            <i class="bi @GetSessionStatusIcon(session)"></i>
+                                            @GetSessionStatusText(session)
                                         </span>
 
                                         <span class="badge bg-secondary">
@@ -335,7 +336,29 @@
     private async Task LoadSessions()
     {
         using var context = await DbContextFactory.CreateDbContextAsync();
+        
+        // Vérification immédiate des sessions expirées avant l'affichage
+        await CheckAndUpdateExpiredSessions(context);
+        
         sessions = await context.Sessions.ToListAsync();
+    }
+
+    private async Task CheckAndUpdateExpiredSessions(ApplicationDbContext context)
+    {
+        var now = DateTime.Now;
+        var expiredSessions = await context.Sessions
+            .Where(s => s.IsActive && s.EndDate < now)
+            .ToListAsync();
+
+        if (expiredSessions.Any())
+        {
+            foreach (var session in expiredSessions)
+            {
+                session.IsActive = false;
+            }
+            
+            await context.SaveChangesAsync();
+        }
     }
 
     private async Task LoadEnrolledCounts()
@@ -667,5 +690,44 @@
         [Required(ErrorMessage = "le nombre de places est requis")]
         [Range(1, 100, ErrorMessage = "Le nombre maximal de place par session est de 100")]
         public bool IsActive { get; set; } = false;
+    }
+
+    private string GetSessionStatusClass(Mooc.Data.Session session)
+    {
+        var now = DateTime.Now;
+        
+        if (now > session.EndDate)
+            return "bg-secondary"; // Session terminée
+        
+        if (!session.IsActive)
+            return "bg-danger"; // Hors ligne manuellement
+            
+        return "bg-success"; // En ligne
+    }
+
+    private string GetSessionStatusIcon(Mooc.Data.Session session)
+    {
+        var now = DateTime.Now;
+        
+        if (now > session.EndDate)
+            return "bi-clock-history"; // Session terminée
+        
+        if (!session.IsActive)
+            return "bi bi-wifi-off"; // Hors ligne
+            
+        return "bi bi-wifi"; // En ligne
+    }
+
+    private string GetSessionStatusText(Mooc.Data.Session session)
+    {
+        var now = DateTime.Now;
+        
+        if (now > session.EndDate)
+            return "Terminée";
+        
+        if (!session.IsActive)
+            return "Hors ligne";
+            
+        return "En ligne";
     }
 }
