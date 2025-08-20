@@ -12,24 +12,44 @@
 
 <PageTitle>Confirmation d'inscription</PageTitle>
 
-<h1>Confirmation d'inscription</h1>
+<div class="auth-container">
+    <div class="auth-card">
+        <h2 class="auth-title">Confirmation d'inscription</h2>
+        
+        <StatusMessage Message="@statusMessage" />
 
-<StatusMessage Message="@statusMessage" />
-
-@if (emailConfirmationLink is not null)
-{
-    <p>
-        Cette application n'a actuellement aucun expéditeur d'e-mail réel enregistré. Consultez <a href="https://aka.ms/aspaccountconf">ces documents</a> pour savoir comment configurer un expéditeur d'e-mail réel.
-        Normalement, ce message vous sera envoyé par e-mail : <a href="@emailConfirmationLink">Cliquez ici pour confirmer votre compte</a>
-    </p>
-}
-else
-{
-    <p role="alert">Veuillez vérifier votre e-mail pour confirmer votre compte.</p>
-}
+        <div class="text-center">
+            <div class="mb-4">
+                <i class="fas fa-envelope-circle-check fa-4x text-primary"></i>
+            </div>
+            
+            <h4 class="mb-3">Vérifiez votre e-mail</h4>
+            
+            <p class="text-muted mb-4">
+                Un email de confirmation a été envoyé à <strong>@Email</strong>.
+                <br />
+                Veuillez cliquer sur le lien dans l'email pour activer votre compte.
+            </p>
+            
+            <div class="alert alert-info" role="alert">
+                <strong>Important :</strong> Vous devez confirmer votre adresse e-mail avant de pouvoir vous connecter.
+            </div>
+            
+            <div class="auth-links">
+                <p class="mb-3">Vous n'avez pas reçu l'email ?</p>
+                <a href="/Account/ResendEmailConfirmation" class="btn btn-outline-primary">
+                    Renvoyer l'email de confirmation
+                </a>
+                <br />
+                <a href="/Account/Login" class="auth-link mt-3 d-inline-block">
+                    Retour à la connexion
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
-    private string? emailConfirmationLink;
     private string? statusMessage;
 
     [CascadingParameter]
@@ -45,24 +65,22 @@ else
     {
         if (Email is null)
         {
-            RedirectManager.RedirectTo("");
+            RedirectManager.RedirectTo("Account/Login");
+            return;
         }
 
         var user = await UserManager.FindByEmailAsync(Email);
         if (user is null)
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = "Erreur lors de la recherche d'un utilisateur pour une adresse e-mail non spécifiée";
+            statusMessage = "Erreur : utilisateur introuvable.";
+            return;
         }
-        else if (EmailSender is IdentityNoOpEmailSender)
+
+        // Vérifier si l'email est déjà confirmé
+        if (user.EmailConfirmed)
         {
-            // Once you add a real email sender, you should remove this code that lets you confirm the account
-            var userId = await UserManager.GetUserIdAsync(user);
-            var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
-            code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-            emailConfirmationLink = NavigationManager.GetUriWithQueryParameters(
-                NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
-                new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
+            statusMessage = "Votre email est déjà confirmé. Vous pouvez vous connecter.";
         }
     }
 }

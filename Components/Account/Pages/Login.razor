@@ -95,6 +95,13 @@
             Logger.LogWarning("User account locked out.");
             RedirectManager.RedirectTo("Account/Lockout");
         }
+        else if (result.IsNotAllowed)
+        {
+            // L'utilisateur existe mais son email n'est pas confirmé
+            errorMessage = "Votre compte n'est pas encore activé. Veuillez vérifier votre email et cliquer sur le lien de confirmation.";
+            // Optionnel : rediriger vers la page de renvoi d'email
+            // RedirectManager.RedirectTo($"Account/ResendEmailConfirmation?email={Input.Email}");
+        }
         else
         {
             errorMessage = "Email ou mot de passe incorrect";

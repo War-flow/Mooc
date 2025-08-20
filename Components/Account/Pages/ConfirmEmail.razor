@@ -6,14 +6,53 @@
 @using Mooc.Data
 
 @inject UserManager<ApplicationUser> UserManager
+@inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityRedirectManager RedirectManager
 
-<PageTitle>Confirmez votre email</PageTitle>
+<PageTitle>Confirmation d'email</PageTitle>
 
-<h1>Confirmez votre email</h1>
-<StatusMessage Message="@statusMessage" />
+<div class="auth-container">
+    <div class="auth-card">
+        <div class="text-center">
+            @if (isConfirmed)
+            {
+                <div class="mb-4">
+                    <i class="fas fa-check-circle fa-4x text-success"></i>
+                </div>
+                <h2 class="auth-title text-success">Email confirmé !</h2>
+                <p class="text-muted mb-4">
+                    Votre adresse email a été confirmée avec succès.
+                    Vous pouvez maintenant vous connecter à votre compte.
+                </p>
+                <a href="/Account/Login" class="btn btn-success btn-lg">
+                    Se connecter
+                </a>
+            }
+            else
+            {
+                <div class="mb-4">
+                    <i class="fas fa-exclamation-triangle fa-4x text-danger"></i>
+                </div>
+                <h2 class="auth-title text-danger">Erreur de confirmation</h2>
+                <div class="alert alert-danger" role="alert">
+                    @statusMessage
+                </div>
+                <div class="auth-links">
+                    <a href="/Account/ResendEmailConfirmation" class="btn btn-outline-primary">
+                        Renvoyer l'email de confirmation
+                    </a>
+                    <br />
+                    <a href="/Account/Login" class="auth-link mt-3 d-inline-block">
+                        Retour à la connexion
+                    </a>
+                </div>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
+    private bool isConfirmed = false;
     private string? statusMessage;
 
     [CascadingParameter]
@@ -25,24 +64,51 @@
     [SupplyParameterFromQuery]
     private string? Code { get; set; }
 
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
     protected override async Task OnInitializedAsync()
     {
         if (UserId is null || Code is null)
         {
-            RedirectManager.RedirectTo("");
+            statusMessage = "Lien de confirmation invalide.";
+            return;
         }
 
         var user = await UserManager.FindByIdAsync(UserId);
         if (user is null)
         {
-            HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
-            statusMessage = $"Erreur lors du chargement de l'utilisateur avec l'ID {UserId}";
+            statusMessage = "Utilisateur introuvable.";
+            return;
+        }
+
+        if (user.EmailConfirmed)
+        {
+            statusMessage = "Votre email est déjà confirmé.";
+            isConfirmed = true;
+            return;
+        }
+
+        var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
+        var result = await UserManager.ConfirmEmailAsync(user, code);
+        
+        if (result.Succeeded)
+        {
+            isConfirmed = true;
+            
+            // Optionnel : connecter automatiquement l'utilisateur après confirmation
+            // await SignInManager.SignInAsync(user, isPersistent: false);
+            
+            // Ou rediriger vers la page de connexion
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                await Task.Delay(3000); // Attendre 3 secondes pour que l'utilisateur voie le message
+                RedirectManager.RedirectTo(ReturnUrl);
+            }
         }
         else
         {
-            var code = Encoding.UTF8.GetString(WebEncoders.Base64UrlDecode(Code));
-            var result = await UserManager.ConfirmEmailAsync(user, code);
-            statusMessage = result.Succeeded ? "Merci d'avoir confirmé votre email. " : "Erreur lors de la confirmation de votre email.";
+            statusMessage = "Erreur lors de la confirmation de votre email. Le lien est peut-être expiré.";
         }
     }
 }

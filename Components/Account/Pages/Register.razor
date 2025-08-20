@@ -153,6 +153,12 @@
                 RedirectManager.RedirectTo(ReturnUrl);
             }
         }
+        catch (Microsoft.AspNetCore.Components.NavigationException)
+        {
+            // La NavigationException est normale pour les redirections dans Blazor Server
+            // Il faut la relancer pour que la redirection fonctionne
+            throw;
+        }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Erreur lors de l'inscription pour {Email}", Input.Email);

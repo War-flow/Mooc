@@ -71,10 +71,11 @@ namespace Mooc
                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-._@+";
                 options.User.RequireUniqueEmail = true;
 
-                // Configuration pour requérir la confirmation d'email
+                // Configuration OBLIGATOIRE pour la confirmation d'email
                 options.SignIn.RequireConfirmedEmail = true;
-
-                // Ne pas inclure les configurations Cookies ici
+                
+                // Empêcher la connexion tant que l'email n'est pas confirmé
+                options.SignIn.RequireConfirmedAccount = true;
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
