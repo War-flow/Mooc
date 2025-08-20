@@ -174,6 +174,14 @@ namespace Mooc
             // Ajout du service d'erreurs
             builder.Services.AddScoped<IErrorHandlingService, ErrorHandlingService>();
 
+            // Ajout du service de génération de certificats
+            builder.Services.AddScoped<ICertificateGenerationService, CertificateGenerationService>();
+
+            // Ajout du service AutomaticCertificateService
+            builder.Services.AddScoped<IAutomaticCertificateService, AutomaticCertificateService>();
+            
+            builder.Services.Configure<CertificateGenerationOptions>(builder.Configuration.GetSection("CertificateGeneration"));
+
             var app = builder.Build();
 
             // Configuration du pipeline de requêtes HTTP

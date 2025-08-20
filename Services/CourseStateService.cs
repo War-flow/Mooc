@@ -25,15 +25,18 @@ namespace Mooc.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly AuthenticationStateProvider _authenticationStateProvider;
         private readonly Dictionary<string, CourseProgress> _courseProgresses = new();
+        private readonly IAutomaticCertificateService _automaticCertificateService;
 
         public CourseStateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
             UserManager<ApplicationUser> userManager,
-            AuthenticationStateProvider authenticationStateProvider)
+            AuthenticationStateProvider authenticationStateProvider,
+            IAutomaticCertificateService automaticCertificateService)
         {
             _contextFactory = contextFactory;
             _userManager = userManager;
             _authenticationStateProvider = authenticationStateProvider;
+            _automaticCertificateService = automaticCertificateService;
         }
 
         // **MÉTHODE MISE À JOUR**: Récupération automatique de l'utilisateur connecté
@@ -215,6 +218,8 @@ namespace Mooc.Services
                     context.CourseProgresses.Add(dbProgress);
                 }
 
+                var wasCompleted = dbProgress.IsCompleted;
+                
                 dbProgress.LastAccessedBlock = progress.LastAccessedBlock;
                 dbProgress.CompletedBlocks = JsonSerializer.Serialize(progress.CompletedBlocks);
                 dbProgress.BlockInteractions = JsonSerializer.Serialize(progress.BlockInteractions);
@@ -222,10 +227,46 @@ namespace Mooc.Services
                 dbProgress.IsCompleted = progress.IsCompleted;
 
                 await context.SaveChangesAsync();
+
+                // **AMÉLIORATION** : Vérifier la génération automatique de certificat à chaque completion
+                if (!wasCompleted && progress.IsCompleted && !string.IsNullOrEmpty(progress.UserId))
+                {
+                    await CheckForAutomaticCertificateGeneration(progress.UserId, progress.CoursId);
+                }
+                
+                // **NOUVEAU** : Vérifier également lors de chaque sauvegarde de progrès
+                // même si le cours n'est pas encore marqué comme terminé
+                else if (!string.IsNullOrEmpty(progress.UserId))
+                {
+                    await CheckForAutomaticCertificateGeneration(progress.UserId, progress.CoursId);
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Erreur lors de la sauvegarde du progrès: {ex.Message}");
+            }
+        }
+
+        // **NOUVELLE MÉTHODE AMÉLIORÉE**
+        private async Task CheckForAutomaticCertificateGeneration(string userId, int coursId)
+        {
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                
+                // Récupérer la session du cours
+                var course = await context.Courses
+                    .FirstOrDefaultAsync(c => c.Id == coursId);
+                    
+                if (course?.SessionId != null)
+                {
+                    // Vérifier et générer le certificat si nécessaire
+                    await _automaticCertificateService.CheckAndGenerateCertificateAsync(userId, course.SessionId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors de la vérification de génération automatique de certificat: {ex.Message}");
             }
         }
     }

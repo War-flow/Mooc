@@ -1,13 +1,17 @@
 ﻿@page "/certification"
-
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.AspNetCore.Authorization
 @using Mooc.Data
+@using Mooc.Services
 @using Microsoft.EntityFrameworkCore
 @inject UserManager<ApplicationUser> UserManagerService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject ICertificateGenerationService CertificateService
 @inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<Certification> _logger
 @attribute [Authorize]
 @attribute [StreamRendering]
 
@@ -30,7 +34,7 @@
                         <i class="bi bi-trophy-fill text-warning fs-2"></i>
                         <div class="mt-2">
                             <small class="text-muted d-block">Total</small>
-                            <strong class="text-primary">3</strong>
+                            <strong class="text-primary">@availableCertificates.Count</strong>
                         </div>
                     </div>
                 </div>
@@ -38,18 +42,34 @@
         </div>
     </div>
 
-    <!-- Filtres et recherche -->
+    <!-- Filtres -->
     <div class="row mb-4">
-        <div class="col-md-2 mt-2 mt-md-0">
-            <div class="d-flex gap-2 justify-content-md-end">
-                <select class="form-select" style="max-width: 200px;">
-                    <option selected>Filtre</option>
-                    <option value="1">Disponibles</option>
-                    <option value="2">En cours</option>
+        <div class="col-md-6 mt-2 mt-md-0">
+            <div class="d-flex gap-2 align-items-center">
+                <select class="form-select" style="max-width: 200px;" @bind="selectedFilter">
+                    <option value="">Tous les certificats</option>
+                    <option value="Generated">Disponibles</option>
+                    <option value="Delivered">Délivrés</option>
+                    <option value="Revoked">Révoqués</option>
                 </select>
-                <button class="btn btn-outline-secondary">
+                <button class="btn btn-outline-secondary" @onclick="ClearFilters" title="Réinitialiser les filtres">
                     <i class="bi bi-funnel"></i>
                 </button>
+                @if (!string.IsNullOrEmpty(selectedFilter))
+                {
+                    <span class="badge bg-info">@GetFilterLabel(selectedFilter)</span>
+                }
+            </div>
+        </div>
+        <div class="col-md-6 mt-2 mt-md-0">
+            <div class="d-flex justify-content-md-end">
+                <div class="input-group" style="max-width: 300px;">
+                    <input type="text" class="form-control" placeholder="Rechercher..." 
+                           @bind="searchTerm" @oninput="OnSearchInput">
+                    <button class="btn btn-outline-secondary" type="button">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -90,104 +110,53 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr class="certification-row">
-                                    <td class="px-4 py-3">
-                                        <span class="badge bg-primary rounded-pill">001</span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex align-items-center">
-                                            <div class="certification-icon me-3">
-                                                <i class="bi bi-file-earmark-pdf-fill text-danger fs-4"></i>
+                                @if (isLoading)
+                                {
+                                    <tr>
+                                        <td colspan="4" class="text-center py-4">
+                                            <div class="spinner-border text-primary" role="status">
+                                                <span class="visually-hidden">Chargement...</span>
                                             </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-semibold">Développement Web Avancé</h6>
-                                                <small class="text-muted">Certification professionnelle</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 d-none d-lg-table-cell">
-                                        <div>
-                                            <span class="d-block fw-medium">Session Automne 2024</span>
-                                            <small class="text-muted">15 Oct. - 20 Déc. 2024</small>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex gap-2">
-                                            <button class="btn btn-success btn-sm d-flex align-items-center">
-                                                <i class="bi bi-download me-1"></i>
-                                                <span class="d-none d-sm-inline">Télécharger</span>
-                                            </button>
-                                            <button class="btn btn-outline-primary btn-sm d-flex align-items-center">
-                                                <i class="bi bi-eye me-1"></i>
-                                                <span class="d-none d-sm-inline">Voir</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr class="certification-row">
-                                    <td class="px-4 py-3">
-                                        <span class="badge bg-primary rounded-pill">002</span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex align-items-center">
-                                            <div class="certification-icon me-3">
-                                                <i class="bi bi-file-earmark-pdf-fill text-danger fs-4"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-semibold">Base de Données MySQL</h6>
-                                                <small class="text-muted">Certification technique</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 d-none d-lg-table-cell">
-                                        <div>
-                                            <span class="d-block fw-medium">Session Été 2024</span>
-                                            <small class="text-muted">01 Juin - 31 Août 2024</small>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex gap-2">
-                                            <button class="btn btn-success btn-sm d-flex align-items-center">
-                                                <i class="bi bi-download me-1"></i>
-                                                <span class="d-none d-sm-inline">Télécharger</span>
-                                            </button>
-                                            <button class="btn btn-outline-primary btn-sm d-flex align-items-center">
-                                                <i class="bi bi-eye me-1"></i>
-                                                <span class="d-none d-sm-inline">Voir</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                                <tr class="certification-row">
-                                    <td class="px-4 py-3">
-                                        <span class="badge bg-warning text-dark rounded-pill">003</span>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex align-items-center">
-                                            <div class="certification-icon me-3">
-                                                <i class="bi bi-hourglass-split text-warning fs-4"></i>
-                                            </div>
-                                            <div>
-                                                <h6 class="mb-1 fw-semibold">Cybersécurité Avancée</h6>
-                                                <small class="text-muted">En cours de traitement</small>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3 d-none d-lg-table-cell">
-                                        <div>
-                                            <span class="d-block fw-medium">Session Hiver 2024</span>
-                                            <small class="text-muted">01 Déc. 2024 - 28 Fév. 2025</small>
-                                        </div>
-                                    </td>
-                                    <td class="px-4 py-3">
-                                        <div class="d-flex gap-2">
-                                            <button class="btn btn-secondary btn-sm d-flex align-items-center" disabled>
-                                                <i class="bi bi-clock me-1"></i>
-                                                <span class="d-none d-sm-inline">En attente</span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
+                                        </td>
+                                    </tr>
+                                }
+                                else if (filteredCertificates?.Any() == true)
+                                {
+                                    @foreach (var cert in filteredCertificates)
+                                    {
+                                        <tr class="certification-row">
+                                            <td class="px-4 py-3">
+                                                <span class="badge bg-primary rounded-pill">@cert.Id</span>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div class="d-flex align-items-center">
+                                                    <div class="certification-icon me-3">
+                                                        <i class="bi bi-file-earmark-pdf-fill text-danger fs-4"></i>
+                                                    </div>
+                                                    <div>
+                                                        <h6 class="mb-1 fw-semibold">@cert.Session.Title</h6>
+                                                        <small class="text-muted">Certificat n° @cert.CertificateNumber</small>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3 d-none d-lg-table-cell">
+                                                <div>
+                                                    <span class="d-block fw-medium">@cert.Session.Title</span>
+                                                    <small class="text-muted">@cert.Session.StartDate.ToString("dd MMM yyyy") - @cert.Session.EndDate.ToString("dd MMM yyyy")</small>
+                                                </div>
+                                            </td>
+                                            <td class="px-4 py-3">
+                                                <div class="d-flex gap-2">
+                                                    <button class="btn btn-success btn-sm d-flex align-items-center" 
+                                                            @onclick="() => DownloadCertificate(cert.SessionId, CertificateType.Pdf)">
+                                                        <i class="bi bi-download me-1"></i>
+                                                        <span class="d-none d-sm-inline">PDF</span>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    }
+                                }
                             </tbody>
                         </table>
                     </div>
@@ -197,7 +166,6 @@
     </div>
 
     <!-- Message si aucune certification -->
-    @* Remplacez "false" par une condition réelle ou supprimez ce bloc si inutile *@
     @if (AucuneCertification)
     {
         <div class="row mt-5">
@@ -208,7 +176,7 @@
                     </div>
                     <h4 class="text-muted mb-3">Aucune certification trouvée</h4>
                     <p class="text-muted mb-4">Vous n'avez pas encore de certificats disponibles. Terminez vos formations pour obtenir vos certificats.</p>
-                    <a href="/formations" class="btn btn-primary">
+                    <a href="/" class="btn btn-primary">
                         <i class="bi bi-book me-2"></i>
                         Voir les formations
                     </a>
@@ -219,6 +187,145 @@
 </div>
 
 @code {
-    // Ajoutez une propriété pour la condition
-    private bool AucuneCertification => false; // Remplacez par la logique réelle
+    private List<Certificate> availableCertificates = new();
+    private List<Certificate> filteredCertificates = new();
+    private bool isLoading = true;
+    private string selectedFilter = string.Empty;
+    private string searchTerm = string.Empty;
+    private Timer? searchTimer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCertificatesAsync();
+        filteredCertificates = availableCertificates;
+    }
+
+    private async Task LoadCertificatesAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManagerService.GetUserAsync(authState.User);
+            if (user != null)
+            {
+                using var context = await DbContextFactory.CreateDbContextAsync();
+                availableCertificates = await context.Certificates
+                    .Include(c => c.Session)
+                    .Where(c => c.UserId == user.Id && c.Status == "Generated")
+                    .OrderByDescending(c => c.DateGenerated)
+                    .ToListAsync();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Erreur lors du chargement des certificats");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ApplyFilter()
+    {
+        await FilterCertificates();
+    }
+
+    private async Task ClearFilters()
+    {
+        selectedFilter = string.Empty;
+        searchTerm = string.Empty;
+        await FilterCertificates();
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchTerm = e.Value?.ToString() ?? string.Empty;
+        
+        searchTimer?.Dispose();
+        searchTimer = new Timer(async _ => 
+        {
+            await InvokeAsync(async () =>
+            {
+                await FilterCertificates();
+                StateHasChanged();
+            });
+        }, null, 300, Timeout.Infinite);
+    }
+
+    private async Task FilterCertificates()
+    {
+        await Task.Run(() =>
+        {
+            var filtered = availableCertificates.AsEnumerable();
+
+            if (!string.IsNullOrEmpty(selectedFilter))
+            {
+                filtered = filtered.Where(c => c.Status == selectedFilter);
+            }
+
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                filtered = filtered.Where(c => 
+                    c.Session.Title.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.CertificateNumber.Contains(searchTerm, StringComparison.OrdinalIgnoreCase));
+            }
+
+            filteredCertificates = filtered.ToList();
+        });
+        
+        StateHasChanged();
+    }
+
+    private string GetFilterLabel(string filter) => filter switch
+    {
+        "Generated" => "Disponibles",
+        "Delivered" => "Délivrés", 
+        "Revoked" => "Révoqués",
+        _ => filter
+    };
+
+    private async Task DownloadCertificate(int sessionId, CertificateType type)
+    {
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            var user = await UserManagerService.GetUserAsync(authState.User);
+            if (user == null) return;
+
+            var certificateData = await CertificateService.GenerateCertificateAsync(sessionId, user.Id, type);
+            
+            var fileName = $"Certificat_{sessionId}_{DateTime.Now:yyyyMMdd}";
+            var contentType = type == CertificateType.Pdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            var fileExtension = type == CertificateType.Pdf ? ".pdf" : ".docx";
+            
+            await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du téléchargement: {ex.Message}");
+        }
+    }
+
+    private bool AucuneCertification => !filteredCertificates?.Any() == true && !isLoading;
+
+    public void Dispose()
+    {
+        searchTimer?.Dispose();
+    }
 }
+
+<script>
+    window.downloadFile = (byteArray, fileName, contentType) => {
+        const blob = new Blob([new Uint8Array(byteArray)], { type: contentType });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    };
+</script>

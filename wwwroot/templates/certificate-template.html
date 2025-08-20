@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <title>Certificat de Formation</title>
+    <style>
+        @page {
+            size: A4 landscape;
+            margin: 0cm;
+        }
+
+        body {
+            font-family: 'Times New Roman', serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+            color: #333;
+            line-height: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .document {
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        
+        .certificate-border {
+            border: 4px solid #2c3e50;
+            border-radius: 15px;
+            padding: 70px 90px;
+            margin: 20px auto;
+            background: white;
+            max-width: 800px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        
+        .certificate-border::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            bottom: 15px;
+            border: 2px solid #34495e;
+            border-radius: 10px;
+        }
+        
+        .header {
+            margin-bottom: 10px;
+        }
+        
+        .main-title {
+            font-size: 42px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .subtitle {
+            font-size: 20px;
+            color: #34495e;
+            margin-top: 25px;
+            margin-bottom: 5px;
+            font-style: italic;
+        }
+        
+        .body-content {
+            margin: 10px 0;
+        }
+        
+        .intro-text {
+            font-size: 16px;
+            margin-bottom: 25px;
+            color: #555;
+        }
+        
+        .recipient-name {
+            font-size: 32px;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 25px 0;
+            text-decoration: underline;
+            text-decoration-color: #e74c3c;
+        }
+        
+        .completion-text {
+            font-size: 16px;
+            margin: 25px 0;
+            color: #555;
+        }
+        
+        .course-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 25px 0;
+            font-style: italic;
+            position: relative;
+        }
+        
+        .course-title::before,
+        .course-title::after {
+            content: '"';
+            font-size: 30px;
+            color: #3498db;
+        }
+        
+        .course-details {
+            margin: 30px 0;
+        }
+        
+        .course-info {
+            font-size: 14px;
+            margin: 10px 0;
+            color: #666;
+        }
+        
+        .delivery-info {
+            margin: 10px 0 20px 0;
+        }
+        
+        .delivery-text {
+            font-size: 14px;
+            margin: 8px 0;
+            color: #555;
+        }
+        
+        .certificate-number {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin: 15px 0 20px 0;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .signature-section {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: 50px;
+            padding-top: 15px;
+        }
+        
+        .signature-left {
+            text-align: left;
+            flex: 1;
+        }
+        
+        .signature-right {
+            text-align: center;
+            flex: 1;
+        }
+        
+        .signature-line {
+            border-top: 1px solid #333;
+            width: 200px;
+            margin: 0 auto 10px auto;
+        }
+        
+        .signature-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+        
+        .signature-title {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 5px;
+        }
+        
+        /* Styles pour impression */
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            
+            .document {
+                min-height: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="document">
+        <div class="certificate-border">
+            <div class="logo-container">
+                <img src="{{LogoUrl}}" alt="Logo" class="logo" />
+            </div>
+
+            <div class="header">
+                <h1 class="main-title">{{MainTitle}}</h1>
+                <h2 class="subtitle">{{Subtitle}}</h2>
+            </div>
+
+            <div class="body-content">
+                <p class="intro-text">{{IntroText}}</p>
+
+                <div class="recipient-name">{{FullName}}</div>
+
+                <p class="completion-text">{{CompletionText}}</p>
+
+                <div class="course-title">{{SessionTitle}}</div>
+
+                <div class="course-details">
+                    <div class="course-info">{{FormationPeriod}}</div>
+                </div>
+
+                <div class="delivery-info">
+                    <div class="delivery-text">{{DeliveryText}}</div>
+                    <div class="delivery-text">{{OrganizationText}}</div>
+                </div>
+
+                <div class="certificate-number">{{CertificateNumberText}}</div>
+            </div>
+
+            <div class="signature-section">
+                <div class="signature-left">
+                    <!-- Espace pour cachet/logo supplémentaire -->
+                </div>
+
+                <div class="signature-right">
+                    <div class="signature-line"></div>
+                    <div class="signature-name">{{SignatoryName}}</div>
+                    <div class="signature-title">{{SignatoryTitle}}</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
