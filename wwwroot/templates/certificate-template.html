@@ -10,7 +10,7 @@
         }
 
         body {
-            font-family: 'Times New Roman', serif;
+            font-family: Arial, Helvetica, sans-serif, serif;
             margin: 0;
             padding: 0;
             background: white;
@@ -33,46 +33,33 @@
         }
         
         .certificate-border {
-            border: 4px solid #2c3e50;
-            border-radius: 15px;
-            padding: 70px 90px;
-            margin: 20px auto;
+            padding: 80px 100px;
+            margin: 5px auto;
             background: white;
-            max-width: 800px;
-            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+            max-width: 100%;
             position: relative;
         }
-        
-        .certificate-border::before {
-            content: '';
-            position: absolute;
-            top: 15px;
-            left: 15px;
-            right: 15px;
-            bottom: 15px;
-            border: 2px solid #34495e;
-            border-radius: 10px;
-        }
-        
+          
         .header {
-            margin-bottom: 10px;
+            margin-bottom: 5px;
         }
-        
+
         .main-title {
-            font-size: 42px;
+            font-size: 70px;
             font-weight: bold;
-            color: #2c3e50;
-            margin-bottom: 15px;
-            letter-spacing: 3px;
+            color: #016f8b;
+            margin-bottom: 10px;
             text-transform: uppercase;
         }
 
-        .subtitle {
-            font-size: 20px;
-            color: #34495e;
-            margin-top: 25px;
-            margin-bottom: 5px;
-            font-style: italic;
+        .seconde-title {
+            font-size: 28px;
+            font-weight: normal;
+            color: #016f8b;
+            margin-top: 50px;
+            margin-bottom: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
         }
         
         .body-content {
@@ -92,6 +79,17 @@
             margin: 25px 0;
             text-decoration: underline;
             text-decoration-color: #e74c3c;
+        }
+
+        .certificate-border {
+            border: 4px solid #2c3e50;
+            border-radius: 15px;
+            padding: 70px 90px;
+            margin: 10px auto 10px 20px ;
+            background: white;
+            max-width: 900px;
+            box-shadow: 10px 10px 100px 10px #000000;
+            position: relative;
         }
         
         .completion-text {
@@ -181,10 +179,10 @@
 
         .logo-container {
             position: absolute;
-            top: 30px;
-            left: 30px;
-            width: 80px;
-            height: 80px;
+            top: 15px;
+            left: 10px;
+            width: 150px;
+            height: 150px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -196,7 +194,24 @@
             object-fit: contain;
             border-radius: 5px;
         }
-        
+
+        .medal-container {
+            position: absolute;
+            top: 20px;
+            right: 10px;
+            width: 125px;
+            height: 125px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .medal {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            border-radius: 50%;
+        }
         /* Styles pour impression */
         @media print {
             body {
@@ -217,9 +232,13 @@
                 <img src="{{LogoUrl}}" alt="Logo" class="logo" />
             </div>
 
+            <div class="medal-container">
+                <img src="{{MedalUrl}}" alt="Médaille" class="medal" />
+            </div>
+
             <div class="header">
                 <h1 class="main-title">{{MainTitle}}</h1>
-                <h2 class="subtitle">{{Subtitle}}</h2>
+                <h2 class="seconde-title">{{SecondTitle}}</h2>
             </div>
 
             <div class="body-content">

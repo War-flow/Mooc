@@ -41,9 +41,9 @@ namespace Mooc.Services
         public string CertificateNumberPrefix { get; set; } = "CERT";
         public string DateFormat { get; set; } = "dd MMMM yyyy";
         public string CultureInfo { get; set; } = "fr-FR";
-        public string OrganizationName { get; set; } = "Centre de Formation";
-        public string SignatoryName { get; set; } = "Le Directeur";
-        public string SignatoryTitle { get; set; } = "Directeur de Formation";
+        public string OrganizationName { get; set; } = "POINT COM";
+        public string SignatoryName { get; set; } = "Christine ILLIDO";
+        public string SignatoryTitle { get; set; } = "lA Direction";
         public string HtmlTemplatePath { get; set; } = "templates/certificate-template.html";
     }
 
@@ -141,15 +141,19 @@ namespace Mooc.Services
                 
                 // Générer l'URL complète du logo ou encoder en Base64
                 var logoUrl = await GetLogoDataUrl();
-                
+
+                // Générer l'URL complète de la médaille ou encoder en Base64
+                var medalUrl = await GetMedalDataUrl();
+
                 // Remplacer les placeholders par les vraies valeurs
                 var replacements = new Dictionary<string, string>
                 {
-                    {"{{MainTitle}}", "CERTIFICAT DE FORMATION"},
+                    {"{{MainTitle}}", "CERTIFICAT"},
+                    {"{{SecondTitle}}", "DE FORMATION"},
                     {"{{Subtitle}}", "ATTESTATION DE RÉUSSITE"},
-                    {"{{IntroText}}", "Il est certifié que"},
+                    {"{{IntroText}}", "est fièrement décerné par Point Com à"},
                     {"{{FullName}}", data.FullName},
-                    {"{{CompletionText}}", "a suivi avec succès la formation"},
+                    {"{{CompletionText}}", "pour avoir terminé avec succès son parcours de formation"},
                     {"{{SessionTitle}}", data.SessionTitle},
                     {"{{FormationPeriod}}", $"Formation dispensée du {data.SessionStartDate:dd MMMM yyyy} au {data.SessionEndDate:dd MMMM yyyy}"},
                     {"{{DeliveryText}}", $"Délivré le {data.DeliveryDate}"},
@@ -157,7 +161,8 @@ namespace Mooc.Services
                     {"{{CertificateNumberText}}", $"Certificat n° {data.CertificateNumber}"},
                     {"{{SignatoryName}}", _options.SignatoryName},
                     {"{{SignatoryTitle}}", _options.SignatoryTitle},
-                    {"{{LogoUrl}}", logoUrl}
+                    {"{{LogoUrl}}", logoUrl},
+                    {"{{MedalUrl}}", medalUrl}
                 };
 
                 return ReplaceTemplatePlaceholders(templateContent, replacements);
@@ -181,7 +186,7 @@ namespace Mooc.Services
                     return ""; // Retourner une chaîne vide si le logo n'existe pas
                 }
 
-                // Lire le fichier et l'encoder en Base64
+                // Lire le fichier logo.png et l'encoder en Base64
                 var logoBytes = await File.ReadAllBytesAsync(logoPath);
                 var mimeType = Path.GetExtension(logoPath).ToLower() switch
                 {
@@ -198,6 +203,39 @@ namespace Mooc.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors de la lecture du fichier logo");
+                return "";
+            }
+        }
+
+        private async Task<string> GetMedalDataUrl()
+        {
+            try
+            {
+                var medalPath = Path.Combine(_environment.WebRootPath, "images", "medal.png");
+
+                if (!File.Exists(medalPath))
+                {
+                    _logger.LogWarning("Fichier médaille introuvable : {MedalPath}", medalPath);
+                    return ""; // Retourner une chaîne vide si la médaille n'existe pas
+                }
+
+                // Lire le fichier medal.png et l'encoder en Base64
+                var medalBytes = await File.ReadAllBytesAsync(medalPath);
+                var mimeType = Path.GetExtension(medalPath).ToLower() switch
+                {
+                    ".png" => "image/png",
+                    ".jpg" or ".jpeg" => "image/jpeg",
+                    ".gif" => "image/gif",
+                    ".svg" => "image/svg+xml",
+                    _ => "image/png"
+                };
+
+                var base64String = Convert.ToBase64String(medalBytes);
+                return $"data:{mimeType};base64,{base64String}";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la lecture du fichier médaille");
                 return "";
             }
         }
