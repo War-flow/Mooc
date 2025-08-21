@@ -43,7 +43,7 @@ namespace Mooc.Services
         public string CultureInfo { get; set; } = "fr-FR";
         public string OrganizationName { get; set; } = "POINT COM";
         public string SignatoryName { get; set; } = "Christine ILLIDO";
-        public string SignatoryTitle { get; set; } = "lA Direction";
+        public string SignatoryTitle { get; set; } = "Directrice du centre";
         public string HtmlTemplatePath { get; set; } = "templates/certificate-template.html";
     }
 

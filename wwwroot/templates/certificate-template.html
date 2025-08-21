@@ -41,22 +41,23 @@
         }
           
         .header {
-            margin-bottom: 5px;
+            margin-top: 45px;
         }
 
         .main-title {
-            font-size: 70px;
+            font-size: 85px;
             font-weight: bold;
-            color: #016f8b;
+            color: #012A8B;
             margin-bottom: 10px;
             text-transform: uppercase;
+            margin-top: 48px;
         }
 
         .seconde-title {
-            font-size: 28px;
+            font-size: 32px;
             font-weight: normal;
-            color: #016f8b;
-            margin-top: 50px;
+            color: #012A8B;
+            margin-top: 55px;
             margin-bottom: 10px;
             letter-spacing: 3px;
             text-transform: uppercase;
@@ -65,20 +66,20 @@
         .body-content {
             margin: 10px 0;
         }
-        
+
         .intro-text {
-            font-size: 16px;
-            margin-bottom: 25px;
-            color: #555;
+            font-size: 22px;
+            margin-top: 30px;
+            margin-bottom: 30px;
+            color: black;
         }
-        
+
         .recipient-name {
-            font-size: 32px;
+            font-size: 50px;
             font-weight: bold;
-            color: #e74c3c;
-            margin: 25px 0;
-            text-decoration: underline;
-            text-decoration-color: #e74c3c;
+            color: #000000;
+            margin: 35px auto 35px auto;
+            text-transform: uppercase;
         }
 
         .certificate-border {
@@ -91,53 +92,48 @@
             box-shadow: 10px 10px 100px 10px #000000;
             position: relative;
         }
-        
+
         .completion-text {
-            font-size: 16px;
-            margin: 25px 0;
-            color: #555;
+            font-size: 20px;
+            margin: 20px 0;
+            color: #000000;
         }
         
         .course-title {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            color: #2c3e50;
+            color: #012A8B;
             margin: 25px 0;
             font-style: italic;
             position: relative;
+        }
+
+        .course-periode {
+            margin-top:15px;
+            color: black;
         }
         
         .course-title::before,
         .course-title::after {
             content: '"';
             font-size: 30px;
-            color: #3498db;
-        }
-        
-        .course-details {
-            margin: 30px 0;
-        }
-        
-        .course-info {
-            font-size: 14px;
-            margin: 10px 0;
-            color: #666;
+            color: #000000;
         }
         
         .delivery-info {
-            margin: 10px 0 20px 0;
+            margin: 15px 0 5px 0;
         }
         
         .delivery-text {
             font-size: 14px;
-            margin: 8px 0;
-            color: #555;
+            margin: 10px;
+            color: black;
         }
         
         .certificate-number {
             font-size: 12px;
             color: #7f8c8d;
-            margin: 15px 0 20px 0;
+            margin: 15px;
             font-family: 'Courier New', monospace;
         }
         
@@ -145,7 +141,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-end;
-            margin-top: 50px;
+            margin-top: 10px;
             padding-top: 15px;
         }
         
@@ -164,7 +160,13 @@
             width: 200px;
             margin: 0 auto 10px auto;
         }
-        
+
+        .name-line {
+            border-top: 1px solid #333;
+            width: 525px;
+            margin: 0 auto 10px auto;
+        }
+
         .signature-name {
             font-size: 14px;
             font-weight: bold;
@@ -175,6 +177,7 @@
         .signature-title {
             font-size: 12px;
             color: #666;
+            margin:10px;
         }
 
         .logo-container {
@@ -197,7 +200,7 @@
 
         .medal-container {
             position: absolute;
-            top: 20px;
+            top: 30px;
             right: 10px;
             width: 125px;
             height: 125px;
@@ -240,28 +243,23 @@
                 <h1 class="main-title">{{MainTitle}}</h1>
                 <h2 class="seconde-title">{{SecondTitle}}</h2>
             </div>
-
             <div class="body-content">
                 <p class="intro-text">{{IntroText}}</p>
 
                 <div class="recipient-name">{{FullName}}</div>
+                <div class="name-line"></div>
 
                 <p class="completion-text">{{CompletionText}}</p>
 
                 <div class="course-title">{{SessionTitle}}</div>
 
-                <div class="course-details">
-                    <div class="course-info">{{FormationPeriod}}</div>
-                </div>
+                <div class="course-periode">{{FormationPeriod}}</div>
 
                 <div class="delivery-info">
                     <div class="delivery-text">{{DeliveryText}}</div>
                     <div class="delivery-text">{{OrganizationText}}</div>
                 </div>
-
-                <div class="certificate-number">{{CertificateNumberText}}</div>
             </div>
-
             <div class="signature-section">
                 <div class="signature-left">
                     <!-- Espace pour cachet/logo supplémentaire -->
@@ -273,6 +271,7 @@
                     <div class="signature-title">{{SignatoryTitle}}</div>
                 </div>
             </div>
+            <div class="certificate-number">{{CertificateNumberText}}</div>
         </div>
     </div>
 </body>
