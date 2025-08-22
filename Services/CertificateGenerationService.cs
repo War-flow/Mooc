@@ -306,12 +306,27 @@ namespace Mooc.Services
             var completedCourses = await GetCompletedCoursesCountAsync(context, sessionId, userId);
             var totalRequiredCourses = await GetTotalRequiredCoursesCountAsync(context, sessionId);
 
+            // Récupérer le certificat existant depuis la base de données
+            var existingCertificate = await context.Certificates
+                .FirstOrDefaultAsync(c => c.UserId == userId && c.SessionId == sessionId);
+
+            // Utiliser le numéro de certificat existant ou en générer un nouveau
+            string certificateNumber;
+            if (existingCertificate != null && !string.IsNullOrEmpty(existingCertificate.CertificateNumber))
+            {
+                certificateNumber = existingCertificate.CertificateNumber;
+            }
+            else
+            {
+                certificateNumber = GenerateCertificateNumber();
+            }
+
             return new CertificateData
             {
                 FullName = $"{user.FirstName} {user.LastName}",
                 SessionTitle = session.Title,
                 DeliveryDate = DateTime.Now.ToString(_options.DateFormat, new System.Globalization.CultureInfo(_options.CultureInfo)),
-                CertificateNumber = GenerateCertificateNumber(),
+                CertificateNumber = certificateNumber,
                 CompletedCourses = completedCourses,
                 TotalRequiredCourses = totalRequiredCourses,
                 SessionStartDate = session.StartDate,
