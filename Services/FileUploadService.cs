@@ -6,6 +6,8 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using System.Text.RegularExpressions;
+using Microsoft.AspNetCore.Http;
+using System.Net.Http.Headers;
 
 namespace Mooc.Services
 {
@@ -17,6 +19,7 @@ namespace Mooc.Services
         private readonly IWebHostEnvironment _environment;
         private readonly ILogger<FileUploadService> _logger;
         private readonly IConfiguration _configuration;
+        private readonly IContentValidationService _validationService;
 
         // Configuration par défaut
         private readonly string[] _allowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp" };
@@ -34,11 +37,12 @@ namespace Mooc.Services
         /// <summary>
         /// Constructeur du service d'upload de fichiers.
         /// </summary>
-        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IConfiguration configuration)
+        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IConfiguration configuration, IContentValidationService validationService)
         {
             _environment = environment;
             _logger = logger;
             _configuration = configuration;
+            _validationService = validationService;
         }
 
         /// <summary>
@@ -118,6 +122,17 @@ namespace Mooc.Services
             
             try
             {
+                // Conversion IBrowserFile -> IFormFile
+                var formFile = ConvertToIFormFile(file);
+
+                // Valider le fichier avant l'upload
+                var validationResult = await _validationService.ValidateFileAsync(formFile);
+                if (!validationResult.IsValid)
+                {
+                    _logger.LogWarning("Fichier rejeté: {Error}", validationResult.ErrorMessage);
+                    throw new InvalidOperationException(validationResult.ErrorMessage ?? "Fichier invalide");
+                }
+
                 ValidateFile(file, "file", _allowedFileExtensions, _maxFileSizes["file"]);
                 
                 var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "files");
@@ -238,6 +253,21 @@ namespace Mooc.Services
             if (filePath.Contains("/files/")) return "files";
             if (filePath.Contains("/sessions/")) return "sessions";
             return "files"; // Par défaut
+        }
+
+        private static IFormFile ConvertToIFormFile(IBrowserFile browserFile)
+        {
+            var stream = browserFile.OpenReadStream(browserFile.Size);
+            return new FormFile(stream, 0, browserFile.Size, browserFile.Name, browserFile.Name)
+            {
+                Headers = new HeaderDictionary(),
+                ContentType = browserFile.ContentType,
+                ContentDisposition = new ContentDispositionHeaderValue("form-data")
+                {
+                    Name = browserFile.Name,
+                    FileName = browserFile.Name
+                }.ToString()
+            };
         }
     }
 }

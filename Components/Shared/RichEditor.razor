@@ -4,6 +4,8 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JSRuntime
 @inject FileUploadService FileUploadService
+@inject IContentValidationService ContentValidationService
+@inject ILogger<RichEditor> _logger
 
 <div class="rich-text-editor">
     @if (ShowToolbar)
@@ -272,12 +274,32 @@
     }
 
     [JSInvokable]
-    public async Task OnContentChanged(string content, int length)
+    public async Task OnContentChanged(string content, int length, string? csrfToken = null)
     {
-        Value = content;
-        characterCount = length.ToString();
-        await ValueChanged.InvokeAsync(content);
-        StateHasChanged();
+        try
+        {
+            // Valider le contenu côté serveur
+            var validationResult = await ContentValidationService.ValidateHtmlContentAsync(content, csrfToken);
+            
+            if (!validationResult.IsValid)
+            {
+                await ShowErrorMessage($"Contenu invalide: {validationResult.ErrorMessage}");
+                return;
+            }
+
+            // Sanitiser le contenu
+            var sanitizedContent = ContentValidationService.SanitizeHtmlContent(content);
+            
+            Value = sanitizedContent;
+            characterCount = length.ToString();
+            await ValueChanged.InvokeAsync(sanitizedContent);
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Erreur lors de la validation du contenu");
+            await ShowErrorMessage("Erreur de validation du contenu");
+        }
     }
 
     private async Task ExecuteCommand(string command)

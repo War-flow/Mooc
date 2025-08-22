@@ -8,6 +8,9 @@ using Mooc.Components.Account;
 using Mooc.Data;
 using Mooc.Services;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 
 namespace Mooc
@@ -182,6 +185,39 @@ namespace Mooc
             
             builder.Services.Configure<CertificateGenerationOptions>(builder.Configuration.GetSection("CertificateGeneration"));
 
+            // Ajouter HtmlAgilityPack pour la validation HTML
+            builder.Services.AddScoped<IContentValidationService, ContentValidationService>();
+
+            // Configuration de sécurité renforcée
+            builder.Services.Configure<FormOptions>(options =>
+            {
+                options.ValueLengthLimit = 100000; // 100KB pour les champs de formulaire
+                options.MultipartBodyLengthLimit = 5 * 1024 * 1024; // 5MB pour les fichiers
+            });
+
+            // Ajouter la protection CSRF
+            builder.Services.AddAntiforgery(options =>
+            {
+                options.HeaderName = "RequestVerificationToken";
+                options.Cookie.Name = "__RequestVerificationToken";
+                options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            });
+
+            // Rate limiting pour éviter les attaques DoS
+            builder.Services.AddRateLimiter(options =>
+            {
+                options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: context.User?.Identity?.Name ?? context.Request.Headers.Host.ToString(),
+                        factory: partition => new FixedWindowRateLimiterOptions
+                        {
+                            AutoReplenishment = true,
+                            PermitLimit = 100,
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+            });
+
             var app = builder.Build();
 
             // Configuration du pipeline de requêtes HTTP
@@ -221,6 +257,7 @@ namespace Mooc
 
             app.UseResponseCaching();
             app.UseAntiforgery();
+            app.UseRateLimiter(); // Ajout de la protection contre les surcharges
 
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();

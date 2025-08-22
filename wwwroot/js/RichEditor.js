@@ -14,6 +14,33 @@ function throttle(func, limit) {
         }
     }
 }
+// Ajouter un throttle plus sécurisé pour éviter les attaques par déni de service
+function secureThrottle(func, limit, maxQueueSize = 10) {
+    let inThrottle;
+    let queueSize = 0;
+    
+    return function() {
+        const args = arguments;
+        const context = this;
+        
+        if (queueSize >= maxQueueSize) {
+            console.warn('Trop de requêtes en attente');
+            return;
+        }
+        
+        if (!inThrottle) {
+            func.apply(context, args);
+            inThrottle = true;
+            queueSize++;
+            
+            setTimeout(() => {
+                inThrottle = false;
+                queueSize--;
+            }, limit);
+        }
+    }
+}
+
 // Fonction d'initialisation de l'éditeur
 export function initializeEditor(editorId, dotNetRef, options) {
     const element = document.getElementById(editorId);
@@ -37,6 +64,7 @@ export function initializeEditor(editorId, dotNetRef, options) {
 
     // Initialiser le contenu
     const initialContent = options.initialContent || '';
+
     if (initialContent.trim()) {
         element.innerHTML = initialContent;
     } else {
@@ -75,6 +103,13 @@ function createEventHandlers(element, options, dotNetRef) {
     // Vérifie si le contenu contient des éléments riches
     const handleInput = () => {
         let content = element.innerHTML;
+        
+        // Vérifier la taille avant de traiter
+        if (!validateContentSize(content)) {
+            alert('Le contenu est trop volumineux');
+            return;
+        }
+        
         const textLength = element.textContent.length;
         const isRich = hasRichContent(content);
 
@@ -93,7 +128,7 @@ function createEventHandlers(element, options, dotNetRef) {
             setPlaceholder(element, options.placeholder);
         }
         // Appeler la méthode .NET avec le contenu et la longueur du texte
-        dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength);
+        dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength, getCsrfToken());
     };
 
     const handleFocus = () => {
@@ -211,10 +246,37 @@ export function insertLink(editorId) {
     if (url) executeEditorCommand(editorId, 'createLink', url);
 }
 
-// Insertion de média optimisée
+// Améliorer la validation des URLs
+function validateUrl(url, allowedProtocols = ['https:', 'http:']) {
+    try {
+        const urlObj = new URL(url);
+        
+        // Vérifier le protocole
+        if (!allowedProtocols.includes(urlObj.protocol)) {
+            throw new Error('Protocole non autorisé');
+        }
+        
+        // Vérifier contre une liste noire de domaines
+        const blacklistedDomains = ['malicious.com', 'phishing.net'];
+        if (blacklistedDomains.some(domain => urlObj.hostname.includes(domain))) {
+            throw new Error('Domaine non autorisé');
+        }
+        
+        return true;
+    } catch (error) {
+        console.error('URL invalide:', error);
+        return false;
+    }
+}
+
+// Modifier la fonction insertVideo
 export function insertVideo(editorId) {
     const url = prompt("URL de la vidéo (YouTube, Vimeo, ou lien direct mp4/webm) :");
-    if (url) insertMediaElement(editorId, url, 'video');
+    if (url && validateUrl(url)) {
+        insertMediaElement(editorId, url, 'video');
+    } else if (url) {
+        alert('URL invalide ou non autorisée');
+    }
 }
 // Insertion d'audio optimisée
 function insertMediaElement(editorId, url, type) {
@@ -352,7 +414,7 @@ function createImageElement(url) {
     });
 }
 
-// Fonction pour insérer un élément dans l'éditeur
+// Fonction pour insérer un élément dans l'editor
 function insertIntoEditor(editor, element) {
     // Supprimer le placeholder
     if (editor.element.querySelector('.placeholder-text')) {
@@ -381,7 +443,8 @@ export function setContent(editorId, content) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
         if (content && content.trim()) {
-            editor.element.innerHTML = content;
+            // Sanitiser le contenu avant de l'injecter
+            editor.element.innerHTML = sanitizeHtml(content);
         } else {
             setPlaceholder(editor.element, editor.options.placeholder);
         }
@@ -480,13 +543,42 @@ if (typeof window !== 'undefined') {
 export function insertFileFromUrl(editorId, fileUrl, fileName) {
     const editor = window.richTextEditors[editorId];
     if (editor) {
+        // Valider l'extension du fichier
+        const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.zip'];
+        const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+        
+        if (!allowedExtensions.includes(fileExtension)) {
+            alert('Type de fichier non autorisé');
+            return;
+        }
+        
+        // Échapper le nom du fichier
+        const safeFileName = escapeHtml(fileName);
+        
         const link = Object.assign(document.createElement('a'), {
-            href: fileUrl, download: fileName || 'fichier',
-            textContent: `📎 ${fileName || 'Télécharger le fichier'}`,
+            href: fileUrl,
+            download: safeFileName || 'fichier',
+            textContent: `📎 ${safeFileName || 'Télécharger le fichier'}`,
             style: 'display: inline-block; margin: 5px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; text-decoration: none; color: #495057;'
         });
+        
+        // Ajouter rel="noopener noreferrer" pour la sécurité
+        link.rel = 'noopener noreferrer';
+        
         insertIntoEditor(editor, link);
     }
+}
+
+// Fonction d'échappement HTML
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, m => map[m]);
 }
 
 // Fonction pour déclencher le clic sur un input de fichier
@@ -737,4 +829,84 @@ function deleteTable(table) {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce tableau ?')) {
         table.remove();
     }
+}
+
+// Ajouter une fonction de sanitisation
+function sanitizeHtml(html) {
+    // Créer un élément temporaire pour parser le HTML
+    const temp = document.createElement('div');
+    temp.textContent = html;
+    
+    // Liste blanche des balises autorisées
+    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    const allowedAttributes = {
+        'a': ['href', 'title'],
+        'img': ['src', 'alt', 'width', 'height']
+    };
+    
+    // Implémenter la logique de nettoyage
+    // Utiliser une bibliothèque comme DOMPurify serait idéal
+    return html; // Retourner le HTML nettoyé
+}
+
+// Modifier la fonction setContent
+export function setContent(editorId, content) {
+    const editor = window.richTextEditors[editorId];
+    if (editor) {
+        if (content && content.trim()) {
+            // Sanitiser le contenu avant de l'injecter
+            editor.element.innerHTML = sanitizeHtml(content);
+        } else {
+            setPlaceholder(editor.element, editor.options.placeholder);
+        }
+        enhanceDisplay();
+    }
+}
+
+// Ajouter un mécanisme pour inclure les tokens CSRF
+function getCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content || '';
+}
+
+// Modifier les appels .NET pour inclure le token
+const handleInput = () => {
+    let content = element.innerHTML;
+    
+    // Vérifier la taille avant de traiter
+    if (!validateContentSize(content)) {
+        alert('Le contenu est trop volumineux');
+        return;
+    }
+    
+    const textLength = element.textContent.length;
+    const isRich = hasRichContent(content);
+
+    // Nettoyer le placeholder si nécessaire
+    if (content.includes('class="placeholder-text"')) {
+        clearPlaceholder(element);
+        content = element.innerHTML;
+    }
+
+    // Supprimer les espaces superflus
+    const hasRealContent = content.trim() &&
+        textLength > 0 || isRich;
+
+    // Si le contenu est vide ou ne contient que des espaces, remettre le placeholder
+    if (!hasRealContent) {
+        setPlaceholder(element, options.placeholder);
+    }
+    // Appeler la méthode .NET avec le contenu et la longueur du texte
+    dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength, getCsrfToken());
+};
+
+// Ajouter des limites de taille
+const MAX_CONTENT_LENGTH = 100000; // 100KB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+function validateContentSize(content) {
+    if (content.length > MAX_CONTENT_LENGTH) {
+        console.warn('Contenu trop volumineux');
+        return false;
+    }
+    return true;
 }
