@@ -603,3 +603,7 @@
         font-size: 1.5rem;
     }
 }
+.navbar-logo {
+    width: 40px;
+    height: 40px;
+}

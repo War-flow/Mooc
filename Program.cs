@@ -40,6 +40,9 @@ namespace Mooc
             // Ajout du service FileUploadService
             builder.Services.AddScoped<FileUploadService>();
 
+            // Ajout du service antivirus (implémentation factice)
+            builder.Services.AddScoped<IAntivirusService, NoOpAntivirusService>();
+
             // Ajout du service BlockService
             builder.Services.AddScoped<BlockService>();
 
@@ -82,7 +85,8 @@ namespace Mooc
             })
             .AddEntityFrameworkStores<ApplicationDbContext>()
             .AddSignInManager()
-            .AddDefaultTokenProviders();
+            .AddDefaultTokenProviders()
+            .AddPasswordValidator<CompromisedPasswordValidator<ApplicationUser>>(); // NOUVEAU
             // Supprimez .AddDefaultUI() car il n'est pas compatible avec Blazor
 
             // Ajoutez la configuration des cookies séparément
@@ -165,14 +169,24 @@ namespace Mooc
             builder.Services.AddHealthChecks();
 
             // Ajouter le logging et la configuration
-            builder.Services.AddLogging();
+            builder.Services.AddLogging(builder =>
+            {
+                builder.AddConsole();
+                // builder.AddFile("logs/security-{Date}.log"); // NLog ou Serilog
+            });
 
             // Configuration des notifications
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddHostedService<SessionExpiryService>();
 
             // Ajout des services SignalR
-            builder.Services.AddSignalR();
+            builder.Services.AddSignalR(options =>
+            {
+                options.EnableDetailedErrors = builder.Environment.IsDevelopment();
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
+                options.HandshakeTimeout = TimeSpan.FromSeconds(15);
+                options.MaximumReceiveMessageSize = 32 * 1024; // 32KB max
+            });
 
             // Ajout du service d'erreurs
             builder.Services.AddScoped<IErrorHandlingService, ErrorHandlingService>();
@@ -198,25 +212,49 @@ namespace Mooc
             // Ajouter la protection CSRF
             builder.Services.AddAntiforgery(options =>
             {
-                options.HeaderName = "RequestVerificationToken";
+                options.HeaderName = "X-CSRF-TOKEN";
                 options.Cookie.Name = "__RequestVerificationToken";
                 options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                options.Cookie.HttpOnly = true;
             });
 
             // Rate limiting pour éviter les attaques DoS
             builder.Services.AddRateLimiter(options =>
             {
+                // Limite globale
                 options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
                     RateLimitPartition.GetFixedWindowLimiter(
-                        partitionKey: context.User?.Identity?.Name ?? context.Request.Headers.Host.ToString(),
-                        factory: partition => new FixedWindowRateLimiterOptions
+                        partitionKey: GetClientIdentifier(context),
+                        factory: _ => new FixedWindowRateLimiterOptions
                         {
-                            AutoReplenishment = true,
                             PermitLimit = 100,
                             Window = TimeSpan.FromMinutes(1)
                         }));
+                
+                // Limite pour les uploads
+                options.AddPolicy("FileUpload", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: GetClientIdentifier(context),
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 5, // 5 uploads par minute max
+                            Window = TimeSpan.FromMinutes(1)
+                        }));
+                
+                // Limite pour l'authentification
+                options.AddPolicy("Authentication", context =>
+                    RateLimitPartition.GetFixedWindowLimiter(
+                        partitionKey: GetClientIdentifier(context),
+                        factory: _ => new FixedWindowRateLimiterOptions
+                        {
+                            PermitLimit = 3, // 3 tentatives par 5 minutes
+                            Window = TimeSpan.FromMinutes(5)
+                        }));
             });
+
+            // Ajout du HttpClient pour la vérification des mots de passe
+            builder.Services.AddHttpClient();
 
             var app = builder.Build();
 
@@ -259,6 +297,19 @@ namespace Mooc
             app.UseAntiforgery();
             app.UseRateLimiter(); // Ajout de la protection contre les surcharges
 
+            // ✅ AJOUTER : Middleware de sécurité
+            app.Use(async (context, next) =>
+            {
+                // Headers de sécurité
+                context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+                context.Response.Headers.Append("X-Frame-Options", "DENY");
+                context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
+                context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+                context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+                
+                await next();
+            });
+
             app.MapRazorComponents<App>()
                 .AddInteractiveServerRenderMode();
 
@@ -269,7 +320,7 @@ namespace Mooc
             app.MapHealthChecks("/health");
 
             // Ajout des hubs SignalR
-            app.MapHub<SessionHub>("/sessionHub");
+            app.MapHub<SessionHub>("/sessionHub").RequireAuthorization();
 
             using (var scope = app.Services.CreateScope())
             {
@@ -279,6 +330,86 @@ namespace Mooc
 
             await app.RunAsync();
         }
+
+        private static string GetClientIdentifier(HttpContext context)
+        {
+            return context.User?.Identity?.Name ?? 
+                   context.Connection.RemoteIpAddress?.ToString() ?? 
+                   "anonymous";
+        }
     }
         
+}
+
+// ✅ AJOUTER : Service de validation des mots de passe compromis
+public class CompromisedPasswordValidator<TUser> : IPasswordValidator<TUser> where TUser : class
+{
+    private readonly HttpClient _httpClient;
+    private readonly ILogger<CompromisedPasswordValidator<TUser>> _logger;
+
+    public CompromisedPasswordValidator(IHttpClientFactory httpClientFactory, ILogger<CompromisedPasswordValidator<TUser>> logger)
+    {
+        _httpClient = httpClientFactory.CreateClient();
+        _httpClient.Timeout = TimeSpan.FromSeconds(5); // Timeout de 5 secondes
+        _logger = logger;
+    }
+
+    public async Task<IdentityResult> ValidateAsync(UserManager<TUser> manager, TUser user, string password)
+    {
+        // Vérifier contre une liste de mots de passe compromis (Have I Been Pwned API)
+        var isCompromised = await CheckPasswordBreachAsync(password);
+        if (isCompromised)
+        {
+            return IdentityResult.Failed(new IdentityError 
+            { 
+                Code = "CompromisedPassword", 
+                Description = "Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre." 
+            });
+        }
+        return IdentityResult.Success;
+    }
+
+    private async Task<bool> CheckPasswordBreachAsync(string password)
+    {
+        try
+        {
+            // Calculer le hash SHA-1 du mot de passe
+            using var sha1 = System.Security.Cryptography.SHA1.Create();
+            var hashBytes = sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(password));
+            var hash = Convert.ToHexString(hashBytes);
+
+            // Prendre les 5 premiers caractères pour l'API k-anonymity
+            var prefix = hash[..5];
+            var suffix = hash[5..];
+
+            // Appeler l'API Have I Been Pwned avec le préfixe
+            var response = await _httpClient.GetAsync($"https://api.pwnedpasswords.com/range/{prefix}");
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Échec de la vérification du mot de passe compromis. Statut: {StatusCode}", response.StatusCode);
+                return false; // En cas d'erreur, autoriser le mot de passe
+            }
+
+            var content = await response.Content.ReadAsStringAsync();
+            
+            // Vérifier si le suffixe apparaît dans la réponse
+            var lines = content.Split('\n');
+            foreach (var line in lines)
+            {
+                if (line.StartsWith(suffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("Mot de passe compromis détecté");
+                    return true; // Mot de passe compromis
+                }
+            }
+
+            return false; // Mot de passe non compromis
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Erreur lors de la vérification du mot de passe compromis");
+            return false; // En cas d'erreur, autoriser le mot de passe
+        }
+    }
 }

@@ -20,6 +20,7 @@ namespace Mooc.Services
         private readonly ILogger<FileUploadService> _logger;
         private readonly IConfiguration _configuration;
         private readonly IContentValidationService _validationService;
+        private readonly IAntivirusService _antivirusService; // Injecter le service antivirus
 
         // Configuration par défaut
         private readonly string[] _allowedImageExtensions = { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp" };
@@ -37,12 +38,13 @@ namespace Mooc.Services
         /// <summary>
         /// Constructeur du service d'upload de fichiers.
         /// </summary>
-        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IConfiguration configuration, IContentValidationService validationService)
+        public FileUploadService(IWebHostEnvironment environment, ILogger<FileUploadService> logger, IConfiguration configuration, IContentValidationService validationService, IAntivirusService antivirusService)
         {
             _environment = environment;
             _logger = logger;
             _configuration = configuration;
             _validationService = validationService;
+            _antivirusService = antivirusService;
         }
 
         /// <summary>
@@ -54,20 +56,35 @@ namespace Mooc.Services
             
             try
             {
-                ValidateFile(file, "image", _allowedImageExtensions, _maxFileSizes["image"]);
+                // Validation de la signature de fichier (magic bytes)
+                await using var stream = file.OpenReadStream(3 * 1024 * 1024);
+                var buffer = new byte[4];
+                await stream.ReadAsync(buffer, 0, 4);
                 
+                // Vérifier la signature réelle du fichier
+                if (!IsValidImageSignature(buffer, file.ContentType))
+                {
+                    throw new InvalidOperationException("Le fichier n'est pas une image valide");
+                }
+                
+                // Scan antivirus si disponible
+                if (_antivirusService != null)
+                {
+                    var scanResult = await _antivirusService.ScanFileAsync(stream);
+                    if (!scanResult.IsClean)
+                    {
+                        throw new InvalidOperationException("Fichier détecté comme malveillant");
+                    }
+                }
+                
+                // Générer un nom unique et sécurisé
+                var safeFileName = GenerateUniqueFileName(file.Name);
+                
+                // Stocker dans un répertoire isolé avec permissions limitées
                 var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "images");
-                EnsureDirectoryExists(uploadsFolder);
-
-                var uniqueFileName = GenerateUniqueFileName(file.Name);
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
-
-                await SaveFileAsync(file, filePath, _maxFileSizes["image"]);
+                SetSecureDirectoryPermissions(uploadsFolder);
                 
-                var relativePath = $"/uploads/images/{uniqueFileName}";
-                _logger.LogInformation("Upload d'image réussi: {RelativePath}", relativePath);
-                
-                return relativePath;
+                return await SaveFileSecurely(stream, uploadsFolder, safeFileName);
             }
             catch (Exception ex)
             {
@@ -268,6 +285,70 @@ namespace Mooc.Services
                     FileName = browserFile.Name
                 }.ToString()
             };
+        }
+
+        private bool IsValidImageSignature(byte[] buffer, string contentType)
+        {
+            // Vérifier les magic bytes des formats d'images
+            return contentType switch
+            {
+                "image/jpeg" => buffer[0] == 0xFF && buffer[1] == 0xD8,
+                "image/png" => buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47,
+                "image/gif" => (buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46),
+                _ => false
+            };
+        }
+
+        /// <summary>
+        /// Définit des permissions sécurisées sur le dossier spécifié.
+        /// Sous Windows, cette méthode ne fait rien.
+        /// Sous Linux, elle définit les permissions à 750.
+        /// </summary>
+        private void SetSecureDirectoryPermissions(string directoryPath)
+        {
+            try
+            {
+                if (!Directory.Exists(directoryPath))
+                    return;
+
+                if (OperatingSystem.IsLinux())
+                {
+                    // Nécessite System.Runtime.InteropServices et System.Diagnostics
+                    var chmod = new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = "/bin/chmod",
+                        Arguments = "750 " + directoryPath,
+                        RedirectStandardOutput = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    };
+                    using var process = System.Diagnostics.Process.Start(chmod);
+                    process?.WaitForExit();
+                }
+                // Sous Windows, on pourrait utiliser DirectorySecurity si besoin
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Impossible de définir les permissions sécurisées sur le dossier: {DirectoryPath}", directoryPath);
+            }
+        }
+
+        private async Task<string> SaveFileSecurely(Stream inputStream, string uploadsFolder, string fileName)
+        {
+            EnsureDirectoryExists(uploadsFolder);
+            var filePath = Path.Combine(uploadsFolder, fileName);
+
+            // Remettre le stream à la position 0 si possible
+            if (inputStream.CanSeek)
+                inputStream.Seek(0, SeekOrigin.Begin);
+
+            await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true);
+            await inputStream.CopyToAsync(fileStream);
+
+            var relativePath = $"/uploads/images/{fileName}";
+            _logger.LogInformation("Upload d'image réussi: {RelativePath}", relativePath);
+
+            return relativePath;
         }
     }
 }
