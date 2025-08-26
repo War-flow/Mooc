@@ -14,32 +14,7 @@ function throttle(func, limit) {
         }
     }
 }
-// Ajouter un throttle plus sécurisé pour éviter les attaques par déni de service
-function secureThrottle(func, limit, maxQueueSize = 10) {
-    let inThrottle;
-    let queueSize = 0;
-    
-    return function() {
-        const args = arguments;
-        const context = this;
-        
-        if (queueSize >= maxQueueSize) {
-            console.warn('Trop de requêtes en attente');
-            return;
-        }
-        
-        if (!inThrottle) {
-            func.apply(context, args);
-            inThrottle = true;
-            queueSize++;
-            
-            setTimeout(() => {
-                inThrottle = false;
-                queueSize--;
-            }, limit);
-        }
-    }
-}
+
 
 // Fonction d'initialisation de l'éditeur
 export function initializeEditor(editorId, dotNetRef, options) {
@@ -364,16 +339,6 @@ function getMimeType(url, type) {
     return MIME_TYPES[type]?.[ext] || (type === 'video' ? 'video/mp4' : 'audio/mpeg');
 }
 
-// Fonctions d'insertion simplifiées
-export function insertVideoFromUrl(editorId, videoUrl) {
-    insertMediaFromUrl(editorId, videoUrl, 'video');
-}
-
-// Fonction pour insérer un audio à partir d'une URL
-export function insertAudioFromUrl(editorId, audioUrl) {
-    insertMediaFromUrl(editorId, audioUrl, 'audio');
-}
-
 // Fonction pour insérer une image à partir d'une URL
 export function insertImageFromUrl(editorId, imageUrl) {
     insertMediaFromUrl(editorId, imageUrl, 'image');
@@ -396,14 +361,6 @@ function createMediaElement(url, type) {
         case 'image': return createImageElement(url);
         default: throw new Error('Type non supporté');
     }
-}
-
-// Fonction pour créer un élément audio
-function createAudioElement(url) {
-    return Object.assign(document.createElement('audio'), {
-        controls: true, src: url,
-        style: 'width: 100%; display: block; margin: 10px auto;'
-    });
 }
 
 // Fonction pour créer un élément image
@@ -539,62 +496,9 @@ if (typeof window !== 'undefined') {
     }
 }
 
-// Fonctions utilitaires restantes
-export function insertFileFromUrl(editorId, fileUrl, fileName) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        // Valider l'extension du fichier
-        const allowedExtensions = ['.pdf', '.doc', '.docx', '.txt', '.zip'];
-        const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
-        
-        if (!allowedExtensions.includes(fileExtension)) {
-            alert('Type de fichier non autorisé');
-            return;
-        }
-        
-        // Échapper le nom du fichier
-        const safeFileName = escapeHtml(fileName);
-        
-        const link = Object.assign(document.createElement('a'), {
-            href: fileUrl,
-            download: safeFileName || 'fichier',
-            textContent: `📎 ${safeFileName || 'Télécharger le fichier'}`,
-            style: 'display: inline-block; margin: 5px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; text-decoration: none; color: #495057;'
-        });
-        
-        // Ajouter rel="noopener noreferrer" pour la sécurité
-        link.rel = 'noopener noreferrer';
-        
-        insertIntoEditor(editor, link);
-    }
-}
-
-// Fonction d'échappement HTML
-function escapeHtml(text) {
-    const map = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-    };
-    return text.replace(/[&<>"']/g, m => map[m]);
-}
-
 // Fonction pour déclencher le clic sur un input de fichier
 export function triggerFileInputClick(selector) {
     document.querySelector(selector)?.click();
-}
-
-// Fonction pour initialiser les toolbars collantes
-export function reinitializeStickyToolbars() {
-    stickyToolbars.forEach((data, editorId) => {
-        window.removeEventListener('scroll', data.scrollListener);
-        data.toolbar.classList.remove('sticky');
-        data.editorElement.style.marginTop = '';
-    });
-    stickyToolbars.clear();
-    Object.keys(window.richTextEditors).forEach(initializeStickyToolbar);
 }
 
 // Fonction pour insérer un tableau
@@ -833,71 +737,170 @@ function deleteTable(table) {
 
 // Ajouter une fonction de sanitisation
 function sanitizeHtml(html) {
-    // Créer un élément temporaire pour parser le HTML
-    const temp = document.createElement('div');
-    temp.textContent = html;
+    // Créer un parser DOM temporaire
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
     
     // Liste blanche des balises autorisées
-    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i', 'div', 'iframe', 'font','span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'iframe', 'video', 'audio', 'source', 'strike', "blockquote"];
+    
+    // Liste blanche des attributs par balise
     const allowedAttributes = {
-        'a': ['href', 'title'],
-        'img': ['src', 'alt', 'width', 'height']
+        'a': ['href', 'title', 'target', 'rel', 'style'],
+        'img': ['src', 'alt', 'width', 'height', 'loading', 'style','class'],
+        'iframe': ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style'],
+        'video': ['src', 'controls', 'width', 'height', 'preload', 'style'],
+        'audio': ['src', 'controls', 'preload', 'style'],
+        'source': ['src', 'type'],
+        'div': ['class', 'style', 'data-video-element', 'align'],
+        'span': ['class', 'style'],
+        'table': ['class', 'style'],
+        'td': ['style', 'contenteditable'],
+        'th': ['style', 'contenteditable'],
+        // Ajouter style à toutes les balises de formatage
+        'p': ['style', 'class'],
+        'h1': ['style', 'class'],
+        'h2': ['style', 'class'],
+        'h3': ['style', 'class'],
+        'h4': ['style', 'class'],
+        'h5': ['style', 'class'],
+        'h6': ['style', 'class'],
+        'b': ['style', 'class'],
+        'i': ['style', 'class'],
+        'u': ['style', 'class'],
+        'strong': ['style', 'class'],
+        'em': ['style', 'class'],
+        'strike': ['style', 'class'],
+        'font': ['color', 'size', 'face', 'style']
     };
     
-    // Implémenter la logique de nettoyage
-    // Utiliser une bibliothèque comme DOMPurify serait idéal
-    return html; // Retourner le HTML nettoyé
-}
-
-// Modifier la fonction setContent
-export function setContent(editorId, content) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        if (content && content.trim()) {
-            // Sanitiser le contenu avant de l'injecter
-            editor.element.innerHTML = sanitizeHtml(content);
-        } else {
-            setPlaceholder(editor.element, editor.options.placeholder);
+    // Fonction récursive pour nettoyer les nœuds
+    function cleanNode(node) {
+        // Traiter les nœuds enfants d'abord (en sens inverse pour éviter les problèmes d'index)
+        for (let i = node.childNodes.length - 1; i >= 0; i--) {
+            const child = node.childNodes[i];
+            
+            if (child.nodeType === Node.ELEMENT_NODE) {
+                const tagName = child.tagName.toLowerCase();
+                
+                // Vérifier si la balise est autorisée
+                if (!allowedTags.includes(tagName)) {
+                    // Remplacer la balise non autorisée par son contenu texte
+                    const textNode = document.createTextNode(child.textContent);
+                    node.replaceChild(textNode, child);
+                } else {
+                    // Nettoyer les attributs
+                    const allowedAttrs = allowedAttributes[tagName] || [];
+                    const attrs = Array.from(child.attributes);
+                    
+                    attrs.forEach(attr => {
+                        if (!allowedAttrs.includes(attr.name)) {
+                            child.removeAttribute(attr.name);
+                        } else {
+                            // Valider les valeurs des attributs
+                            const cleanValue = sanitizeAttributeValue(attr.name, attr.value, tagName);
+                            if (cleanValue !== false) {
+                                child.setAttribute(attr.name, cleanValue);
+                            } else {
+                                child.removeAttribute(attr.name);
+                            }
+                        }
+                    });
+                    
+                    // Nettoyer récursivement les enfants
+                    cleanNode(child);
+                }
+            }
         }
-        enhanceDisplay();
     }
+    
+    // Fonction pour valider et nettoyer les valeurs d'attributs
+    function sanitizeAttributeValue(attrName, value, tagName) {
+        switch (attrName) {
+            case 'href':
+            case 'src':
+                // Valider les URLs
+                try {
+                    const url = new URL(value, window.location.href);
+                    // Autoriser uniquement certains protocoles
+                    const allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
+                    
+                    // Pour les iframes de vidéo, autoriser seulement les domaines de confiance
+                    if (tagName === 'iframe') {
+                        const trustedVideoHosts = [
+                            'youtube.com', 'www.youtube.com',
+                            'vimeo.com', 'player.vimeo.com',
+                            'dailymotion.com', 'www.dailymotion.com'
+                        ];
+                        if (!trustedVideoHosts.some(host => url.hostname.includes(host))) {
+                            return false;
+                        }
+                    }
+                    
+                    if (!allowedProtocols.includes(url.protocol)) {
+                        return false;
+                    }
+                    return value;
+                } catch {
+                    return false;
+                }
+                
+            case 'style':
+                // Nettoyer les styles dangereux
+                return sanitizeStyles(value);
+                
+            case 'target':
+                // Autoriser seulement _blank et _self
+                return ['_blank', '_self'].includes(value) ? value : '_self';
+                
+            case 'rel':
+                // Forcer noopener noreferrer pour les liens externes
+                return 'noopener noreferrer';
+                
+            default:
+                return value;
+        }
+    }
+    
+    // Fonction pour nettoyer les styles CSS (améliorer la fonction existante)
+    function sanitizeStyles(styleString) {
+        const allowedProperties = [
+            'color', 'background-color', 'font-size', 'font-weight', 'font-style',
+            'text-align', 'text-decoration', 'padding', 'margin', 'border',
+            'width', 'height', 'max-width', 'max-height', 'display', 'position',
+            'top', 'left', 'right', 'bottom', 'float', 'clear',
+            // Ajouter plus de propriétés de couleur
+            'border-color', 'outline-color', 'text-shadow', 'box-shadow'
+        ];
+        
+        const styles = styleString.split(';').filter(s => s.trim());
+        const cleanedStyles = [];
+        
+        styles.forEach(style => {
+            const [property, value] = style.split(':').map(s => s.trim());
+            
+            if (property && value && allowedProperties.includes(property)) {
+                // Vérifier que la valeur ne contient pas de JavaScript
+                if (!value.includes('javascript:') && !value.includes('expression(')) {
+                    cleanedStyles.push(`${property}: ${value}`);
+                }
+            }
+        });
+        
+        return cleanedStyles.join('; ');
+    }
+    
+    // Nettoyer le document
+    cleanNode(doc.body);
+    
+    // Retourner le HTML nettoyé
+    return doc.body.innerHTML;
 }
 
 // Ajouter un mécanisme pour inclure les tokens CSRF
 function getCsrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content || '';
 }
-
-// Modifier les appels .NET pour inclure le token
-const handleInput = () => {
-    let content = element.innerHTML;
-    
-    // Vérifier la taille avant de traiter
-    if (!validateContentSize(content)) {
-        alert('Le contenu est trop volumineux');
-        return;
-    }
-    
-    const textLength = element.textContent.length;
-    const isRich = hasRichContent(content);
-
-    // Nettoyer le placeholder si nécessaire
-    if (content.includes('class="placeholder-text"')) {
-        clearPlaceholder(element);
-        content = element.innerHTML;
-    }
-
-    // Supprimer les espaces superflus
-    const hasRealContent = content.trim() &&
-        textLength > 0 || isRich;
-
-    // Si le contenu est vide ou ne contient que des espaces, remettre le placeholder
-    if (!hasRealContent) {
-        setPlaceholder(element, options.placeholder);
-    }
-    // Appeler la méthode .NET avec le contenu et la longueur du texte
-    dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength, getCsrfToken());
-};
 
 // Ajouter des limites de taille
 const MAX_CONTENT_LENGTH = 100000; // 100KB

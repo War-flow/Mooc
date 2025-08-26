@@ -94,13 +94,6 @@
                             </label>
                         </div>
 
-                        <div class="mb-3 form-check">
-                            <InputCheckbox @bind-Value="coursModel.IsRequired" class="form-check-input" id="isRequiredCheck" />
-                            <label class="form-check-label" for="isRequiredCheck">
-                                Cours obligatoire
-                            </label>
-                        </div>
-
                         <div class="mb-3">
                             <label class="form-label">Ordre d'affichage</label>
                             <InputNumber @bind-Value="coursModel.Order" class="form-control" />
@@ -117,10 +110,10 @@
             </div>
             <div class="card-body">
                 <div>
-                    <buton type="button" class="btn btn-cancel" @onclick="RetourVersListe"
+                    <button type="button" class="btn btn-cancel" @onclick="RetourVersListe"
                         aria-label="Annuler les modifications">
                         <i class="bi bi-x-lg"></i> Annuler
-                    </buton>
+                    </button>
 
                     <button type="submit" class="btn btn-valid">
                         <i class="bi bi-floppy"></i> @(isEditing ? "Mettre à jour" : "Créer le cours")
@@ -182,7 +175,6 @@
             {
                 SessionId = sessionIdFromUrl ?? 0,
                 IsPublished = false,
-                IsRequired = false,
                 Order = 1,
                 Duration = 30
             };
@@ -219,7 +211,6 @@
                     Description = cours.Description ?? string.Empty,
                     SessionId = cours.SessionId,
                     IsPublished = cours.IsPublished,
-                    IsRequired = cours.IsRequired,
                     Order = cours.Order,
                 };
 
@@ -331,7 +322,6 @@
                     cours.Description = coursModel.Description;
                     cours.SessionId = coursModel.SessionId;
                     cours.IsPublished = coursModel.IsPublished;
-                    cours.IsRequired = coursModel.IsRequired;
                     cours.Order = coursModel.Order;
                     cours.Content = blocksJson;
                     cours.UpdatedAt = DateTime.UtcNow;
@@ -349,7 +339,6 @@
                     Description = coursModel.Description,
                     SessionId = coursModel.SessionId,
                     IsPublished = coursModel.IsPublished,
-                    IsRequired = coursModel.IsRequired,
                     Order = coursModel.Order,
                     Content = blocksJson,
                     CreatedAt = DateTime.UtcNow,
@@ -398,7 +387,5 @@
         public int Duration { get; set; } = 30;
 
         public bool IsPublished { get; set; }
-
-        public bool IsRequired { get; set; }
     }
 }

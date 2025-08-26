@@ -83,10 +83,6 @@ else
                             <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
                                 @(cours.IsPublished ? "Disponible" : "À venir")
                             </span>
-                            @if (cours.IsRequired)
-                            {
-                                <span class="badge bg-warning">Obligatoire</span>
-                            }
                             <span class="badge @GetCourseStatusBadgeClass(cours.Id)">
                                 @GetCourseCompletionStatus(cours.Id)
                             </span>

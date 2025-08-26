@@ -524,14 +524,14 @@ namespace Mooc.Services
             return await context.CourseProgresses
                 .Where(cp => cp.UserId == userId && cp.IsCompleted)
                 .Join(context.Courses, cp => cp.CoursId, c => c.Id, (cp, c) => c)
-                .Where(c => c.SessionId == sessionId && c.IsRequired && c.IsPublished)
+                .Where(c => c.SessionId == sessionId && c.IsPublished)
                 .CountAsync();
         }
 
         private async Task<int> GetTotalRequiredCoursesCountAsync(ApplicationDbContext context, int sessionId)
         {
             return await context.Courses
-                .CountAsync(c => c.SessionId == sessionId && c.IsRequired && c.IsPublished);
+                .CountAsync(c => c.SessionId == sessionId && c.IsPublished);
         }
 
         private string GenerateCertificateNumber()

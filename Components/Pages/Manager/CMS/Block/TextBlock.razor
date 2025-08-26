@@ -9,6 +9,8 @@
 @using Mooc.Components.Shared
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @implements IAsyncDisposable
+@inject IContentValidationService ContentValidationService
+
 
 @using System.ComponentModel.DataAnnotations
 @using System.Text.Json
@@ -178,9 +180,9 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender && !IsEditing && TypedContent.Text.Contains("<img"))
+        if (!firstRender && !IsEditing && (TypedContent.Text.Contains("<img") || HasVideoContent(TypedContent.Text)))
         {
-            await EnhanceImageDisplay();
+            await EnhanceMediaDisplay();
         }
 
         // Initialiser l'éditeur seulement au premier rendu en mode édition
@@ -223,7 +225,21 @@
         }
     }
 
-    private async Task EnhanceImageDisplay()
+    // ⚠️ CORRECTION : Vérifier la présence de contenu vidéo
+    private bool HasVideoContent(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return false;
+            
+        return content.Contains("data-video-element") || 
+               content.Contains("<iframe") || 
+               content.Contains("<video") ||
+               content.Contains("youtube.com") ||
+               content.Contains("vimeo.com") ||
+               content.Contains("dailymotion.com");
+    }
+
+    private async Task EnhanceMediaDisplay()
     {
         try
         {
@@ -231,7 +247,7 @@
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur amélioration images: {ex.Message}");
+            Console.WriteLine($"Erreur amélioration médias: {ex.Message}");
         }
     }
 
@@ -240,11 +256,8 @@
         if (string.IsNullOrEmpty(htmlContent))
             return string.Empty;
             
-        var cleaned = htmlContent
-            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
-            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
-            
-        return cleaned.Trim();
+        // Utiliser le niveau "Standard" pour l'affichage en lecture seule
+        return ContentValidationService.SanitizeHtmlContent(htmlContent, SanitizationLevel.Standard);
     }
 
     private async Task OnTextContentChanged(string newContent)
@@ -252,7 +265,8 @@
         // Mettre à jour l'état local immédiatement
         currentEditorContent = newContent;
         
-        var contentToSave = PreserveImagesInContent(newContent);
+        // ⚠️ CORRECTION : Préserver TOUS les médias (images ET vidéos)
+        var contentToSave = PreserveMediaContent(newContent);
         TypedContent.Text = contentToSave;
         
         // Debounce pour éviter trop d'appels
@@ -270,19 +284,47 @@
         }
     }
 
-    private string PreserveImagesInContent(string content)
+    // ⚠️ CORRECTION : Méthode améliorée pour préserver TOUS les médias ET les couleurs
+    private string PreserveMediaContent(string content)
     {
         if (string.IsNullOrEmpty(content))
             return string.Empty;
 
-        if (content.Contains("<img"))
+        // Nettoyer seulement les placeholders
+        content = content
+            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
+            .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "")
+            .Replace("<div class=\"placeholder-text\" style=\"color: #6c757d; font-style: italic; pointer-events: none;\">", "");
+
+        // Vérifier si le contenu a des éléments riches ou des couleurs
+        bool hasRichContent = content.Contains("<img") || 
+                            content.Contains("data-video-element") || 
+                            content.Contains("<iframe") || 
+                            content.Contains("<video") ||
+                            content.Contains("<audio") ||
+                            content.Contains("<b>") ||
+                            content.Contains("<i>") ||
+                            content.Contains("<u>") ||
+                            content.Contains("<strong>") ||
+                            content.Contains("<em>") ||
+                            content.Contains("<strike>") ||
+                            content.Contains("<font") ||
+                            content.Contains("youtube.com") ||
+                            content.Contains("vimeo.com") ||
+                            content.Contains("dailymotion.com") ||
+                            // Vérifier la présence de couleurs
+                            content.Contains("color:") ||
+                            content.Contains("background-color:") ||
+                            content.Contains("style=");
+
+        if (hasRichContent)
         {
-            return content
-                .Replace("<div style=\"color: #6c757d; font-style: italic;\">Commencez à écrire...</div>", "")
-                .Replace("<div style=\"color: #6c757d; font-style: italic;\">Saisissez le contenu de votre bloc...</div>", "");
+            // Utiliser le niveau "Minimal" pour préserver le formatage et les couleurs
+            return ContentValidationService.SanitizeHtmlContent(content, SanitizationLevel.Minimal);
         }
         
-        return SanitizeHtmlContent(content);
+        // Pour le texte simple, utiliser aussi la sanitisation minimale
+        return ContentValidationService.SanitizeHtmlContent(content, SanitizationLevel.Minimal);
     }
 
     private bool IsValid()
@@ -291,6 +333,7 @@
         
         return !string.IsNullOrWhiteSpace(textContent) || 
                textContent.Contains("<img") ||
+               HasVideoContent(textContent) ||
                !string.IsNullOrWhiteSpace(TypedContent.Title);
     }
 
@@ -355,8 +398,9 @@
             StateHasChanged();
             ClearError();
 
-            // Utiliser le contenu de l'éditeur
+            // ⚠️ CORRECTION : Utiliser le contenu préservé
             var finalContent = string.IsNullOrWhiteSpace(currentEditorContent) ? TypedContent.Text : currentEditorContent;
+            finalContent = PreserveMediaContent(finalContent);
             
             Block.Title = TypedContent.Title;
             Block.Text = finalContent;
@@ -381,7 +425,7 @@
                     return;
                 }
 
-                await VerifyImageSave();
+                await VerifyMediaSave();
             }
 
             _originalContent = null;
@@ -393,7 +437,7 @@
             
             // Améliorer l'affichage après sauvegarde
             await Task.Delay(100);
-            await EnhanceImageDisplay();
+            await EnhanceMediaDisplay();
         }
         catch (Exception ex)
         {
@@ -473,7 +517,8 @@
         errorMessage = null;
     }
 
-    private async Task VerifyImageSave()
+    // ⚠️ CORRECTION : Vérifier la sauvegarde de TOUS les médias
+    private async Task VerifyMediaSave()
     {
         try
         {
@@ -487,9 +532,15 @@
                 var blocksFromDb = JsonSerializer.Deserialize<List<CourBuilder.CoursBlock>>(cours.Content) ?? new();
                 var savedBlock = blocksFromDb.FirstOrDefault(b => b.Id == Block.Id);
                 
-                if (savedBlock?.Text?.Contains("/uploads/images/") == true)
+                if (savedBlock?.Text != null)
                 {
-                    Console.WriteLine("✅ Image sauvegardée avec succès");
+                    bool hasImage = savedBlock.Text.Contains("/uploads/images/");
+                    bool hasVideo = HasVideoContent(savedBlock.Text);
+                    
+                    if (hasImage)
+                        Console.WriteLine("✅ Image sauvegardée avec succès");
+                    if (hasVideo)
+                        Console.WriteLine("✅ Vidéo sauvegardée avec succès");
                 }
             }
         }

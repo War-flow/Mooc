@@ -33,7 +33,7 @@ namespace Mooc.Services
 
                 // Récupérer tous les cours obligatoires de la session
                 var requiredCourses = await context.Courses
-                    .Where(c => c.SessionId == sessionId && c.IsRequired && c.IsPublished)
+                    .Where(c => c.SessionId == sessionId && c.IsPublished)
                     .Select(c => c.Id)
                     .ToListAsync();
 

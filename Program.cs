@@ -201,6 +201,14 @@ namespace Mooc
 
             // Ajouter HtmlAgilityPack pour la validation HTML
             builder.Services.AddScoped<IContentValidationService, ContentValidationService>();
+            
+            builder.Services.Configure<ContentValidationSettings>(
+                builder.Configuration.GetSection("ContentValidation"));
+
+            builder.Services.AddHttpClient("ValidationClient", client =>
+            {
+                client.DefaultRequestHeaders.Add("User-Agent", "Mooc-ContentValidator/1.0");
+            });
 
             // Configuration de sécurité renforcée
             builder.Services.Configure<FormOptions>(options =>

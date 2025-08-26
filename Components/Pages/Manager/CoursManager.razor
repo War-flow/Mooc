@@ -55,10 +55,6 @@
                                 <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
                                     @(cours.IsPublished ? "Publié" : "Brouillon")
                                 </span>
-                                @if (cours.IsRequired)
-                                {
-                                    <span class="badge bg-warning ms-1">Obligatoire</span>
-                                }
                             </div>
                         </div>
                         
@@ -77,18 +73,18 @@
                         
                         <div class="course-actions">
                             <div class="btn-group w-100" role="group">
-                                <button class="btn btn-outline-info" @onclick="() => VoirCours(cours.Id)" title="Voir le module">
+                                <button class="btn" @onclick="() => VoirCours(cours.Id)" title="Voir le module">
                                     <i class="bi bi-eye"></i>
                                 </button>
-                                <button class="btn btn-outline-primary" @onclick="() => EditerCours(cours.Id)" title="Modifier le module">
+                                <button class="btn" @onclick="() => EditerCours(cours.Id)" title="Modifier le module">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                <button class="btn @(cours.IsPublished ? "btn-success" : "btn-outline-secondary")" 
+                                <button class="btn" 
                                         @onclick="() => ToggleCourseStatus(cours.Id)" 
                                         title="@(cours.IsPublished ? "Dépublier" : "Publier")">
                                     <i class="bi @(cours.IsPublished ? "bi-eye-slash" : "bi-eye")"></i>
                                 </button>
-                                <button class="btn btn-outline-danger" @onclick="() => SupprimerCoursConfirmation(cours.Id)" title="Supprimer le module">
+                                <button class="btn" @onclick="() => SupprimerCoursConfirmation(cours.Id)" title="Supprimer le module">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -235,7 +231,7 @@ else
             if (cours != null)
             {
                 cours.IsPublished = !cours.IsPublished;
-                cours.UpdatedAt = DateTime.Now;
+                cours.UpdatedAt = DateTime.UtcNow;
                 await context.SaveChangesAsync();
 
                 // Mettre à jour la liste locale

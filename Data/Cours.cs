@@ -22,9 +22,6 @@ namespace Mooc.Data
         // Indique si le cours est publié
         public bool IsPublished { get; set; } = false;
         
-        // Indique si le cours est obligatoire
-        public bool IsRequired { get; set; } = false;
-        
         // Dates de création et mise à jour
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
