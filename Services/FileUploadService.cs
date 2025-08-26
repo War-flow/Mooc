@@ -56,35 +56,57 @@ namespace Mooc.Services
             
             try
             {
-                // Validation de la signature de fichier (magic bytes)
-                await using var stream = file.OpenReadStream(3 * 1024 * 1024);
-                var buffer = new byte[4];
-                await stream.ReadAsync(buffer, 0, 4);
+                // ⭐ CORRECTION : Validation de base d'abord
+                ValidateFile(file, "image", _allowedImageExtensions, _maxFileSizes["image"]);
                 
-                // Vérifier la signature réelle du fichier
-                if (!IsValidImageSignature(buffer, file.ContentType))
+                // ⭐ CORRECTION : Utiliser une approche en plusieurs étapes pour éviter la corruption
+                
+                // Étape 1 : Lire le fichier complet en mémoire pour validation
+                byte[] fileContent;
+                await using (var stream = file.OpenReadStream(_maxFileSizes["image"]))
+                {
+                    using var memoryStream = new MemoryStream();
+                    await stream.CopyToAsync(memoryStream);
+                    fileContent = memoryStream.ToArray();
+                }
+                
+                // Étape 2 : Validation de la signature sur les premiers bytes
+                if (fileContent.Length < 4)
+                {
+                    throw new InvalidOperationException("Fichier trop petit pour être une image valide");
+                }
+                
+                if (!IsValidImageSignature(fileContent.Take(4).ToArray(), file.ContentType))
                 {
                     throw new InvalidOperationException("Le fichier n'est pas une image valide");
                 }
                 
-                // Scan antivirus si disponible
+                // Étape 3 : Scan antivirus si disponible (sur le contenu en mémoire)
                 if (_antivirusService != null)
                 {
-                    var scanResult = await _antivirusService.ScanFileAsync(stream);
+                    using var validationStream = new MemoryStream(fileContent);
+                    var scanResult = await _antivirusService.ScanFileAsync(validationStream);
                     if (!scanResult.IsClean)
                     {
                         throw new InvalidOperationException("Fichier détecté comme malveillant");
                     }
                 }
                 
-                // Générer un nom unique et sécurisé
+                // Étape 4 : Sauvegarde du fichier intact
                 var safeFileName = GenerateUniqueFileName(file.Name);
-                
-                // Stocker dans un répertoire isolé avec permissions limitées
                 var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "images");
+                EnsureDirectoryExists(uploadsFolder);
                 SetSecureDirectoryPermissions(uploadsFolder);
                 
-                return await SaveFileSecurely(stream, uploadsFolder, safeFileName);
+                var filePath = Path.Combine(uploadsFolder, safeFileName);
+                
+                // ⭐ CORRECTION : Écrire directement le contenu intact sans re-lecture du stream
+                await File.WriteAllBytesAsync(filePath, fileContent);
+                
+                var relativePath = $"/uploads/images/{safeFileName}";
+                _logger.LogInformation("Upload d'image réussi: {RelativePath}", relativePath);
+                
+                return relativePath;
             }
             catch (Exception ex)
             {
@@ -94,7 +116,7 @@ namespace Mooc.Services
         }
 
         /// <summary>
-        ///     
+        /// Upload un audio.
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
@@ -128,7 +150,7 @@ namespace Mooc.Services
         }
 
         /// <summary>
-        ///     
+        /// Upload un fichier générique.
         /// </summary>
         /// <param name="file"></param>
         /// <returns></returns>
@@ -331,24 +353,6 @@ namespace Mooc.Services
             {
                 _logger.LogWarning(ex, "Impossible de définir les permissions sécurisées sur le dossier: {DirectoryPath}", directoryPath);
             }
-        }
-
-        private async Task<string> SaveFileSecurely(Stream inputStream, string uploadsFolder, string fileName)
-        {
-            EnsureDirectoryExists(uploadsFolder);
-            var filePath = Path.Combine(uploadsFolder, fileName);
-
-            // Remettre le stream à la position 0 si possible
-            if (inputStream.CanSeek)
-                inputStream.Seek(0, SeekOrigin.Begin);
-
-            await using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, bufferSize: 4096, useAsync: true);
-            await inputStream.CopyToAsync(fileStream);
-
-            var relativePath = $"/uploads/images/{fileName}";
-            _logger.LogInformation("Upload d'image réussi: {RelativePath}", relativePath);
-
-            return relativePath;
         }
     }
 }

@@ -41,6 +41,8 @@ export function initializeEditor(editorId, dotNetRef, options) {
 
     if (initialContent.trim()) {
         element.innerHTML = initialContent;
+        // ⭐ CORRECTION : Améliorer l'affichage après l'initialisation
+        setTimeout(() => enhanceDisplay(), 100);
     } else {
         setPlaceholder(element, options.placeholder);
     }
@@ -80,6 +82,8 @@ export function setContent(editorId, content) {
     try {
         if (content && content.trim()) {
             editor.element.innerHTML = content;
+            // ⭐ CORRECTION : Améliorer l'affichage après définition du contenu
+            setTimeout(() => enhanceDisplay(), 100);
         } else {
             setPlaceholder(editor.element, editor.options.placeholder);
         }
@@ -148,9 +152,17 @@ function createEventHandlers(element, options, dotNetRef) {
         // Si le contenu est vide ou ne contient que des espaces, remettre le placeholder
         if (!hasRealContent) {
             setPlaceholder(element, options.placeholder);
+        } else {
+            // ⭐ CORRECTION : Améliorer l'affichage après chaque modification
+            setTimeout(() => enhanceDisplay(), 50);
         }
+        
         // Appeler la méthode .NET avec le contenu et la longueur du texte
-        dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength, getCsrfToken());
+        try {
+            dotNetRef.invokeMethodAsync('OnContentChanged', content, textLength, getCsrfToken());
+        } catch (error) {
+            console.error('Erreur lors de l\'appel .NET:', error);
+        }
     };
 
     const handleFocus = () => {
@@ -189,6 +201,9 @@ function createEventHandlers(element, options, dotNetRef) {
         if (element.querySelector('.placeholder-text')) {
             clearPlaceholder(element);
         }
+        
+        // ⭐ CORRECTION : Améliorer l'affichage après le collage
+        setTimeout(() => enhanceDisplay(), 100);
     };
 
     return {
@@ -430,12 +445,30 @@ function createMediaElement(url, type) {
     }
 }
 
-// Fonction pour créer un élément image
+// ⭐ CORRECTION : Fonction pour créer un élément image améliorée
 function createImageElement(url) {
-    return Object.assign(document.createElement('img'), {
-        src: url, alt: 'Image insérée', loading: 'lazy',
-        style: 'max-width: 100%; height: auto; display: block; margin: 10px auto;'
+    const img = document.createElement('img');
+    img.src = url;
+    img.alt = 'Image insérée';
+    img.loading = 'lazy';
+    img.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 10px auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+    
+    // ⭐ Ajouter des gestionnaires d'événements pour l'affichage
+    img.addEventListener('load', () => {
+        img.classList.add('loaded');
+        console.log('Image chargée avec succès:', url);
     });
+    
+    img.addEventListener('error', (e) => {
+        console.error('Erreur de chargement de l\'image:', url, e);
+        img.alt = 'Erreur de chargement de l\'image';
+        img.style.border = '2px dashed #dc3545';
+        img.style.color = '#dc3545';
+        img.style.textAlign = 'center';
+        img.style.padding = '20px';
+    });
+    
+    return img;
 }
 
 // Fonction pour insérer un élément dans l'éditeur
@@ -460,6 +493,9 @@ function insertIntoEditor(editor, element) {
     }
 
     editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    // ⭐ CORRECTION : Améliorer l'affichage après insertion
+    setTimeout(() => enhanceDisplay(), 100);
 }
 
 // Fonction pour détruire l'éditeur
@@ -482,26 +518,107 @@ export function destroyEditor(editorId) {
     }
 }
 
-// Fonction d'amélioration consolidée
+// ⭐ CORRECTION : Fonction d'amélioration consolidée et renforcée
 function enhanceDisplay() {
-    const selectors = ['.text-message img', '.text-message .video-container', '.rich-editor-content img', '.rich-editor-content .video-container'];
+    try {
+        const selectors = [
+            '.text-message img',
+            '.text-message .video-container', 
+            '.rich-editor-content img',
+            '.rich-editor-content .video-container',
+            '.text-content img', // Ajouter ce sélecteur
+            '.text-block img'    // Ajouter ce sélecteur
+        ];
 
-    selectors.forEach(selector => {
-        document.querySelectorAll(selector).forEach(element => {
-            if (!element.classList.contains('enhanced')) {
-                element.classList.add('enhanced');
-                setupMediaHandlers(element);
+        selectors.forEach(selector => {
+            document.querySelectorAll(selector).forEach(element => {
+                if (!element.classList.contains('enhanced')) {
+                    element.classList.add('enhanced');
+                    setupMediaHandlers(element);
+                }
+            });
+        });
+        
+        // ⭐ Vérifier spécifiquement les images uploadées
+        document.querySelectorAll('img[src*="/uploads/images/"]').forEach(img => {
+            if (!img.classList.contains('enhanced')) {
+                img.classList.add('enhanced');
+                setupImageHandlers(img);
+                console.log('Image uploadée améliorée:', img.src);
             }
         });
-    });
+        
+    } catch (error) {
+        console.error('Erreur lors de l\'amélioration de l\'affichage:', error);
+    }
 }
 
-// Fonction pour configurer les gestionnaires d'événements pour les médias
+// ⭐ CORRECTION : Fonction pour configurer les gestionnaires d'événements pour les médias améliorée
 function setupMediaHandlers(element) {
     if (element.tagName === 'IMG') {
-        element.addEventListener('load', () => element.classList.add('loaded'));
-        element.addEventListener('error', () => element.style.display = 'none');
-        if (element.complete) element.classList.add('loaded');
+        setupImageHandlers(element);
+    }
+}
+
+// ⭐ NOUVELLE FONCTION : Gestionnaires spécifiques pour les images
+function setupImageHandlers(img) {
+    // Supprimer les anciens gestionnaires pour éviter les doublons
+    const newImg = img.cloneNode(true);
+    img.parentNode?.replaceChild(newImg, img);
+    
+    newImg.addEventListener('load', () => {
+        newImg.classList.add('loaded');
+        console.log('Image chargée:', newImg.src);
+    });
+    
+    newImg.addEventListener('error', (e) => {
+        console.error('Erreur de chargement de l\'image:', newImg.src);
+        // ⭐ CORRECTION : Améliorer le message d'erreur et le style
+        newImg.style.border = '2px dashed #dc3545';
+        newImg.style.backgroundColor = '#f8d7da';
+        newImg.style.color = '#721c24';
+        newImg.style.textAlign = 'center';
+        newImg.style.padding = '20px';
+        newImg.style.borderRadius = '4px';
+        newImg.style.fontSize = '14px';
+        
+        // ⭐ CORRECTION : Changer le message d'erreur
+        newImg.alt = 'Erreur de chargement de l\'image';
+        
+        // ⭐ CORRECTION : Créer un conteneur d'erreur avec icône
+        const errorContainer = document.createElement('div');
+        errorContainer.style.cssText = `
+            border: 2px dashed #dc3545;
+            background-color: #f8d7da;
+            color: #721c24;
+            text-align: center;
+            padding: 20px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            max-width: 100%;
+            margin: 10px auto;
+        `;
+        
+        errorContainer.innerHTML = `
+            <i class="bi bi-exclamation-triangle" style="font-size: 24px;"></i>
+            <span>Impossible de charger l'image</span>
+            <small style="opacity: 0.7;">Vérifiez que l'URL est correcte et accessible</small>
+        `;
+        
+        // Remplacer l'image défaillante par le conteneur d'erreur
+        newImg.parentNode?.replaceChild(errorContainer, newImg);
+    });
+    
+    // Si l'image est déjà chargée
+    if (newImg.complete && newImg.naturalWidth > 0) {
+        newImg.classList.add('loaded');
+    } else if (newImg.complete && newImg.naturalWidth === 0) {
+        // L'image a fini de charger mais a échoué
+        newImg.dispatchEvent(new Event('error'));
     }
 }
 
@@ -532,368 +649,11 @@ if (typeof window !== 'undefined') {
     // Observer optimisé
     if (window.MutationObserver) {
         new MutationObserver(mutations => {
-            if (mutations.some(m => m.addedNodes.length)) enhanceDisplay();
+            if (mutations.some(m => m.addedNodes.length)) {
+                setTimeout(() => enhanceDisplay(), 50);
+            }
         }).observe(document.body, { childList: true, subtree: true });
     }
-}
-
-// Fonction pour créer l'élément tableau
-function createTableElement(rows, cols) {
-    const table = document.createElement('table');
-    table.className = 'table table-bordered table-striped';
-    table.style.cssText = 'width: 100%; margin: 10px 0; border-collapse: collapse;';
-
-    // Créer l'en-tête
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
-
-    for (let j = 0; j < cols; j++) {
-        const th = document.createElement('th');
-        th.innerHTML = `En-tête ${j + 1}`;
-        th.style.cssText = 'padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold;';
-        th.contentEditable = true;
-        headerRow.appendChild(th);
-    }
-
-    thead.appendChild(headerRow);
-    table.appendChild(thead);
-
-    // Créer le corps du tableau
-    const tbody = document.createElement('tbody');
-
-    for (let i = 0; i < rows; i++) {
-        const row = document.createElement('tr');
-
-        for (let j = 0; j < cols; j++) {
-            const td = document.createElement('td');
-            td.innerHTML = '&nbsp;';
-            td.style.cssText = 'padding: 8px; border: 1px solid #dee2e6; min-height: 20px;';
-            td.contentEditable = true;
-            row.appendChild(td);
-        }
-
-        tbody.appendChild(row);
-    }
-
-    table.appendChild(tbody);
-
-    // Ajouter les gestionnaires d'événements pour l'édition
-    setupTableEditHandlers(table);
-
-    return table;
-}
-
-// Fonction pour gérer la navigation dans le tableau
-function handleTableNavigation(e, table) {
-    const currentCell = e.target;
-    if (!currentCell.matches('td, th')) return;
-
-    const cells = Array.from(table.querySelectorAll('td, th'));
-    const currentIndex = cells.indexOf(currentCell);
-
-    let targetIndex = currentIndex;
-
-    switch (e.key) {
-        case 'Tab':
-            e.preventDefault();
-            targetIndex = e.shiftKey ? currentIndex - 1 : currentIndex + 1;
-            break;
-        case 'ArrowRight':
-            targetIndex = currentIndex + 1;
-            break;
-        case 'ArrowLeft':
-            targetIndex = currentIndex - 1;
-            break;
-        case 'ArrowDown':
-            const colsCount = table.querySelector('tr').children.length;
-            targetIndex = currentIndex + colsCount;
-            break;
-        case 'ArrowUp':
-            const colsCountUp = table.querySelector('tr').children.length;
-            targetIndex = currentIndex - colsCountUp;
-            break;
-    }
-
-    if (targetIndex >= 0 && targetIndex < cells.length) {
-        cells[targetIndex].focus();
-        e.preventDefault();
-    }
-}
-
-// Les autres fonctions de tableaux restent inchangées...
-function setupTableEditHandlers(table) {
-    table.addEventListener('keydown', (e) => handleTableNavigation(e, table));
-    table.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        showTableContextMenu(e, table);
-    });
-}
-
-// Fonction pour afficher le menu contextuel du tableau
-function showTableContextMenu(e, table) {
-    // Retirer les anciens menus
-    document.querySelectorAll('.table-context-menu').forEach(menu => menu.remove());
-
-    const menu = document.createElement('div');
-    menu.className = 'table-context-menu';
-    menu.style.cssText = `
-        position: absolute;
-        top: ${e.pageY}px;
-        left: ${e.pageX}px;
-        background: white;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        z-index: 1000;
-        padding: 5px 0;
-        min-width: 150px;
-    `;
-
-    const menuItems = [
-        { label: 'Ajouter une ligne', action: () => addTableRow(table) },
-        { label: 'Ajouter une colonne', action: () => addTableColumn(table) },
-        { label: 'Supprimer la ligne', action: () => deleteTableRow(table, e.target) },
-        { label: 'Supprimer la colonne', action: () => deleteTableColumn(table, e.target) },
-        { label: 'Supprimer le tableau', action: () => deleteTable(table) }
-    ];
-
-    menuItems.forEach(item => {
-        const menuItem = document.createElement('div');
-        menuItem.textContent = item.label;
-        menuItem.style.cssText = 'padding: 8px 12px; cursor: pointer; font-size: 14px;';
-        menuItem.addEventListener('mouseenter', () => menuItem.style.backgroundColor = '#f5f5f5');
-        menuItem.addEventListener('mouseleave', () => menuItem.style.backgroundColor = 'transparent');
-        menuItem.addEventListener('click', () => {
-            item.action();
-            menu.remove();
-        });
-        menu.appendChild(menuItem);
-    });
-
-    document.body.appendChild(menu);
-
-    // Fermer le menu en cliquant ailleurs
-    setTimeout(() => {
-        document.addEventListener('click', function closeMenu() {
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
-        });
-    }, 10);
-}
-
-// Fonctions utilitaires pour la manipulation des tableaux
-function addTableRow(table) {
-    const tbody = table.querySelector('tbody');
-    const firstRow = tbody.querySelector('tr');
-    const colsCount = firstRow.children.length;
-
-    const newRow = document.createElement('tr');
-    for (let i = 0; i < colsCount; i++) {
-        const td = document.createElement('td');
-        td.innerHTML = '&nbsp;';
-        td.style.cssText = 'padding: 8px; border: 1px solid #dee2e6; min-height: 20px;';
-        td.contentEditable = true;
-        newRow.appendChild(td);
-    }
-
-    tbody.appendChild(newRow);
-}
-
-// Fonction pour ajouter une colonne au tableau
-function addTableColumn(table) {
-    const rows = table.querySelectorAll('tr');
-
-    rows.forEach((row, index) => {
-        const cell = document.createElement(index === 0 ? 'th' : 'td');
-        cell.innerHTML = index === 0 ? 'Nouvelle colonne' : '&nbsp;';
-        cell.style.cssText = index === 0 ?
-            'padding: 8px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold;' :
-            'padding: 8px; border: 1px solid #dee2e6; min-height: 20px;';
-        cell.contentEditable = true;
-        row.appendChild(cell);
-    });
-}
-
-// Fonctions pour supprimer des lignes, colonnes ou le tableau entier
-function deleteTableRow(table, targetCell) {
-    const row = targetCell.closest('tr');
-    const tbody = table.querySelector('tbody');
-
-    if (tbody.children.length > 1) {
-        row.remove();
-    } else {
-        alert('Impossible de supprimer la dernière ligne');
-    }
-}
-
-// Fonction pour supprimer une colonne du tableau
-function deleteTableColumn(table, targetCell) {
-    const cellIndex = Array.from(targetCell.parentElement.children).indexOf(targetCell);
-    const rows = table.querySelectorAll('tr');
-
-    if (rows[0].children.length > 1) {
-        rows.forEach(row => {
-            if (row.children[cellIndex]) {
-                row.children[cellIndex].remove();
-            }
-        });
-    } else {
-        alert('Impossible de supprimer la dernière colonne');
-    }
-}
-
-// Fonction pour supprimer le tableau entier
-function deleteTable(table) {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce tableau ?')) {
-        table.remove();
-    }
-}
-
-// Fonction récursive pour nettoyer les nœuds
-function cleanNode(node) {
-    // Traiter les nœuds enfants d'abord (en sens inverse pour éviter les problèmes d'index)
-    for (let i = node.childNodes.length - 1; i >= 0; i--) {
-        const child = node.childNodes[i];
-        
-        if (child.nodeType === Node.ELEMENT_NODE) {
-            const tagName = child.tagName.toLowerCase();
-            
-            // Vérifier si la balise est autorisée
-            const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i', 'div', 'iframe', 'font', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'video', 'audio', 'source', 'strike', 'blockquote', 'pre', 'code'];
-            
-            if (!allowedTags.includes(tagName)) {
-                // Remplacer la balise non autorisée par son contenu texte
-                const textNode = document.createTextNode(child.textContent);
-                node.replaceChild(textNode, child);
-            } else {
-                // Nettoyer les attributs
-                const allowedAttributes = {
-                    'a': ['href', 'title', 'target', 'rel', 'class', 'style'],
-                    'img': ['src', 'alt', 'width', 'height', 'loading', 'style', 'class'],
-                    'iframe': ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style', 'class', 'title', 'allow'],
-                    'video': ['src', 'controls', 'width', 'height', 'preload', 'style', 'class', 'poster', 'autoplay', 'loop', 'muted'],
-                    'audio': ['src', 'controls', 'preload', 'style', 'class', 'autoplay', 'loop', 'muted'],
-                    'source': ['src', 'type'],
-                    'div': ['class', 'style', 'data-video-element', 'data-preserved-video', 'align', 'id'],
-                    'span': ['class', 'style'],
-                    'table': ['class', 'style', 'border', 'cellpadding', 'cellspacing'],
-                    'td': ['style', 'contenteditable', 'class', 'colspan', 'rowspan'],
-                    'th': ['style', 'contenteditable', 'class', 'colspan', 'rowspan'],
-                    'p': ['class', 'style', 'align'],
-                    'font': ['color', 'size', 'face', 'style'],
-                    'blockquote': ['class', 'style', 'cite'],
-                    'strong': ['class', 'style'],
-                    'em': ['class', 'style'],
-                    'b': ['class', 'style'],
-                    'i': ['class', 'style'],
-                    'u': ['class', 'style'],
-                    'strike': ['class', 'style'],
-                    'h1': ['class', 'style'],
-                    'h2': ['class', 'style'],
-                    'h3': ['class', 'style'],
-                    'h4': ['class', 'style'],
-                    'h5': ['class', 'style'],
-                    'h6': ['class', 'style']
-                };
-                
-                const allowedAttrs = allowedAttributes[tagName] || [];
-                const attrs = Array.from(child.attributes);
-                
-                attrs.forEach(attr => {
-                    if (!allowedAttrs.includes(attr.name)) {
-                        child.removeAttribute(attr.name);
-                    } else {
-                        // Valider les valeurs des attributs
-                        const cleanValue = sanitizeAttributeValue(attr.name, attr.value, tagName);
-                        if (cleanValue !== false) {
-                            child.setAttribute(attr.name, cleanValue);
-                        } else {
-                            child.removeAttribute(attr.name);
-                        }
-                    }
-                });
-                
-                // Nettoyer récursivement les enfants
-                cleanNode(child);
-            }
-        }
-    }
-}
-
-// Fonction pour valider et nettoyer les valeurs d'attributs
-function sanitizeAttributeValue(attrName, value, tagName) {
-    switch (attrName) {
-        case 'href':
-        case 'src':
-            // Valider les URLs
-            try {
-                const url = new URL(value, window.location.href);
-                // Autoriser uniquement certains protocoles
-                const allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
-                
-                // Pour les iframes de vidéo, autoriser seulement les domaines de confiance
-                if (tagName === 'iframe') {
-                    const trustedVideoHosts = [
-                        'youtube.com', 'www.youtube.com',
-                        'vimeo.com', 'player.vimeo.com',
-                        'dailymotion.com', 'www.dailymotion.com'
-                    ];
-                    if (!trustedVideoHosts.some(host => url.hostname.includes(host))) {
-                        return false;
-                    }
-                }
-                
-                if (!allowedProtocols.includes(url.protocol)) {
-                    return false;
-                }
-                return value;
-            } catch {
-                return false;
-            }
-            
-        case 'style':
-            // Nettoyer les styles dangereux
-            return sanitizeStyles(value);
-            
-        case 'target':
-            // Autoriser seulement _blank et _self
-            return ['_blank', '_self'].includes(value) ? value : '_self';
-            
-        case 'rel':
-            // Forcer noopener noreferrer pour les liens externes
-            return 'noopener noreferrer';
-            
-        default:
-            return value;
-    }
-}
-
-// Fonction pour nettoyer les styles CSS (améliorer la fonction existante)
-function sanitizeStyles(styleString) {
-    const allowedProperties = [
-        'color', 'background-color', 'font-size', 'font-weight', 'font-style',
-        'text-align', 'text-decoration', 'padding', 'margin', 'border',
-        'width', 'height', 'max-width', 'max-height', 'display', 'position',
-        'top', 'left', 'right', 'bottom', 'float', 'clear',
-        // Ajouter plus de propriétés de couleur
-        'border-color', 'outline-color', 'text-shadow', 'box-shadow'
-    ];
-    
-    const styles = styleString.split(';').filter(s => s.trim());
-    const cleanedStyles = [];
-    
-    styles.forEach(style => {
-        const [property, value] = style.split(':').map(s => s.trim());
-        
-        if (property && value && allowedProperties.includes(property)) {
-            // Vérifier que la valeur ne contient pas de JavaScript
-            if (!value.includes('javascript:') && !value.includes('expression(')) {
-                cleanedStyles.push(`${property}: ${value}`);
-            }
-        }
-    });
-    
-    return cleanedStyles.join('; ');
 }
 
 // Ajouter un mécanisme pour inclure les tokens CSRF
@@ -911,4 +671,184 @@ function validateContentSize(content) {
         return false;
     }
     return true;
+}
+
+// Fonction pour déclencher le clic sur un input file
+export function triggerFileInputClick(selector) {
+    try {
+        const fileInput = document.querySelector(selector);
+        if (fileInput) {
+            fileInput.click();
+        } else {
+            console.error(`Élément non trouvé avec le sélecteur: ${selector}`);
+        }
+    } catch (error) {
+        console.error('Erreur lors du déclenchement du clic sur l\'input file:', error);
+    }
+}
+
+// ⭐ CORRECTION : Fonction pour insérer une image à partir d'une URL améliorée
+export function insertImageFromUrl(editorId, url) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) {
+        console.error('Éditeur non trouvé:', editorId);
+        return;
+    }
+
+    try {
+        console.log('Insertion d\'une image:', url);
+        const img = createImageElement(url);
+        insertIntoEditor(editor, img);
+        
+        // ⭐ Force l'amélioration de l'affichage après insertion
+        setTimeout(() => {
+            enhanceDisplay();
+            console.log('Image insérée et affichage amélioré');
+        }, 100);
+        
+    } catch (error) {
+        console.error('Erreur lors de l\'insertion de l\'image:', error);
+    }
+}
+
+// Fonction pour insérer un audio à partir d'une URL
+export function insertAudioFromUrl(editorId, url) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) return;
+
+    try {
+        const audio = createAudioElement(url);
+        insertIntoEditor(editor, audio);
+    } catch (error) {
+        console.error('Erreur lors de l\'insertion de l\'audio:', error);
+    }
+}
+
+// Fonction pour insérer un fichier à partir d'une URL
+export function insertFileFromUrl(editorId, url, fileName) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) return;
+
+    try {
+        const link = createFileLink(url, fileName);
+        insertIntoEditor(editor, link);
+    } catch (error) {
+        console.error('Erreur lors de l\'insertion du fichier:', error);
+    }
+}
+
+// Fonction pour créer un lien de fichier
+function createFileLink(url, fileName) {
+    const link = document.createElement('a');
+    link.href = url;
+    link.textContent = fileName;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.style.cssText = 'color: #007bff; text-decoration: underline; margin: 0 5px;';
+    
+    // Ajouter une icône selon le type de fichier
+    const icon = document.createElement('i');
+    const extension = fileName.split('.').pop()?.toLowerCase();
+    
+    switch (extension) {
+        case 'pdf':
+            icon.className = 'bi bi-file-earmark-pdf';
+            break;
+        case 'doc':
+        case 'docx':
+            icon.className = 'bi bi-file-earmark-word';
+            break;
+        case 'xls':
+        case 'xlsx':
+            icon.className = 'bi bi-file-earmark-excel';
+            break;
+        case 'ppt':
+        case 'pptx':
+            icon.className = 'bi bi-file-earmark-ppt';
+            break;
+        case 'zip':
+        case 'rar':
+            icon.className = 'bi bi-file-earmark-zip';
+            break;
+        default:
+            icon.className = 'bi bi-file-earmark';
+    }
+    
+    icon.style.marginRight = '5px';
+    link.insertBefore(icon, link.firstChild);
+    
+    return link;
+}
+
+// Fonction pour insérer un lien
+export function insertLink(editorId) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) return;
+
+    const url = prompt("URL du lien :");
+    if (url && validateUrl(url)) {
+        const text = prompt("Texte du lien (optionnel):") || url;
+        
+        // Supprimer le placeholder si nécessaire
+        if (editor.element.querySelector('.placeholder-text')) {
+            clearPlaceholder(editor.element);
+        }
+
+        editor.element.focus();
+        const selection = window.getSelection();
+        
+        if (selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            const selectedText = range.toString();
+            
+            if (selectedText) {
+                // Il y a du texte sélectionné, créer un lien avec ce texte
+                const link = document.createElement('a');
+                link.href = url;
+                link.textContent = selectedText;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                
+                range.deleteContents();
+                range.insertNode(link);
+            } else {
+                // Pas de texte sélectionné, insérer un nouveau lien
+                const link = document.createElement('a');
+                link.href = url;
+                link.textContent = text;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                
+                range.insertNode(link);
+                range.setStartAfter(link);
+            }
+            
+            selection.removeAllRanges();
+            selection.addRange(range);
+        }
+        
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if (url) {
+        alert('URL invalide');
+    }
+}
+
+// Exports globaux pour Blazor
+if (typeof window !== 'undefined') {
+    // Exposer toutes les fonctions exportées dans l'objet window
+    window.initializeEditor = initializeEditor;
+    window.setContent = setContent;
+    window.getContent = getContent;
+    window.executeCommand = executeCommand;
+    window.executeCommandWithValue = executeCommandWithValue;
+    window.insertVideo = insertVideo;
+    window.destroyEditor = destroyEditor;
+    window.triggerFileInputClick = triggerFileInputClick;
+    window.insertImageFromUrl = insertImageFromUrl;
+    window.insertAudioFromUrl = insertAudioFromUrl;
+    window.insertFileFromUrl = insertFileFromUrl;
+    window.insertLink = insertLink;
+    
+    // Fonctions utilitaires déjà exposées
+    window.enhanceImageDisplay = window.enhanceVideoDisplay = enhanceDisplay;
 }

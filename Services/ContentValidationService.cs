@@ -237,7 +237,7 @@ namespace Mooc.Services
                 foreach (var link in links)
                 {
                     var href = link.GetAttributeValue("href", "");
-                    if (!string.IsNullOrEmpty(href) && Uri.IsWellFormedUriString(href, UriKind.Absolute))
+                    if (!string.IsNullOrEmpty(href) && IsValidUrlForValidation(href))
                     {
                         urlsToValidate.Add(href);
                     }
@@ -251,7 +251,7 @@ namespace Mooc.Services
                 foreach (var media in mediaSources)
                 {
                     var src = media.GetAttributeValue("src", "");
-                    if (!string.IsNullOrEmpty(src) && Uri.IsWellFormedUriString(src, UriKind.Absolute))
+                    if (!string.IsNullOrEmpty(src) && IsValidUrlForValidation(src))
                     {
                         urlsToValidate.Add(src);
                     }
@@ -274,6 +274,36 @@ namespace Mooc.Services
                 {
                     errors.Add($"URL invalide: {url} - {result.ErrorMessage}");
                 }
+            }
+        }
+
+        // ⭐ NOUVELLE MÉTHODE : Vérifier si une URL doit être validée
+        private bool IsValidUrlForValidation(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return false;
+
+            // ⭐ CORRECTION : Accepter directement les URLs relatives locales
+            if (url.StartsWith("/uploads/"))
+            {
+                _logger.LogDebug("URL locale acceptée: {Url}", url);
+                return false; // Ne pas valider, considérer comme valide
+            }
+
+            // ⭐ CORRECTION : Accepter les URLs data: pour les images encodées
+            if (url.StartsWith("data:"))
+            {
+                return false; // Ne pas valider, considérer comme valide
+            }
+
+            // ⭐ CORRECTION : Vérifier si c'est une URL absolue valide
+            try
+            {
+                return Uri.IsWellFormedUriString(url, UriKind.Absolute);
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -303,7 +333,7 @@ namespace Mooc.Services
                     return cachedResult;
                 }
 
-                // Validation existante...
+                // ⭐ CORRECTION : Traitement spécial pour les URLs locales
                 if (string.IsNullOrEmpty(url))
                 {
                     return ValidationResult.Failure("URL vide");
@@ -314,24 +344,59 @@ namespace Mooc.Services
                     return ValidationResult.Failure("URL trop longue");
                 }
 
-                if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                // ⭐ CORRECTION : Accepter directement les URLs locales
+                if (url.StartsWith("/uploads/"))
                 {
-                    return ValidationResult.Failure("Format d'URL invalide");
+                    var localResult = ValidationResult.Success();
+                    _cache.Set(cacheKey, localResult, TimeSpan.FromHours(24)); // Cache plus long pour les URLs locales
+                    _logger.LogDebug("URL locale validée: {Url}", url);
+                    return localResult;
                 }
 
-                // Vérifier le protocole
-                if (!_settings.AllowedProtocols.Contains(uri.Scheme.ToLower()))
+                // ⭐ CORRECTION : Accepter les URLs data: 
+                if (url.StartsWith("data:"))
                 {
-                    _logger.LogWarning("Protocole non autorisé: {Scheme}", uri.Scheme);
-                    return ValidationResult.Failure($"Protocole non autorisé: {uri.Scheme}");
+                    var dataResult = ValidationResult.Success();
+                    _cache.Set(cacheKey, dataResult, TimeSpan.FromHours(1));
+                    return dataResult;
                 }
 
-                // Vérifier la liste noire des domaines
-                var hostname = uri.Host.ToLower();
-                if (_settings.BlacklistedDomains.Any(domain => hostname.Contains(domain)))
+                // ⭐ CORRECTION : Gérer les URLs relatives et absolues
+                Uri uri;
+                if (url.StartsWith("/"))
                 {
-                    _logger.LogWarning("Domaine en liste noir: {Hostname}", hostname);
-                    return ValidationResult.Failure("Domaine non autorisé");
+                    // URL relative - validation basique uniquement
+                    if (!Uri.TryCreate(url, UriKind.Relative, out uri))
+                    {
+                        return ValidationResult.Failure("Format d'URL relative invalide");
+                    }
+                    
+                    var relativeResult = ValidationResult.Success();
+                    _cache.Set(cacheKey, relativeResult, TimeSpan.FromHours(1));
+                    return relativeResult;
+                }
+                else
+                {
+                    // URL absolue
+                    if (!Uri.TryCreate(url, UriKind.Absolute, out uri))
+                    {
+                        return ValidationResult.Failure("Format d'URL invalide");
+                    }
+
+                    // Vérifier le protocole
+                    if (!_settings.AllowedProtocols.Contains(uri.Scheme.ToLower()))
+                    {
+                        _logger.LogWarning("Protocole non autorisé: {Scheme}", uri.Scheme);
+                        return ValidationResult.Failure($"Protocole non autorisé: {uri.Scheme}");
+                    }
+
+                    // Vérifier la liste noire des domaines
+                    var hostname = uri.Host.ToLower();
+                    if (_settings.BlacklistedDomains.Any(domain => hostname.Contains(domain)))
+                    {
+                        _logger.LogWarning("Domaine en liste noir: {Hostname}", hostname);
+                        return ValidationResult.Failure("Domaine non autorisé");
+                    }
                 }
 
                 // Vérification HTTP HEAD pour valider l'existence
@@ -351,6 +416,13 @@ namespace Mooc.Services
 
         private async Task<ValidationResult> ValidateUrlAccessibilityAsync(Uri uri, bool isImageUrl)
         {
+            // ⭐ CORRECTION : Améliorer la validation pour les URLs relatives
+            if (!uri.IsAbsoluteUri)
+            {
+                // Pour les URLs relatives (comme /uploads/images/...), considérer comme valides
+                return ValidationResult.Success();
+            }
+
             using var httpClient = _httpClientFactory.CreateClient("ValidationClient");
             httpClient.Timeout = TimeSpan.FromSeconds(5);
 
@@ -361,6 +433,7 @@ namespace Mooc.Services
 
                 if (!response.IsSuccessStatusCode)
                 {
+                    _logger.LogWarning("URL inaccessible: {Url} - Status: {StatusCode}", uri, response.StatusCode);
                     return ValidationResult.Failure($"URL inaccessible (HTTP {(int)response.StatusCode})");
                 }
 
@@ -372,6 +445,7 @@ namespace Mooc.Services
                     
                     if (!allowedImageTypes.Contains(contentType))
                     {
+                        _logger.LogWarning("Type d'image non autorisé: {ContentType} pour {Url}", contentType, uri);
                         return ValidationResult.Failure("Type d'image non autorisé");
                     }
                 }
@@ -380,10 +454,12 @@ namespace Mooc.Services
             }
             catch (TaskCanceledException)
             {
+                _logger.LogWarning("Timeout lors de la validation de l'URL: {Url}", uri);
                 return ValidationResult.Failure("URL inaccessible (timeout)");
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException ex)
             {
+                _logger.LogWarning(ex, "Erreur HTTP lors de la validation de l'URL: {Url}", uri);
                 return ValidationResult.Failure("URL inaccessible");
             }
         }
@@ -678,9 +754,17 @@ namespace Mooc.Services
 
                 sanitizer.KeepChildNodes = true;
 
-                // CORRECTION : Améliorer la préservation des URLs vidéo avec logging
+                // ⭐ CORRECTION : Améliorer la préservation des URLs avec gestion des URLs locales
                 sanitizer.FilterUrl += (sender, e) =>
                 {
+                    // ⭐ CORRECTION : Autoriser les URLs locales
+                    if (e.OriginalUrl.StartsWith("/uploads/"))
+                    {
+                        e.SanitizedUrl = e.OriginalUrl;
+                        _logger.LogDebug("URL locale préservée: {Url}", e.OriginalUrl);
+                        return;
+                    }
+
                     var isVideoUrl = IsAllowedVideoUrl(e.OriginalUrl);
                     var isImageUrl = IsAllowedImageUrl(e.OriginalUrl);
                     
@@ -691,10 +775,14 @@ namespace Mooc.Services
                         {
                             _logger.LogDebug("URL vidéo préservée: {Url}", e.OriginalUrl);
                         }
+                        else
+                        {
+                            _logger.LogDebug("URL image préservée: {Url}", e.OriginalUrl);
+                        }
                     }
                     else
                     {
-                        _logger.LogWarning("URL filtrée: {Url}", e.OriginalUrl);
+                        _logger.LogDebug("URL standard filtrée: {Url}", e.OriginalUrl);
                     }
                 };
 
@@ -1041,6 +1129,10 @@ namespace Mooc.Services
         {
             if (string.IsNullOrEmpty(url))
                 return false;
+
+            // ⭐ CORRECTION : Autoriser directement les URLs locales
+            if (url.StartsWith("/uploads/"))
+                return true;
                 
             try
             {
@@ -1057,7 +1149,8 @@ namespace Mooc.Services
             }
             catch
             {
-                return false;
+                // Si on ne peut pas créer l'URI, vérifier si c'est une URL relative
+                return url.StartsWith("/uploads/");
             }
         }
 
