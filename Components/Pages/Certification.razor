@@ -148,8 +148,18 @@
                                             <td class="px-4 py-3">
                                                 <div class="d-flex gap-2">
                                                     <button class="btn btn-success btn-sm d-flex align-items-center" 
-                                                            @onclick="() => DownloadCertificate(cert.SessionId, CertificateType.Pdf)">
-                                                        <i class="bi bi-download me-1"></i>
+                                                            @onclick="() => DownloadCertificate(cert.SessionId, CertificateType.Pdf)"
+                                                            disabled="@isDownloading">
+                                                        @if (isDownloading)
+                                                        {
+                                                            <div class="spinner-border spinner-border-sm me-1" role="status">
+                                                                <span class="visually-hidden">Téléchargement...</span>
+                                                            </div>
+                                                        }
+                                                        else
+                                                        {
+                                                            <i class="bi bi-download me-1"></i>
+                                                        }
                                                         <span class="d-none d-sm-inline">PDF</span>
                                                     </button>
                                                 </div>
@@ -190,14 +200,50 @@
     private List<Certificate> availableCertificates = new();
     private List<Certificate> filteredCertificates = new();
     private bool isLoading = true;
+    private bool isDownloading = false;
     private string selectedFilter = string.Empty;
     private string searchTerm = string.Empty;
     private Timer? searchTimer;
+    private IJSObjectReference? jsModule;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCertificatesAsync();
         filteredCertificates = availableCertificates;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/downloadHelper.js");
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors du chargement du module JavaScript");
+                // Fallback : définir la fonction inline
+                await JSRuntime.InvokeVoidAsync("eval", @"
+                    window.downloadFile = function(byteArray, fileName, contentType) {
+                        try {
+                            const blob = new Blob([new Uint8Array(byteArray)], { type: contentType });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = fileName;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                        } catch (error) {
+                            console.error('Erreur lors du téléchargement:', error);
+                            throw error;
+                        }
+                    };
+                ");
+            }
+        }
     }
 
     private async Task LoadCertificatesAsync()
@@ -288,11 +334,20 @@
 
     private async Task DownloadCertificate(int sessionId, CertificateType type)
     {
+        if (isDownloading) return;
+
         try
         {
+            isDownloading = true;
+            StateHasChanged();
+
             var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
             var user = await UserManagerService.GetUserAsync(authState.User);
-            if (user == null) return;
+            if (user == null) 
+            {
+                _logger?.LogWarning("Utilisateur non trouvé pour le téléchargement du certificat");
+                return;
+            }
 
             var certificateData = await CertificateService.GenerateCertificateAsync(sessionId, user.Id, type);
             
@@ -300,32 +355,44 @@
             var contentType = type == CertificateType.Pdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
             var fileExtension = type == CertificateType.Pdf ? ".pdf" : ".docx";
             
-            await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+            if (jsModule != null)
+            {
+                await jsModule.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+            }
+        }
+        catch (JSException jsEx)
+        {
+            _logger?.LogError(jsEx, "Erreur JavaScript lors du téléchargement: {Message}", jsEx.Message);
+            
+            // Affichage d'un message à l'utilisateur
+            await JSRuntime.InvokeVoidAsync("alert", $"Erreur lors du téléchargement: {jsEx.Message}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur lors du téléchargement: {ex.Message}");
+            _logger?.LogError(ex, "Erreur lors du téléchargement du certificat {SessionId}", sessionId);
+            
+            // Affichage d'un message à l'utilisateur
+            await JSRuntime.InvokeVoidAsync("alert", "Erreur lors du téléchargement du certificat. Veuillez réessayer.");
+        }
+        finally
+        {
+            isDownloading = false;
+            StateHasChanged();
         }
     }
 
     private bool AucuneCertification => !filteredCertificates?.Any() == true && !isLoading;
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         searchTimer?.Dispose();
+        if (jsModule != null)
+        {
+            await jsModule.DisposeAsync();
+        }
     }
-}
-
-<script>
-    window.downloadFile = (byteArray, fileName, contentType) => {
-        const blob = new Blob([new Uint8Array(byteArray)], { type: contentType });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-    };
-</script>
+    }

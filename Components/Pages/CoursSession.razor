@@ -74,6 +74,15 @@ else
             </div>
         }
 
+        @* **NOUVEAU: Affichage du message d'erreur temporaire** *@
+        @if (!string.IsNullOrEmpty(tempErrorMessage))
+        {
+            <div class="alert alert-info mb-4" role="alert">
+                <i class="bi bi-info-circle me-2"></i>
+                @((MarkupString)tempErrorMessage)
+            </div>
+        }
+
         <div class="courses-grid">
             @foreach (var cours in orderedCoursList)
             {
@@ -100,10 +109,11 @@ else
                     <div class="course-actions">
                         <div class="btn-group w-100">
                             <button class="btn btn-outline-primary"
-                                    @onclick="() => VoirCours(cours.Id)"
-                                    disabled="@(!cours.IsPublished)">
-                                <i class="bi bi-play-circle-fill me-1"></i>
-                                @(cours.IsPublished ? "Démarrer" : "Bientôt")
+                                 @onclick="() => VoirCours(cours.Id)"
+                                 disabled="@(!cours.IsPublished || IsSessionEnded() || GetCourseCompletionStatus(cours.Id) == "Terminé")">
+                                 <i class="bi bi-play-circle-fill me-1"></i>
+                                 @(GetCourseCompletionStatus(cours.Id) == "Terminé" ? "Terminé" :
+                                 cours.IsPublished ? "Démarrer" : "Bientôt")
                             </button>
                         </div>
                     </div>
@@ -152,8 +162,10 @@ else
     private List<Cours> coursList = new();
     private bool isLoading = true;
     private string? errorMessage;
+    private string? tempErrorMessage; // Nouveau: pour les erreurs temporaires
     private Timer? refreshTimer;
-    private Timer? courseProgressTimer; // Nouveau timer pour les progrès des cours
+    private Timer? courseProgressTimer;
+    private Timer? errorMessageTimer; // Nouveau: pour effacer les erreurs temporaires
 
     // Nouveau dictionnaire pour tracker les progrès des cours
     private Dictionary<int, Services.CourseProgress> courseProgresses = new();
@@ -189,7 +201,8 @@ else
     public void Dispose()
     {
         refreshTimer?.Dispose();
-        courseProgressTimer?.Dispose(); // Nouveau
+        courseProgressTimer?.Dispose();
+        errorMessageTimer?.Dispose(); // Nouveau
     }
 
     // Nouvelle méthode pour charger les progrès des cours
@@ -351,7 +364,56 @@ else
     // Ajout de la méthode manquante pour corriger CS0103
     private void VoirCours(int coursId)
     {
-        // Redirige vers la page du cours avec la route correcte
+        // Vérifier si la session est terminée
+        if (IsSessionEnded())
+        {
+            tempErrorMessage = $"Impossible de démarrer le cours. Cette session s'est terminée le {session?.EndDate.ToString("dd/MM/yyyy")}.<br>Vous serez redirigé vers la page d'accueil dans quelques secondes.";
+            
+            // Programmer l'effacement du message après 5 secondes
+            errorMessageTimer?.Dispose();
+            errorMessageTimer = new Timer(_ => {
+                tempErrorMessage = null;
+                NavigationManager.NavigateTo("/"); // Rediriger vers la page d'accueil
+            }, null, TimeSpan.FromSeconds(5), Timeout.InfiniteTimeSpan);
+            
+            StateHasChanged();
+            return;
+        }
+
+        // **NOUVEAU: Vérifier si le cours est déjà terminé**
+        if (GetCourseCompletionStatus(coursId) == "Terminé")
+        {
+            tempErrorMessage = "Ce cours est déjà terminé. Vous ne pouvez pas le redémarrer.";
+            
+            // Programmer l'effacement du message après 3 secondes
+            errorMessageTimer?.Dispose();
+            errorMessageTimer = new Timer(_ => {
+                tempErrorMessage = null;
+                InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
+            
+            StateHasChanged();
+            return;
+        }
+
+        // Vérifier si le cours est publié
+        var cours = coursList.FirstOrDefault(c => c.Id == coursId);
+        if (cours == null || !cours.IsPublished)
+        {
+            tempErrorMessage = "Ce cours n'est pas encore disponible.";
+            
+            // Programmer l'effacement du message après 5 secondes
+            errorMessageTimer?.Dispose();
+            errorMessageTimer = new Timer(_ => {
+                tempErrorMessage = null;
+                InvokeAsync(StateHasChanged);
+            }, null, TimeSpan.FromSeconds(5), Timeout.InfiniteTimeSpan);
+            
+            StateHasChanged();
+            return;
+        }
+
+        // Si tout est OK, naviguer vers le cours
         NavigationManager.NavigateTo($"/Cours/View/{coursId}");
     }
 }

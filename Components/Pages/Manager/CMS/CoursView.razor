@@ -16,222 +16,332 @@
 
 <PageTitle>@(cours?.Title ?? "Cours") - @GetCurrentBlockTitle()</PageTitle>
 
-<div class="container mt-4">
-    @if (cours != null)
-    {
-        <div class="row">
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 60vh;">
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-3 text-muted">Chargement du cours...</p>
+        </div>
+    </div>
+}
+else if (cours == null)
+{
+    <div class="container mt-4">
+        <div class="alert alert-warning d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle me-3 fs-4"></i>
+            <div>
+                <strong>Cours introuvable</strong>
+                <p class="mb-0">Le cours demandé n'a pas été trouvé ou n'est plus disponible.</p>
+            </div>
+        </div>
+        <button class="btn btn-primary" @onclick='() => NavigationManager.NavigateTo("/Manager/Cours")'>
+            <i class="bi bi-arrow-left me-1"></i> Retour aux cours
+        </button>
+    </div>
+} 
+else
+{
+    <div class="container mt-4">
+        <!-- En-tête du cours amélioré -->
+        <div class="row mb-4">
             <div class="col-md-8">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h2 class="mb-0">@cours.Title</h2>
-                        <div class="cours-progress">
-                            @if (courseProgress != null)
-                            {
-                                <span class="badge bg-success ms-2">
-                                    @courseProgress.CompletedBlocks.Count complété(s)
-                                </span>
-                                @if (courseProgress.IsCompleted)
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="mb-0">
+                                <i class="bi bi-book me-2"></i>
+                                @cours.Title
+                            </h2>
+                            <div class="course-status">
+                                @if (courseProgress?.IsCompleted == true)
                                 {
-                                    <span class="badge bg-success ms-2">
-                                        Cours terminé
+                                    <span class="badge bg-success fs-6">
+                                        <i class="bi bi-trophy-fill me-1"></i>
+                                        Terminé
                                     </span>
                                 }
-                            }
+                                else if (courseProgress != null && courseProgress.CompletedBlocks.Any())
+                                {
+                                    <span class="badge bg-info fs-6">
+                                        <i class="bi bi-clock-history me-1"></i>
+                                        En cours
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary fs-6">
+                                        <i class="bi bi-play me-1"></i>
+                                        Non commencé
+                                    </span>
+                                }
+                            </div>
                         </div>
                     </div>
                     <div class="card-body">
                         @if (!string.IsNullOrEmpty(cours.Description))
                         {
-                            <p class="text-muted">@cours.Description</p>
+                            <p class="text-muted mb-3">@cours.Description</p>
                         }
-                        <div class="mb-3">
-                           
-                        </div>
 
-                        <!-- Barre de progression -->
+                        <!-- Barre de progression améliorée -->
                         @if (courseProgress != null && blocks != null)
                         {
                             var progressPercentage = blocks.Count > 0 ? (courseProgress.CompletedBlocks.Count * 100 / blocks.Count) : 0;
-                            <div class="progress mb-3" style="height: 8px;">
-                                <div class="progress-bar bg-success" role="progressbar"
+                            <div class="progress mb-3" style="height: 12px;">
+                                <div class="progress-bar bg-gradient progress-bar-striped @(courseProgress.IsCompleted ? "bg-success" : "bg-info")" 
+                                     role="progressbar"
                                      style="width: @progressPercentage%"
                                      aria-valuenow="@progressPercentage"
                                      aria-valuemin="0"
-                                     aria-valuemax="100"></div>
+                                     aria-valuemax="100">
+                                </div>
                             </div>
-                            <small class="text-muted">Progression: @progressPercentage%</small>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-graph-up me-1"></i>
+                                    Progression: @progressPercentage% (@courseProgress.CompletedBlocks.Count/@blocks.Count blocs)
+                                </small>
+                                @if (courseProgress.IsCompleted)
+                                {
+                                    <small class="text-success fw-bold">
+                                        <i class="bi bi-check-circle-fill me-1"></i>
+                                        Cours terminé !
+                                    </small>
+                                }
+                            </div>
+                        }
+
+                        <!-- Navigation entre blocs -->
+                        @if (blocks != null && blocks.Any())
+                        {
+                            <div class="block-navigation mt-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button class="btn btn-outline-primary" 
+                                            @onclick="GoToPreviousBlock"
+                                            disabled="@(CurrentBlockIndex <= 0)">
+                                        <i class="bi bi-arrow-left me-1"></i>
+                                        Précédent
+                                    </button>
+
+                                    <div class="block-counter">
+                                        <span class="badge bg-light text-dark">
+                                            Bloc @(CurrentBlockIndex + 1) sur @blocks.Count
+                                        </span>
+                                    </div>
+
+                                    <button class="btn btn-outline-primary" 
+                                            @onclick="GoToNextBlock"
+                                            disabled="@(!CanNavigateToNext())">
+                                        Suivant
+                                        <i class="bi bi-arrow-right ms-1"></i>
+                                    </button>
+                                </div>
+                            </div>
                         }
                     </div>
                 </div>
             </div>
+            
             <div class="col-md-4">
-                <div class="card">
+                <div class="card shadow-sm">
                     <div class="card-header">
-                        <h5 class="mb-0">Navigation</h5>
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Informations
+                        </h5>
                     </div>
                     <div class="card-body">
-                        <hr />
-                        <p><strong>Session :</strong> @cours.Session?.Title</p>
-                        <p><strong>Date de début :</strong> @cours.Session?.StartDate.ToString("dd/MM/yyyy")</p>
-                        <p><strong>Date de fin :</strong> @cours.Session?.EndDate.ToString("dd/MM/yyyy")</p>
-                        <hr />
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="card mt-4">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <div class="block-navigation">
-                    @if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
-                    {
-                        <button class="btn btn-outline-primary btn-sm"
-                                @onclick="() => GoToNextBlock()"
-                                disabled="@(!CanNavigateToNext())">
-                            Suivant <i class="bi bi-arrow-right"></i>
-                        </button>
-
-                        @if (!CanNavigateToNext() && IsCurrentBlockQuiz())
-                        {
-                            <small class="text-warning ms-2">
-                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                Vous devez compléter ce quiz pour continuer
-                            </small>
-                        }
-                    }
-                    else if (IsLastBlock() && !IsCurrentBlockCompleted())
-                    {
-                        <!-- Bouton pour terminer le cours sur le dernier bloc -->
-                        <button class="btn btn-success btn-sm"
-                                @onclick="() => CompleteCourse()"
-                                disabled="@(!CanCompleteCourse())">
-                            <i class="bi bi-check-circle me-1"></i>
-                            Terminer le cours
-                        </button>
-
-                        @if (!CanCompleteCourse() && IsCurrentBlockQuiz())
-                        {
-                            <small class="text-warning ms-2">
-                                <i class="bi bi-exclamation-triangle me-1"></i>
-                                Vous devez compléter ce quiz pour terminer le cours
-                            </small>
-                        }
-                    }
-                    else if (courseProgress?.IsCompleted == true)
-                    {
-                        <!-- Message de félicitations si le cours est terminé -->
-                        <div class="alert alert-success mb-0">
-                            <i class="bi bi-trophy me-2"></i>
-                            <strong>Félicitations !</strong> Vous avez terminé ce cours avec succès.
-                            <p class="mb-0 mt-2">
-                                <i class="bi bi-check-circle me-1"></i>
-                                Vous avez répondu correctement à <strong>@GetCorrectAnswersCount()</strong> quiz sur <strong>@GetTotalQuizCount()</strong>
-                                @if (GetTotalQuizCount() > 0)
-                                {
-                                    <span class="ms-2 badge bg-info">
-                                        @(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%
-                                    </span>
-                                }
+                        <div class="info-item mb-3">
+                            <strong>Session :</strong>
+                            <p class="mb-0">@cours.Session?.Title</p>
+                        </div>
+                        <div class="info-item mb-3">
+                            <strong>Période :</strong>
+                            <p class="mb-0">
+                                Du @cours.Session?.StartDate.ToString("dd/MM/yyyy") 
+                                au @cours.Session?.EndDate.ToString("dd/MM/yyyy")
                             </p>
                         </div>
+                        
+                        @if (courseProgress?.IsCompleted == true)
+                        {
+                            <div class="info-item mb-3">
+                                <strong>Score :</strong>
+                                <div class="score-display">
+                                    <span class="fs-4 fw-bold text-success">
+                                        @GetCorrectAnswersCount()/@GetTotalQuizCount()
+                                    </span>
+                                    @if (GetTotalQuizCount() > 0)
+                                    {
+                                        <span class="text-muted">
+                                            (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
+                                        </span>
+                                    }
+                                </div>
+                            </div>
+                        }
+
+                        <!-- Liste des blocs avec statut -->
+                        @if (blocks != null && blocks.Any())
+                        {
+                            <div class="blocks-overview">
+                                <strong>Contenu du cours :</strong>
+                                <div class="list-group list-group-flush mt-2">
+                                    @for (int i = 0; i < blocks.Count; i++)
+                                    {
+                                        var blockIndex = i;
+                                        var block = blocks[i];
+                                        var isCompleted = courseProgress?.CompletedBlocks.Contains(blockIndex) ?? false;
+                                        var isCurrent = blockIndex == CurrentBlockIndex;
+
+                                        <div class="list-group-item @(isCurrent ? "active" : "") p-2"
+                                             @onclick="() => GoToBlock(blockIndex)"
+                                             role="button">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <span class="@(isCurrent ? "fw-bold" : "")">
+                                                    @(blockIndex + 1). @(!string.IsNullOrEmpty(block.Title) ? block.Title : GetBlockTypeDisplay(block.Type))
+                                                </span>
+                                                @if (isCompleted)
+                                                {
+                                                    <i class="bi bi-check-circle-fill text-success"></i>
+                                                }
+                                                else if (isCurrent)
+                                                {
+                                                    <i class="bi bi-arrow-right text-primary"></i>
+                                                }
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenu principal du bloc -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    @if (showNavigationHelper && !CanNavigateToNext() && IsCurrentBlockQuiz())
+                    {
+                        <div class="alert alert-warning alert-dismissible fade show m-3">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Information :</strong> Vous devez compléter ce quiz pour continuer vers le bloc suivant.
+                            <button type="button" class="btn-close" @onclick="() => showNavigationHelper = false"></button>
+                        </div>
                     }
+
+                    <div class="card-body">
+                        @if (blocks != null && blocks.Any() && CurrentBlockIndex >= 0 && CurrentBlockIndex < blocks.Count)
+                        {
+                            var currentBlock = blocks[CurrentBlockIndex];
+                            <div class="course-block-viewer">
+                                <DynamicComponent Type="@GetViewerBlockComponent(currentBlock.Type)"
+                                                  Parameters="@GetViewerBlockParameters(currentBlock)" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="alert alert-info text-center">
+                                <i class="bi bi-info-circle me-2 fs-3"></i>
+                                <h5>Cours en construction</h5>
+                                <p class="mb-0">Ce cours ne contient pas encore de contenu. Revenez plus tard !</p>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Pied de page avec navigation -->
+                    <div class="card-footer bg-light">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div class="navigation-left">
+                                @if (CurrentBlockIndex > 0)
+                                {
+                                    <button class="btn btn-outline-secondary" @onclick="GoToPreviousBlock">
+                                        <i class="bi bi-arrow-left me-1"></i>
+                                        Précédent
+                                    </button>
+                                }
+                            </div>
+
+                            <div class="navigation-center">
+                                @if (courseProgress?.IsCompleted == true)
+                                {
+                                    <!-- Affichage pour cours terminé -->
+                                    <div class="text-center">
+                                        <div class="alert alert-success d-inline-flex align-items-center mb-0">
+                                            <i class="bi bi-trophy-fill me-2 fs-5"></i>
+                                            <div>
+                                                <strong>Félicitations !</strong>
+                                                <div class="small">
+                                                    Score : @GetCorrectAnswersCount()/@GetTotalQuizCount() 
+                                                    @if (GetTotalQuizCount() > 0)
+                                                    {
+                                                        <span>(@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                                else if (IsLastBlock() && !IsCurrentBlockCompleted())
+                                {
+                                    <!-- Bouton pour terminer le cours -->
+                                    <button class="btn btn-success @(CanCompleteCourse() ? "" : "disabled")" 
+                                            @onclick="CompleteCourse"
+                                            disabled="@(!CanCompleteCourse())">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Terminer le cours
+                                    </button>
+                                    
+                                    @if (!CanCompleteCourse() && IsCurrentBlockQuiz())
+                                    {
+                                        <div class="text-warning small mt-1">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            Complétez ce quiz pour terminer
+                                        </div>
+                                    }
+                                }
+                            </div>
+
+                            <div class="navigation-right">
+                                @if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
+                                {
+                                    <button class="btn @(CanNavigateToNext() ? "btn-primary" : "btn-outline-primary disabled")" 
+                                            @onclick="GoToNextBlock"
+                                            disabled="@(!CanNavigateToNext())">
+                                        Suivant
+                                        <i class="bi bi-arrow-right ms-1"></i>
+                                    </button>
+                                }
+                                else if (courseProgress?.IsCompleted == true)
+                                {
+                                    <button class="btn btn-outline-secondary" @onclick="RetourVersListe">
+                                        <i class="bi bi-list me-1"></i>
+                                        Retour aux cours
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-            <div class="card-body">
-                @if (blocks != null && blocks.Any() && CurrentBlockIndex >= 0 && CurrentBlockIndex < blocks.Count)
-                {
-                    var currentBlock = blocks[CurrentBlockIndex];
-                    <div class="cours-block-viewer">
-                        <DynamicComponent Type="@GetViewerBlockComponent(currentBlock.Type)"
-                                          Parameters="@GetViewerBlockParameters(currentBlock)" />
-                    </div>
-
-                }
-                else
-                {
-                    <div class="alert alert-info">
-                        <i class="bi bi-info-circle me-2"></i>
-                        Ce cours ne contient pas encore de contenu.
-                    </div>
-                }
-                <div class="card-footer d-flex justify-content-between align-items-center">
-                    <div class="block-navigation">
-                        @if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
-                        {
-                            <button class="btn btn-outline-primary btn-sm"
-                                    @onclick="() => GoToNextBlock()"
-                                    disabled="@(!CanNavigateToNext())">
-                                Suivant <i class="bi bi-arrow-right"></i>
-                            </button>
-
-                            @if (!CanNavigateToNext() && IsCurrentBlockQuiz())
-                            {
-                                <small class="text-warning ms-2">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    Vous devez compléter ce quiz pour continuer
-                                </small>
-                            }
-                        }
-                        else if (IsLastBlock() && !IsCurrentBlockCompleted())
-                        {
-                            <!-- Bouton pour terminer le cours sur le dernier bloc (footer aussi) -->
-                            <button class="btn btn-success"
-                                    @onclick="() => CompleteCourse()"
-                                    disabled="@(!CanCompleteCourse())">
-                                <i class="bi bi-check-circle me-1"></i>
-                                Terminer le cours
-                            </button>
-
-                            @if (!CanCompleteCourse() && IsCurrentBlockQuiz())
-                            {
-                                <small class="text-warning ms-2">
-                                    <i class="bi bi-exclamation-triangle me-1"></i>
-                                    Vous devez compléter ce quiz pour terminer le cours
-                                </small>
-                            }
-                        }
-                        else if (courseProgress?.IsCompleted == true)
-                        {
-                            <!-- Bouton pour retourner à la liste des cours -->
-                            <button class="btn btn-outline-secondary"
-                                    @onclick="RetourVersListe">
-                                <i class="bi bi-arrow-left me-1"></i>
-                                Retour aux cours
-                            </button>
-                        }
-                    </div>
-                </div>
-            </div>
         </div>
-    }
-    else if (isLoading)
-    {
-        <div class="text-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Chargement...</span>
-            </div>
-        </div>
-    }
-    else
-    {
-        <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle me-2"></i>
-            Le cours demandé n'a pas été trouvé.
-        </div>
-    }
-</div>
-
+    </div>
+}
 
 @code {
-    [Parameter]
-    public int CoursId { get; set; }
-
-    [Parameter]
-    public int? BlockIndex { get; set; }
+    [Parameter] public int CoursId { get; set; }
+    [Parameter] public int? BlockIndex { get; set; }
 
     private Cours? cours;
     private List<CourBuilder.CoursBlock>? blocks;
     private bool isLoading = true;
+    private bool showNavigationHelper = true;
     private int CurrentBlockIndex => BlockIndex ?? 0;
     private Services.CourseProgress? courseProgress;
 
@@ -246,11 +356,12 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // Rediriger vers le bloc précédemment consulté ou le premier bloc
+        // Rediriger vers le dernier bloc consulté si aucun bloc spécifié
         if (!BlockIndex.HasValue && blocks != null && blocks.Any())
         {
             var targetBlock = courseProgress?.LastAccessedBlock ?? 0;
             NavigationManager.NavigateTo(GetBlockUrl(targetBlock), replace: true);
+            return;
         }
 
         // Vérifier que l'index est valide
@@ -258,29 +369,7 @@
             (BlockIndex.Value < 0 || BlockIndex.Value >= blocks.Count))
         {
             NavigationManager.NavigateTo(GetBlockUrl(0), replace: true);
-        }
-
-        // **NOUVEAU**: Bloquer l'accès aux blocs complétés
-        if (BlockIndex.HasValue && courseProgress != null &&
-            courseProgress.CompletedBlocks.Contains(BlockIndex.Value))
-        {
-            // Rediriger vers le dernier bloc accessible (non complété)
-            var nextIncompleteBlock = GetNextIncompleteBlock();
-            if (nextIncompleteBlock.HasValue)
-            {
-                NavigationManager.NavigateTo(GetBlockUrl(nextIncompleteBlock.Value), replace: true);
-                return;
-            }
-            else
-            {
-                // Si tous les blocs sont complétés, rester sur le dernier bloc
-                var lastBlock = (blocks?.Count ?? 1) - 1;
-                if (BlockIndex.Value != lastBlock)
-                {
-                    NavigationManager.NavigateTo(GetBlockUrl(lastBlock), replace: true);
-                    return;
-                }
-            }
+            return;
         }
 
         // Sauvegarder l'accès au bloc actuel
@@ -289,22 +378,6 @@
             courseProgress.LastAccessedBlock = BlockIndex.Value;
             await CourseStateService.SaveProgressAsync(courseProgress);
         }
-    }
-
-    // **NOUVELLE MÉTHODE**: Trouver le prochain bloc non complété
-    private int? GetNextIncompleteBlock()
-    {
-        if (blocks == null || courseProgress == null) return null;
-
-        for (int i = 0; i < blocks.Count; i++)
-        {
-            if (!courseProgress.CompletedBlocks.Contains(i))
-            {
-                return i;
-            }
-        }
-
-        return null; // Tous les blocs sont complétés
     }
 
     private async Task LoadCoursData()
@@ -348,13 +421,51 @@
     {
         try
         {
-            // Pour l'instant, utiliser un utilisateur anonyme
-            // Dans une vraie application, récupérer l'ID de l'utilisateur connecté
             courseProgress = await CourseStateService.GetOrCreateProgressAsync(CoursId);
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement du progrès: {ex.Message}");
+        }
+    }
+
+    // Navigation améliorée
+    private async Task GoToPreviousBlock()
+    {
+        if (CurrentBlockIndex > 0)
+        {
+            NavigationManager.NavigateTo(GetBlockUrl(CurrentBlockIndex - 1));
+        }
+    }
+
+    private async Task GoToNextBlock()
+    {
+        if (!CanNavigateToNext())
+        {
+            if (IsCurrentBlockQuiz())
+            {
+                await JSRuntime.InvokeVoidAsync("alert", "Vous devez compléter ce quiz pour continuer.");
+            }
+            return;
+        }
+
+        // Marquer le bloc actuel comme complété
+        if (courseProgress != null && !courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
+        {
+            await MarkBlockAsCompleted();
+        }
+
+        if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
+        {
+            NavigationManager.NavigateTo(GetBlockUrl(CurrentBlockIndex + 1));
+        }
+    }
+
+    private async Task GoToBlock(int blockIndex)
+    {
+        if (blockIndex >= 0 && blockIndex < (blocks?.Count ?? 0))
+        {
+            NavigationManager.NavigateTo(GetBlockUrl(blockIndex));
         }
     }
 
@@ -368,7 +479,6 @@
             if (blocks != null && courseProgress.CompletedBlocks.Count >= blocks.Count)
             {
                 courseProgress.IsCompleted = true;
-                await JSRuntime.InvokeVoidAsync("alert", "Félicitations ! Vous avez terminé ce cours.");
             }
 
             await CourseStateService.SaveProgressAsync(courseProgress);
@@ -376,14 +486,13 @@
         }
     }
 
-    // **NOUVELLE MÉTHODE**: Terminer le cours
     private async Task CompleteCourse()
     {
         if (courseProgress == null || blocks == null) return;
 
         try
         {
-            // Marquer le dernier bloc comme complété
+            // Marquer le dernier bloc comme complété s'il ne l'est pas
             if (!courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
             {
                 courseProgress.CompletedBlocks.Add(CurrentBlockIndex);
@@ -392,15 +501,13 @@
             // Marquer le cours comme terminé
             courseProgress.IsCompleted = true;
 
-            // Sauvegarder les modifications
             await CourseStateService.SaveProgressAsync(courseProgress);
 
-            // Afficher un message de félicitations détaillé
-            var correctAnswers = GetCorrectAnswersCount();
-            var totalQuiz = GetTotalQuizCount();
-            var scoreMessage = totalQuiz > 0 ? $"\nScore: {correctAnswers}/{totalQuiz} quiz réussis ({Math.Round((double)correctAnswers / totalQuiz * 100, 1)}%)" : "";
+            // Montrer une notification de succès
+            await JSRuntime.InvokeVoidAsync("alert", 
+                $"🎉 Félicitations ! Vous avez terminé ce cours.\n" +
+                $"Score : {GetCorrectAnswersCount()}/{GetTotalQuizCount()} quiz réussis");
 
-            // Rafraîchir l'interface
             StateHasChanged();
         }
         catch (Exception ex)
@@ -410,17 +517,15 @@
         }
     }
 
-    // **NOUVELLES MÉTHODES UTILITAIRES**
+    // Méthodes utilitaires améliorées
     private bool IsLastBlock()
     {
-        if (blocks == null) return false;
-        return CurrentBlockIndex == blocks.Count - 1;
+        return blocks != null && CurrentBlockIndex == blocks.Count - 1;
     }
 
     private bool IsCurrentBlockCompleted()
     {
-        if (courseProgress == null) return false;
-        return courseProgress.CompletedBlocks.Contains(CurrentBlockIndex);
+        return courseProgress?.CompletedBlocks.Contains(CurrentBlockIndex) ?? false;
     }
 
     private bool CanCompleteCourse()
@@ -428,31 +533,59 @@
         if (blocks == null || courseProgress == null) return false;
 
         var currentBlock = blocks[CurrentBlockIndex];
-
+        
         // Si ce n'est pas un quiz, permettre la completion
-        if (currentBlock.Type != "quiz")
-        {
-            return true;
-        }
+        if (currentBlock.Type != "quiz") return true;
 
         // Si c'est un quiz, vérifier s'il est complété
         return quizCompletionState.ContainsKey(CurrentBlockIndex) && quizCompletionState[CurrentBlockIndex];
     }
 
+    private bool CanNavigateToNext()
+    {
+        if (blocks == null) return false;
+
+        var currentBlock = blocks[CurrentBlockIndex];
+        
+        // Si ce n'est pas un quiz, permettre la navigation
+        if (currentBlock.Type != "quiz") return true;
+
+        // Si c'est un quiz, vérifier s'il est complété
+        return quizCompletionState.ContainsKey(CurrentBlockIndex) && quizCompletionState[CurrentBlockIndex];
+    }
+
+    private bool IsCurrentBlockQuiz()
+    {
+        if (blocks == null || CurrentBlockIndex >= blocks.Count) return false;
+        return blocks[CurrentBlockIndex].Type == "quiz";
+    }
+
+    private async Task OnQuizCompleted(bool isCorrect)
+    {
+        // Marquer le quiz comme complété
+        quizCompletionState[CurrentBlockIndex] = true;
+
+        // Enregistrer l'interaction du quiz
+        if (courseProgress != null)
+        {
+            var quizInteraction = new { 
+                completed = true, 
+                correct = isCorrect, 
+                timestamp = DateTime.UtcNow 
+            };
+            courseProgress.BlockInteractions[CurrentBlockIndex] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
+            
+            await CourseStateService.SaveProgressAsync(courseProgress);
+        }
+
+        StateHasChanged();
+    }
+
     private void RetourVersListe()
     {
         var sessionId = cours?.SessionId;
-
-        if (sessionId.HasValue)
-        {
-            // Si on connaît la session, rediriger vers la gestion des cours de cette session
-            NavigationManager.NavigateTo($"/session/{sessionId.Value}");
-        }
-        else
-        {
-            // Sinon, rediriger vers la liste générale des cours
-            NavigationManager.NavigateTo("/Manager/Cours");
-        }
+        var url = sessionId.HasValue ? $"/session/{sessionId.Value}" : "/Manager/Cours";
+        NavigationManager.NavigateTo(url);
     }
 
     private string GetBlockUrl(int blockIndex)
@@ -473,12 +606,11 @@
 
     private string GetBlockTypeDisplay(string type) => type switch
     {
-        "texte" => "Texte",
+        "texte" => "Contenu textuel",
         "quiz" => "Quiz",
         _ => "Contenu"
     };
 
-    // Méthode pour obtenir le composant viewer correspondant à chaque type de bloc
     private Type GetViewerBlockComponent(string type) => type switch
     {
         "texte" => typeof(TextBlockViewer),
@@ -486,7 +618,6 @@
         _ => typeof(TextBlockViewer)
     };
 
-    // Méthode pour créer les paramètres pour les composants viewer
     private Dictionary<string, object> GetViewerBlockParameters(CourBuilder.CoursBlock block)
     {
         var parameters = new Dictionary<string, object>
@@ -504,77 +635,6 @@
         return parameters;
     }
 
-    private async Task GoToNextBlock()
-    {
-        // Vérifier si la navigation est autorisée
-        if (!CanNavigateToNext())
-        {
-            if (IsCurrentBlockQuiz())
-            {
-                await JSRuntime.InvokeVoidAsync("alert", "Vous devez compléter ce quiz pour continuer vers le bloc suivant.");
-            }
-            return;
-        }
-
-        // Marquer le bloc actuel comme complété s'il ne l'est pas déjà
-        if (courseProgress != null && !courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
-        {
-            await MarkBlockAsCompleted();
-        }
-
-        // Naviguer vers le bloc suivant
-        if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
-        {
-            NavigationManager.NavigateTo(GetBlockUrl(CurrentBlockIndex + 1));
-        }
-    }
-
-    // **NOUVELLES MÉTHODES** : Gestion de l'état des quiz
-    private bool CanNavigateToNext()
-    {
-        if (blocks == null) return false;
-
-        var currentBlock = blocks[CurrentBlockIndex];
-
-        // Si ce n'est pas un quiz, permettre la navigation
-        if (currentBlock.Type != "quiz")
-        {
-            return true;
-        }
-
-        // Si c'est un quiz, vérifier s'il est complété
-        return quizCompletionState.ContainsKey(CurrentBlockIndex) && quizCompletionState[CurrentBlockIndex];
-    }
-
-    private bool IsCurrentBlockQuiz()
-    {
-        if (blocks == null) return false;
-        return blocks[CurrentBlockIndex].Type == "quiz";
-    }
-
-    private async Task OnQuizCompleted(bool isCorrect)
-    {
-        // Marquer le quiz comme complété (peu importe si correct ou incorrect)
-        quizCompletionState[CurrentBlockIndex] = true;
-
-        // Enregistrer la réponse dans les interactions
-        if (courseProgress != null)
-        {
-            // Sauvegarder l'interaction du quiz
-            var quizInteraction = new { completed = true, correct = isCorrect, timestamp = DateTime.UtcNow };
-            courseProgress.BlockInteractions[CurrentBlockIndex] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
-
-            // **CORRECTION** : Ne plus incrémenter manuellement CorrectAnswers
-            // Le comptage sera fait automatiquement par CalculateCorrectAnswersFromInteractions dans CourseStateService
-            
-            await CourseStateService.SaveProgressAsync(courseProgress);
-        }
-
-        // Rafraîchir l'interface
-        StateHasChanged();
-    }
-
-    // **NOUVELLE MÉTHODE CORRIGÉE**: Calcul des statistiques de quiz basé sur les interactions
     private int GetCorrectAnswersCount()
     {
         if (courseProgress?.BlockInteractions == null) return 0;
@@ -600,19 +660,9 @@
         return correctCount;
     }
 
-    // **NOUVELLES MÉTHODES**: Calcul des statistiques de quiz
     private int GetTotalQuizCount()
     {
         if (blocks == null) return 0;
         return blocks.Count(b => b.Type == "quiz");
-    }
-
-    // Ajoutez cette méthode pour vérifier si un bloc est accessible
-    private bool IsBlockAccessible(int blockIndex)
-    {
-        if (courseProgress == null) return true;
-
-        // Un bloc est accessible s'il n'est pas complété
-        return !courseProgress.CompletedBlocks.Contains(blockIndex);
     }
 }

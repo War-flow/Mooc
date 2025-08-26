@@ -3,6 +3,7 @@
 @using Mooc.Data
 @inject IJSRuntime JSRuntime
 
+<link href="~/css/quiz-styles.css" rel="stylesheet" />
 
 <div class="quiz-block-viewer">
     @if (!string.IsNullOrEmpty(Block.Title))
@@ -12,63 +13,84 @@
 
     @if (IsCompleted)
     {
-        <div class="alert alert-success">
-            <i class="bi bi-check-circle-fill me-2"></i>
-            Quiz terminé ! @(IsCorrect.HasValue && IsCorrect.Value ? "Réponse correcte." : "")
+        <div class="alert alert-success d-flex align-items-center">
+            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
+            <div>
+                <strong>Quiz terminé !</strong>
+                @if (IsCorrect.HasValue)
+                {
+                    <span class="ms-2">
+                        @(IsCorrect.Value ? "🎉 Excellente réponse !" : "📚 Continue d'apprendre !")
+                    </span>
+                }
+            </div>
         </div>
     }
 
     @if (!string.IsNullOrEmpty(QuizData.Question))
     {
         <div class="quiz-display">
-            <!-- Indicateur de progression -->
+            <!-- Barre de progression améliorée -->
             @if (QuizData.ShowProgress)
             {
-                <div class="quiz-progress" style="width: @GetProgressPercentage()%"></div>
+                <div class="quiz-progress mb-3" style="--progress-width: @GetProgressPercentage()%"></div>
+                <small class="text-muted mb-3 d-block">
+                    Progression : @GetProgressPercentage()%
+                </small>
             }
 
-            <!-- Statistiques du quiz -->
-            @if (QuizData.ShowStats && IsCompleted)
+            <!-- Statistiques en temps réel -->
+            @if (QuizData.ShowStats && !IsCompleted)
             {
-                <div class="quiz-stats mb-3">
-                    <small class="text-muted">
-                        @if (TimeSpent.TotalSeconds > 0)
+                <div class="quiz-live-stats mb-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <small class="text-muted">
+                            ⏱️ Temps écoulé : <span class="fw-bold">@GetFormattedTime()</span>
+                        </small>
+                        @if (HasUserAnswer())
                         {
-                            @($"Temps: {TimeSpent:mm\\:ss}")
+                            <small class="text-success">
+                                ✓ Réponse sélectionnée
+                            </small>
                         }
-                    </small>
+                    </div>
                 </div>
             }
 
-            <div class="question mb-4">
-                <strong>@((MarkupString)QuizData.Question)</strong>
+            <div class="question">
+                @((MarkupString)QuizData.Question)
             </div>
 
-            <div class="options mb-4">
+            <div class="options">
                 @for (int i = 0; i < QuizData.Options.Count; i++)
                 {
                     var index = i;
-                    var optionClass = GetOptionClass(index);
+                    var optionClass = GetEnhancedOptionClass(index);
 
-                    <div class="form-check @optionClass @(IsCompleted ? "disabled" : "")"
-                         @onclick="() => { if (!IsCompleted) HandleOptionClick(index); }">
+                    <div class="form-check @optionClass"
+                         @onclick="() => HandleOptionClick(index)"
+                         @onkeydown="@(async (e) => await HandleKeyDown(e, index))">
+
                         @if (QuizData.Type == "multiple-select")
                         {
-                            <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
+                            <input class="form-check-input" type="checkbox"
+                                   id="option-@Block.Order-@index"
                                    disabled="@IsCompleted"
                                    checked="@(IsCompleted? CompletedAnswers[index] : UserAnswers[index])"
                                    @onchange="@(e => { if (!IsCompleted) UserAnswers[index] = (bool)e.Value; })" />
                         }
                         else
                         {
-                            <input class="form-check-input" type="radio" name="quiz-@Block.Order"
-                                   id="option-@Block.Order-@index" value="@index"
+                            <input class="form-check-input" type="radio"
+                                   name="quiz-@Block.Order"
+                                   id="option-@Block.Order-@index"
                                    disabled="@IsCompleted"
                                    checked="@(IsCompleted? CompletedAnswers[index] : UserAnswers[index])"
                                    @onchange="@(e => { if (!IsCompleted) SetUserAnswer(index); })" />
                         }
+
                         <label class="form-check-label" for="option-@Block.Order-@index">
-                            @QuizData.Options[index].Text
+                            <span>@QuizData.Options[index].Text</span>
 
                             <!-- Icônes de résultat avec animation -->
                             @if (IsCompleted && QuizData.Options[index].IsCorrect)
@@ -84,98 +106,198 @@
                 }
             </div>
 
-            <div class="quiz-actions">
+            <div class="quiz-actions mt-4">
                 @if (!IsCompleted)
                 {
-                    <button type="button" class="btn quiz-submit-btn" @onclick="SubmitAnswer"
-                            disabled="@(!HasUserAnswer() || IsSubmitting)">
-                        @if (IsSubmitting)
-                        {
-                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
-                        }
-                        <i class="bi bi-check-lg me-2"></i>
-                        Valider la réponse
-                    </button>
-
-                    <!-- Bouton d'aide (si activé) -->
-                    @if (QuizData.AllowHint && !string.IsNullOrEmpty(QuizData.Hint) && !HintUsed)
-                    {
-                        <button type="button" class="btn btn-outline-info ms-2" @onclick="ShowHint">
-                            <i class="bi bi-lightbulb me-1"></i>
-                            Indice
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <button type="button" class="quiz-submit-btn"
+                                @onclick="SubmitAnswer"
+                                disabled="@(!HasUserAnswer() || IsSubmitting)">
+                            @if (IsSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm" role="status"></span>
+                                <span>Vérification...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-lg"></i>
+                                <span>Valider ma réponse</span>
+                            }
                         </button>
+
+                        <!-- Bouton d'aide amélioré -->
+                        @if (QuizData.AllowHint && !string.IsNullOrEmpty(QuizData.Hint) && !HintUsed)
+                        {
+                            <button type="button" class="btn btn-outline-info" @onclick="ShowHint">
+                                <i class="bi bi-lightbulb me-1"></i>
+                                💡 Besoin d'aide ?
+                            </button>
+                        }
+                    </div>
+
+                    <!-- Indicateur de progression des réponses -->
+                    @if (HasUserAnswer())
+                    {
+                        <div class="mt-2">
+                            <small class="text-success d-flex align-items-center">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Réponse prête à être validée
+                            </small>
+                        </div>
                     }
                 }
                 else
                 {
-                    <!-- Badge de résultat animé -->
+                    <!-- Badge de résultat avec score détaillé -->
                     @if (IsCorrect.HasValue)
                     {
-                        <span class="result-badge @(IsCorrect.Value ? "success" : "error")">
-                            @if (IsCorrect.Value)
-                            {
-                                <i class="bi bi-check-lg me-2"></i>
-                                @("Excellent !")
-                            }
-                            else
-                            {
-                                <i class="bi bi-x-lg me-2"></i>
-                                @("Incorrect")
-                            }
-                        </span>
+                        <div class="result-section">
+                            <span class="result-badge @(IsCorrect.Value ? "success" : "error")">
+                                @if (IsCorrect.Value)
+                                {
+                                    <i class="bi bi-trophy-fill me-2"></i>
+                                    <span>@GetSuccessMessage()</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-arrow-repeat me-2"></i>
+                                    <span>@GetEncouragementMessage()</span>
+                                }
+                            </span>
+
+                            <!-- Score détaillé -->
+                            <div class="score-details mt-3">
+                                <div class="row g-2">
+                                    <div class="col-auto">
+                                        <div class="score-item">
+                                            <div class="score-value @(IsCorrect.Value ? "text-success" : "text-warning")">
+                                                @(IsCorrect.GetValueOrDefault() ? "100" : "0")%
+                                            </div>
+                                            <div class="score-label">Score</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="score-item">
+                                            <div class="score-value text-info">
+                                                @GetFormattedTime()
+                                            </div>
+                                            <div class="score-label">Temps</div>
+                                        </div>
+                                    </div>
+                                    @if (AttemptsCount > 1)
+                                    {
+                                        <div class="col-auto">
+                                            <div class="score-item">
+                                                <div class="score-value text-secondary">
+                                                    @AttemptsCount
+                                                </div>
+                                                <div class="score-label">Tentatives</div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+                            </div>
+                        </div>
                     }
                 }
             </div>
 
-            <!-- Indice (si demandé) -->
+            <!-- Sections de feedback améliorées -->
             @if (HintUsed && !string.IsNullOrEmpty(QuizData.Hint))
             {
-                <div class="alert alert-info mt-3">
-                    <i class="bi bi-lightbulb me-2"></i>
-                    <strong>Indice :</strong> @QuizData.Hint
-                </div>
-            }
-
-            <!-- Feedback personnalisé -->
-            @if (IsCompleted && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback && !string.IsNullOrEmpty(ValidationMessage))
-            {
-                <div class="quiz-feedback">
-                    <strong>Feedback :</strong> @ValidationMessage
-
-                    @if (QuizData.ShowCorrectAnswer)
-                    {
-                        <div class="mt-2">
-                            <small><strong>Réponse correcte :</strong> @GetCorrectAnswersText()</small>
+                <div class="alert alert-info mt-3 quiz-hint">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-lightbulb text-warning me-2 fs-5"></i>
+                        <div>
+                            <strong>💡 Indice utilisé :</strong>
+                            <p class="mb-0 mt-1">@QuizData.Hint</p>
                         </div>
-                    }
+                    </div>
                 </div>
             }
 
-            <!-- Explication détaillée -->
+            @if (IsCompleted && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback)
+            {
+                <div class="quiz-feedback mt-3">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-chat-square-text text-primary me-2 fs-5"></i>
+                        <div>
+                            <strong>💬 Feedback :</strong>
+                            <p class="mb-2 mt-1">@ValidationMessage</p>
+
+                            @if (QuizData.ShowCorrectAnswer)
+                            {
+                                <div class="correct-answer-reveal">
+                                    <strong>✅ Bonne(s) réponse(s) :</strong>
+                                    <span class="ms-1 text-success fw-bold">@GetCorrectAnswersText()</span>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            }
+
             @if (IsCompleted && !string.IsNullOrEmpty(QuizData.Explanation))
             {
-                <div class="quiz-explanation">
-                    <strong>Explication :</strong> @((MarkupString)QuizData.Explanation)
+                <div class="quiz-explanation mt-3">
+                    <div class="d-flex align-items-start">
+                        <i class="bi bi-book text-info me-2 fs-5"></i>
+                        <div>
+                            <strong>📖 Explication :</strong>
+                            <div class="mt-1">@((MarkupString)QuizData.Explanation)</div>
+                        </div>
+                    </div>
                 </div>
             }
 
-            <!-- Score et statistiques finales -->
+            <!-- Statistiques finales améliorées -->
             @if (IsCompleted && QuizData.ShowStats)
             {
-                <div class="quiz-final-stats mt-3">
-                    <div class="row text-center">
+                <div class="quiz-final-stats">
+                    <h6 class="text-center mb-3 text-muted">📊 Résumé de votre performance</h6>
+                    <div class="row text-center g-3">
                         <div class="col-md-4">
                             <div class="stat-item">
-                                <div class="stat-value">@(IsCorrect.GetValueOrDefault() ? "100" : "0")%</div>
-                                <div class="stat-label">Score</div>
+                                <div class="stat-value @(IsCorrect.GetValueOrDefault() ? "text-success" : "text-warning")">
+                                    @(IsCorrect.GetValueOrDefault() ? "100" : "0")%
+                                </div>
+                                <div class="stat-label">Score Final</div>
                             </div>
                         </div>
                         <div class="col-md-4">
                             <div class="stat-item">
-                                <div class="stat-value">@TimeSpent.ToString(@"mm\:ss")</div>
-                                <div class="stat-label">Temps</div>
+                                <div class="stat-value text-info">@GetFormattedTime()</div>
+                                <div class="stat-label">Temps Total</div>
                             </div>
                         </div>
+                        <div class="col-md-4">
+                            <div class="stat-item">
+                                <div class="stat-value text-secondary">@AttemptsCount</div>
+                                <div class="stat-label">Tentative(s)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Performance badge -->
+                    <div class="text-center mt-3">
+                        @if (IsCorrect.GetValueOrDefault() && TimeSpent.TotalSeconds <= 30 && AttemptsCount == 1)
+                        {
+                            <span class="badge bg-warning text-dark px-3 py-2">
+                                ⚡ Performance Excellente !
+                            </span>
+                        }
+                        else if (IsCorrect.GetValueOrDefault())
+                        {
+                            <span class="badge bg-success px-3 py-2">
+                                🎯 Objectif Atteint !
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-info px-3 py-2">
+                                📚 Continue ton apprentissage !
+                            </span>
+                        }
                     </div>
                 </div>
             }
@@ -190,18 +312,6 @@
     }
 </div>
 
-<style>
-    .form-check.disabled {
-        opacity: 0.7;
-        cursor: not-allowed;
-    }
-
-        .form-check.disabled input,
-        .form-check.disabled label {
-            cursor: not-allowed;
-        }
-</style>
-
 @code {
     [Parameter] public CourBuilder.CoursBlock Block { get; set; } = default!;
     [Parameter] public bool IsReadOnly { get; set; } = true;
@@ -209,36 +319,48 @@
     [Parameter] public bool IsCompleted { get; set; } = false;
     [Parameter] public EventCallback<bool> IsCompletedChanged { get; set; }
 
-    // Ajout de la déclaration manquante pour QuizData
     private QuizStructure QuizData { get; set; } = new QuizStructure();
 
-    // État du quiz
+    // État du quiz amélioré
     private bool IsAnswered { get; set; } = false;
     private bool IsSubmitting { get; set; } = false;
     private bool? IsCorrect { get; set; } = null;
     private List<bool> UserAnswers { get; set; } = new();
-    private List<bool> CompletedAnswers { get; set; } = new(); // Pour stocker les réponses après validation
+    private List<bool> CompletedAnswers { get; set; } = new();
     private string ValidationMessage { get; set; } = string.Empty;
     private DateTime StartTime { get; set; }
     private TimeSpan TimeSpent { get; set; }
     private bool HintUsed { get; set; } = false;
+    private int AttemptsCount { get; set; } = 0;
+    private Timer? _timeUpdateTimer;
 
     protected override void OnInitialized()
     {
         LoadQuizData();
 
-        // Si le quiz est déjà complété, on met à jour l'état
         if (IsCompleted)
         {
             IsAnswered = true;
-            // Initialiser les réponses complétées avec des valeurs vides
             CompletedAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
         }
         else
         {
             InitializeUserAnswers();
             StartTime = DateTime.UtcNow;
+            StartTimeUpdateTimer();
         }
+    }
+
+    private void StartTimeUpdateTimer()
+    {
+        _timeUpdateTimer = new Timer(async _ =>
+        {
+            if (!IsCompleted)
+            {
+                TimeSpent = DateTime.UtcNow - StartTime;
+                await InvokeAsync(StateHasChanged);
+            }
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
     }
 
     private void LoadQuizData()
@@ -260,26 +382,41 @@
     {
         if (IsCompleted || IsAnswered) return;
 
-        // Plus de feedback tactile - fonction supprimée
+        if (QuizData.Type == "multiple-select")
+        {
+            UserAnswers[index] = !UserAnswers[index];
+        }
+        else
+        {
+            SetUserAnswer(index);
+        }
+        StateHasChanged();
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            HandleOptionClick(index);
+        }
     }
 
     private async Task SubmitAnswer()
     {
-        if (IsCompleted) return; // Empêcher la double soumission
+        if (IsCompleted) return;
 
         IsSubmitting = true;
+        AttemptsCount++;
         TimeSpent = DateTime.UtcNow - StartTime;
+        _timeUpdateTimer?.Dispose();
 
-        // Simulation d'un délai pour l'effet
-        await Task.Delay(500);
+        await Task.Delay(800); // Effet visuel
 
-        // Sauvegarder les réponses de l'utilisateur
         CompletedAnswers = new List<bool>(UserAnswers);
-
         IsCorrect = CheckAnswer();
         IsAnswered = true;
         IsSubmitting = false;
-        IsCompleted = true; // Marquer comme complété
+        IsCompleted = true;
 
         if (QuizData.ShowValidationFeedback)
         {
@@ -288,13 +425,11 @@
                 : GetFailureMessage();
         }
 
-        // Notifier le parent du changement d'état
         if (IsCompletedChanged.HasDelegate)
         {
             await IsCompletedChanged.InvokeAsync(true);
         }
 
-        // Notification du parent
         if (OnQuizCompleted.HasDelegate)
         {
             await OnQuizCompleted.InvokeAsync(IsCorrect.GetValueOrDefault());
@@ -316,15 +451,41 @@
         return IsCorrect.GetValueOrDefault() ? "100" : "50";
     }
 
+    private string GetFormattedTime()
+    {
+        return TimeSpent.ToString(@"mm\:ss");
+    }
+
+    private string GetEnhancedOptionClass(int index)
+    {
+        var classes = new List<string>();
+
+        if (!IsCompleted)
+        {
+            if (UserAnswers[index]) classes.Add("selected");
+        }
+        else
+        {
+            if (QuizData.Options[index].IsCorrect)
+                classes.Add("correct");
+            else if (CompletedAnswers[index])
+                classes.Add("incorrect");
+        }
+
+        if (IsCompleted) classes.Add("disabled");
+
+        return string.Join(" ", classes);
+    }
+
     private string GetSuccessMessage()
     {
         var messages = new[]
         {
-            "Excellent travail !",
-            "Parfait !",
-            "Bravo !",
-            "Très bien !",
-            "Fantastique !"
+            "Parfait ! 🎉",
+            "Excellente réponse ! 🌟",
+            "Bravo ! 👏",
+            "Superbe travail ! 🚀",
+            "Fantastique ! ⭐"
         };
         return messages[new Random().Next(messages.Length)];
     }
@@ -333,9 +494,22 @@
     {
         var messages = new[]
         {
-            "Pas tout à fait !",
-            "Presque !",
-            "Ce n'est pas grave, on apprend de ses erreurs.",
+            "Pas de problème, on apprend tous ! 📚",
+            "Chaque erreur est une leçon ! 💪",
+            "Continue, tu es sur la bonne voie ! 🎯",
+            "Ne te décourage pas ! 🌈"
+        };
+        return messages[new Random().Next(messages.Length)];
+    }
+
+    private string GetEncouragementMessage()
+    {
+        var messages = new[]
+        {
+            "Bonne tentative ! 🌟",
+            "Continue d'apprendre ! 📖",
+            "Presque ! 💪",
+            "Bon effort ! 👍"
         };
         return messages[new Random().Next(messages.Length)];
     }
@@ -346,20 +520,6 @@
             .Where((option, index) => option.IsCorrect)
             .Select(option => option.Text);
         return string.Join(", ", correctOptions);
-    }
-
-    private string GetOptionClass(int index)
-    {
-        if (!IsCompleted) return string.Empty;
-
-        var classes = new List<string>();
-
-        if (QuizData.Options[index].IsCorrect)
-            classes.Add("correct");
-        else if (CompletedAnswers[index])
-            classes.Add("incorrect");
-
-        return string.Join(" ", classes);
     }
 
     private void SetUserAnswer(int index)
@@ -402,5 +562,10 @@
     private bool HasUserAnswer()
     {
         return UserAnswers != null && UserAnswers.Any(a => a);
+    }
+
+    public void Dispose()
+    {
+        _timeUpdateTimer?.Dispose();
     }
 }

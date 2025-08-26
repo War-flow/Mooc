@@ -7,7 +7,11 @@
     <h4 class="quiz-title">
         @if (IsEditing)
         {
-            <InputText class="form-control" @bind-Value="Block.Title" placeholder="Titre du quiz" />
+            <InputText class="form-control" @bind-Value="Block.Title" 
+                      @bind-Value:event="oninput"
+                      @onblur="ValidateTitle"
+                      placeholder="Titre du quiz" 
+                      maxlength="100" />
             @if (titleError)
             {
                 <small class="text-danger">Le titre ne peut pas dépasser 100 caractères</small>
@@ -26,20 +30,26 @@
 
     @if (IsEditing)
     {
-        <!-- Mode édition du quiz -->
+        <!-- Mode édition du quiz avec validation en temps réel -->
         <div class="quiz-editor">
             <div class="mb-3">
-                <label class="form-label">Question</label>
-                @if (useRichEditor)
-                {
-                    <div id="editor-@Block.Order" class="rich-editor" style="height: 150px;"></div>
-                }
-                else
-                {
-                    <InputTextArea class="form-control" @bind-Value="QuizData.Question" rows="3"
-                                   placeholder="Saisissez votre question..." />
-                }
+                <label class="form-label">
+                    Question <span class="text-danger">*</span>
+                    <small class="text-muted">(@QuizData.Question.Length/500 caractères)</small>
+                </label>
 
+                <InputTextArea class="@($"form-control {GetQuestionValidationClass()}")"
+                               @bind-Value="QuizData.Question"
+                               @bind-Value:event="oninput"
+                               @onblur="ValidateQuestion"
+                               rows="3"
+                               maxlength="500"
+                               placeholder="Saisissez votre question..." />
+                
+                @if (questionError)
+                {
+                    <small class="text-danger">@questionErrorMessage</small>
+                }
             </div>
 
             <div class="mb-3">
@@ -47,19 +57,27 @@
                 <InputSelect class="form-select" @bind-Value="QuizData.Type" @onchange="OnQuizTypeChanged">
                     <option value="multiple-choice">Choix multiple (une seule réponse)</option>
                     <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
+                    <option value="true-false">Vrai/Faux</option>
                 </InputSelect>
             </div>
             
             <div class="mb-3">
-                <label class="form-label">
-                    Réponses
-                    @if (QuizData.Type == "multiple-select")
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>
+                        Réponses
+                        @if (QuizData.Type == "multiple-select")
+                        {
+                            <small class="text-muted">(Cochez les bonnes réponses)</small>
+                        }
+                        else
+                        {
+                            <small class="text-muted">(Sélectionnez la bonne réponse)</small>
+                        }
+                    </span>
+                    
+                    @if (optionsError)
                     {
-                        <small class="text-muted">(Cochez les bonnes réponses)</small>
-                    }
-                    else
-                    {
-                        <small class="text-muted">(Sélectionnez la bonne réponse)</small>
+                        <small class="text-danger">@optionsErrorMessage</small>
                     }
                 </label>
 
@@ -72,7 +90,7 @@
                             <div class="input-group-text">
                                 <input class="form-check-input" type="checkbox"
                                        checked="@QuizData.Options[index].IsCorrect"
-                                       @onchange="@(e => QuizData.Options[index].IsCorrect = (bool)e.Value!)" />
+                                       @onchange="@(e => { QuizData.Options[index].IsCorrect = (bool)e.Value!; ValidateOptions(); })" />
                             </div>
                         }
                         else
@@ -80,48 +98,152 @@
                             <div class="input-group-text">
                                 <input class="form-check-input" type="radio" name="correct-answer-@Block.Order"
                                        checked="@QuizData.Options[index].IsCorrect"
-                                       @onchange="@(e => SetSingleCorrectAnswer(index))" />
+                                       @onchange="@(e => { SetSingleCorrectAnswer(index); ValidateOptions(); })" />
                             </div>
                         }
-                        <InputText class="form-control" @bind-Value="QuizData.Options[index].Text"
-                                   placeholder="@($"Option {index + 1}")" />
+                        <InputText class="@($"form-control {GetOptionValidationClass(index)}")"
+                                   @bind-Value="QuizData.Options[index].Text"
+                                   @bind-Value:event="oninput"
+                                   @onblur="() => ValidateOption(index)"
+                                   placeholder="@($"Option {index + 1}")"
+                                   maxlength="200" />
                         <button type="button" class="btn btn-outline-danger"
                                 @onclick="() => RemoveOption(index)"
-                                disabled="@(QuizData.Options.Count <= GetMinimumOptions())">
+                                disabled="@(QuizData.Options.Count <= GetMinimumOptions())"
+                                title="Supprimer cette option">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
                 }
 
-                <button type="button" class="btn btn-outline-primary btn-sm" @onclick="AddOption"
-                        disabled="@(QuizData.Options.Count >= 6)">
-                    <i class="bi bi-plus"></i> Ajouter une option
-                </button>
+                <div class="d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-outline-primary btn-sm" 
+                            @onclick="AddOption"
+                            disabled="@(QuizData.Options.Count >= 6)">
+                        <i class="bi bi-plus"></i> Ajouter une option
+                    </button>
+                    <small class="text-muted">Maximum 6 options</small>
+                </div>
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Explication (optionnel)</label>
-                <InputTextArea class="form-control" @bind-Value="QuizData.Explanation" rows="2"
-                               placeholder="Explication affichée après la réponse..." />
+                <label class="form-label">
+                    Explication (optionnel)
+                    <small class="text-muted">(@QuizData.Explanation.Length/300 caractères)</small>
+                </label>
+                <InputTextArea class="form-control" 
+                              @bind-Value="QuizData.Explanation" 
+                              rows="2"
+                              maxlength="300"
+                              placeholder="Explication affichée après la réponse..." />
             </div>
 
-            <!-- Paramètres avancés -->
-            <div class="mb-3">
-                <div class="form-check">
-                    <InputCheckbox class="form-check-input" @bind-Value="QuizData.ShowValidationFeedback" id="@showFeedbackId" />
-                    <label class="form-check-label" for="@showFeedbackId">
-                        Afficher un retour détaillé sur les erreurs
-                    </label>
+            <!-- Paramètres avancés avec accordéon -->
+            <div class="accordion" id="advancedSettings">
+                <div class="accordion-item">
+                    <h2 class="accordion-header">
+                        <button class="accordion-button collapsed" type="button" 
+                                data-bs-toggle="collapse" data-bs-target="#collapseAdvanced">
+                            <i class="bi bi-gear me-2"></i>
+                            Paramètres avancés
+                        </button>
+                    </h2>
+                    <div id="collapseAdvanced" class="accordion-collapse collapse">
+                        <div class="accordion-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.ShowValidationFeedback" id="@showFeedbackId" />
+                                        <label class="form-check-label" for="@showFeedbackId">
+                                            Afficher un retour détaillé
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.ShowProgress" id="@($"showProgress-{Block.Order}")" />
+                                        <label class="form-check-label" for="@($"showProgress-{Block.Order}")">
+                                            Afficher la progression
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.ShowStats" id="@($"showStats-{Block.Order}")" />
+                                        <label class="form-check-label" for="@($"showStats-{Block.Order}")">
+                                            Afficher les statistiques
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <InputCheckbox class="form-check-input" @bind-Value="QuizData.AllowHint" id="@($"allowHint-{Block.Order}")" />
+                                        <label class="form-check-label" for="@($"allowHint-{Block.Order}")">
+                                            Autoriser l'aide
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            @if (QuizData.AllowHint)
+                            {
+                                <div class="mt-3">
+                                    <label class="form-label">Indice (optionnel)</label>
+                                    <InputTextArea class="form-control" 
+                                                  @bind-Value="QuizData.Hint" 
+                                                  rows="2"
+                                                  maxlength="200"
+                                                  placeholder="Indice pour aider l'utilisateur..." />
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Prévisualisation en temps réel -->
+            <div class="mt-4 p-3 bg-light rounded">
+                <h6 class="text-muted mb-3">
+                    <i class="bi bi-eye me-1"></i> Aperçu du quiz
+                </h6>
+                <div class="quiz-preview">
+                    @if (!string.IsNullOrEmpty(QuizData.Question))
+                    {
+                        <div class="fw-bold mb-3">@QuizData.Question</div>
+                        @for (int i = 0; i < QuizData.Options.Count; i++)
+                        {
+                            var index = i;
+                            <div class="form-check">
+                                <input class="form-check-input" type="@(QuizData.Type == "multiple-select" ? "checkbox" : "radio")" disabled />
+                                <label class="form-check-label">
+                                    @QuizData.Options[index].Text
+                                    @if (QuizData.Options[index].IsCorrect)
+                                    {
+                                        <i class="bi bi-check-circle text-success ms-1"></i>
+                                    }
+                                </label>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <em class="text-muted">Saisissez une question pour voir l'aperçu</em>
+                    }
                 </div>
             </div>
         </div>
     }
     else
     {
-        <!-- Mode affichage du quiz -->
+        <!-- Mode affichage du quiz avec interactions améliorées -->
         <div class="quiz-display">
             @if (!string.IsNullOrEmpty(QuizData.Question))
             {
+                <!-- Barre de progression si activée -->
+                @if (QuizData.ShowProgress && IsAnswered)
+                {
+                    <div class="progress mb-3" style="height: 8px;">
+                        <div class="progress-bar @(IsCorrect.GetValueOrDefault() ? "bg-success" : "bg-warning")" 
+                             style="width: 100%" role="progressbar"></div>
+                    </div>
+                }
+
                 <div class="question mb-3">
                     <strong>@((MarkupString)QuizData.Question)</strong>
                 </div>
@@ -130,27 +252,37 @@
                     @for (int i = 0; i < QuizData.Options.Count; i++)
                     {
                         var index = i;
-                        <div class="form-check">
+                        <div class="form-check @GetOptionDisplayClass(index)"
+                             @onclick="@(async () => { if (!IsAnswered) HandleOptionClick(index); })"
+                             role="button"
+                             tabindex="@(IsAnswered ? -1 : 0)"
+                             @onkeypress="@(async (e) => await HandleOptionKeyPress(e, index))">
+
                             @if (QuizData.Type == "multiple-select")
                             {
-                                <input class="form-check-input" type="checkbox" id="option-@Block.Order-@index"
-                                       disabled="@IsAnswered" @bind="UserAnswers[index]" />
+                                <input class="form-check-input" type="checkbox" 
+                                       id="option-@Block.Order-@index"
+                                       disabled="@IsAnswered" 
+                                       checked="@UserAnswers[index]" />
                             }
                             else
                             {
-                                <input class="form-check-input" type="radio" name="quiz-@Block.Order"
-                                       id="option-@Block.Order-@index" value="@index"
-                                       disabled="@IsAnswered" @onchange="@(e => SetUserAnswer(index))" />
+                                <input class="form-check-input" type="radio" 
+                                       name="quiz-@Block.Order"
+                                       id="option-@Block.Order-@index" 
+                                       disabled="@IsAnswered" 
+                                       checked="@UserAnswers[index]" />
                             }
-                            <label class="form-check-label @GetOptionClass(index)" for="option-@Block.Order-@index">
+                            
+                            <label class="form-check-label @GetOptionLabelClass(index)" for="option-@Block.Order-@index">
                                 @QuizData.Options[index].Text
                                 @if (IsAnswered && QuizData.Options[index].IsCorrect)
                                 {
-                                    <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                                    <i class="bi bi-check-circle-fill text-success ms-2" title="Bonne réponse"></i>
                                 }
                                 else if (IsAnswered && UserAnswers[index] && !QuizData.Options[index].IsCorrect)
                                 {
-                                    <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+                                    <i class="bi bi-x-circle-fill text-danger ms-2" title="Mauvaise réponse"></i>
                                 }
                             </label>
                         </div>
@@ -160,44 +292,107 @@
                 <div class="quiz-actions mb-3">
                     @if (!IsAnswered)
                     {
-                        <button type="button" class="btn btn-primary" @onclick="SubmitAnswer"
-                                disabled="@(!HasUserAnswer())">
-                            Valider la réponse
-                        </button>
-                    }
-                    else
-                    {
-
-                        @if (IsCorrect.HasValue)
-                        {
-                            <span class="ms-3 badge @(IsCorrect.Value ? "bg-success" : "bg-danger")">
-                                @if (IsCorrect.Value)
+                        <div class="d-flex flex-wrap gap-2 align-items-center">
+                            <button type="button" class="btn btn-primary" 
+                                    @onclick="SubmitAnswer"
+                                    disabled="@(!HasUserAnswer() || isSubmitting)">
+                                @if (isSubmitting)
                                 {
-                                    <i class="bi bi-check-lg me-1"></i>
-                                    @:Correct!
+                                    <span class="spinner-border spinner-border-sm me-1">Validation...</span>
+                                   
                                 }
                                 else
                                 {
-                                    <i class="bi bi-x-lg me-1"></i>
-                                    @:Incorrect
+                                    <i class="bi bi-check-lg me-1">Valider la réponse</i>
+                                   
                                 }
-                            </span>
+                            </button>
+
+                            @if (QuizData.AllowHint && !string.IsNullOrEmpty(QuizData.Hint) && !hintShown)
+                            {
+                                <button type="button" class="btn btn-outline-info btn-sm" @onclick="ShowHint">
+                                    <i class="bi bi-lightbulb me-1"></i>
+                                    Aide
+                                </button>
+                            }
+                        </div>
+
+                        @if (HasUserAnswer())
+                        {
+                            <small class="text-success d-block mt-2">
+                                <i class="bi bi-check-circle me-1"></i>
+                                Réponse sélectionnée, vous pouvez valider
+                            </small>
                         }
+                    }
+                    else
+                    {
+                        <!-- Résultat avec animation -->
+                        <div class="result-container">
+                            @if (IsCorrect.HasValue)
+                            {
+                                <div class="alert @(IsCorrect.Value ? "alert-success" : "alert-warning") d-flex align-items-center">
+                                    @if (IsCorrect.Value)
+                                    {
+                                        <i class="bi bi-trophy-fill me-2 fs-5"></i>
+                                        <strong>Excellent ! Bonne réponse.</strong>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-book me-2 fs-5"></i>
+                                        <strong>Pas de problème ! Continue.</strong>
+                                    }
+                                </div>
+                            }
+                        </div>
                     }
                 </div>
 
-                <!-- Feedback détaillé pour les réponses incorrectes -->
+                <!-- Indice si montré -->
+                @if (hintShown && !string.IsNullOrEmpty(QuizData.Hint))
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-lightbulb me-2"></i>
+                        <strong>Indice :</strong> @QuizData.Hint
+                    </div>
+                }
+
+                <!-- Feedback détaillé -->
                 @if (IsAnswered && !IsCorrect.GetValueOrDefault() && QuizData.ShowValidationFeedback && !string.IsNullOrEmpty(ValidationMessage))
                 {
-                    <div class="alert alert-warning">
-                        <strong>Résultat</strong> @ValidationMessage
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        <strong>Explication :</strong> @ValidationMessage
                     </div>
                 }
 
                 @if (IsAnswered && !string.IsNullOrEmpty(QuizData.Explanation))
                 {
-                    <div class="alert alert-info">
-                        <strong>Explication :</strong> @QuizData.Explanation
+                    <div class="alert alert-secondary">
+                        <i class="bi bi-book me-2"></i>
+                        <strong>En savoir plus :</strong> @QuizData.Explanation
+                    </div>
+                }
+
+                <!-- Statistiques si activées -->
+                @if (IsAnswered && QuizData.ShowStats)
+                {
+                    <div class="quiz-stats mt-3 p-3 bg-light rounded">
+                        <h6 class="text-muted mb-2">
+                            <i class="bi bi-bar-chart me-1"></i> Statistiques
+                        </h6>
+                        <div class="row text-center">
+                            <div class="col">
+                                <div class="fw-bold @(IsCorrect.GetValueOrDefault() ? "text-success" : "text-warning")">
+                                    @(IsCorrect.GetValueOrDefault() ? "100%" : "0%")
+                                </div>
+                                <small class="text-muted">Score</small>
+                            </div>
+                            <div class="col">
+                                <div class="fw-bold text-info">1</div>
+                                <small class="text-muted">Tentative</small>
+                            </div>
+                        </div>
                     </div>
                 }
             }
@@ -212,8 +407,17 @@
     }
 
     <div class="block-controls mt-3">
-        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit">
-            <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i> @(IsEditing ? "Enregistrer" : "Modifier")
+        <button type="button" class="btn-block btn-valid" @onclick="ToggleEdit" disabled="@isSaving">
+            @if (isSaving)
+            {
+                <span class="spinner-border spinner-border-sm me-1">Enregistrement...</span>
+                
+            }
+            else
+            {
+                <i class="bi bi-@(IsEditing ? "floppy" : "pencil")"></i>
+                @(IsEditing ? "Enregistrer" : "Modifier")
+            }
         </button>
         @if (!IsEditing)
         {
@@ -231,32 +435,31 @@
 </div>
 
 @code {
-    [Parameter]
-    public CourBuilder.CoursBlock Block { get; set; } = default!;
+    [Parameter] public CourBuilder.CoursBlock Block { get; set; } = default!;
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? AdditionalAttributes { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
+    [CascadingParameter] private EditContext? EditContext { get; set; }
 
-    [Parameter(CaptureUnmatchedValues = true)]
-    public Dictionary<string, object>? AdditionalAttributes { get; set; }
-
-    [Parameter]
-    public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
-
-    [Parameter]
-    public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
-
-    [CascadingParameter]
-    private EditContext? EditContext { get; set; }
-
-    // État du composant
+    // État du composant amélioré
     private bool IsEditing { get; set; } = false;
-    private bool useRichEditor { get; set; } = false;
+    private bool isSaving { get; set; } = false;
+    private bool isSubmitting { get; set; } = false;
+    private bool hintShown { get; set; } = false;
+    
+    // Validation en temps réel
     private bool titleError { get; set; } = false;
+    private bool questionError { get; set; } = false;
+    private bool optionsError { get; set; } = false;
+    private string questionErrorMessage { get; set; } = string.Empty;
+    private string optionsErrorMessage { get; set; } = string.Empty;
+    private List<bool> optionErrors { get; set; } = new();
+    
     private string originalContent = string.Empty;
     private string originalTitle = string.Empty;
-    private string editorId => $"editor-{Block.Order}";
 
     // Propriétés calculées pour les IDs
     private string showFeedbackId => $"showFeedback-{Block.Order}";
-    private string useRichEditorId => $"useRichEditor-{Block.Order}";
 
     // État du quiz
     private bool IsAnswered { get; set; } = false;
@@ -267,7 +470,7 @@
     // Structure des données du quiz
     private QuizStructure QuizData { get; set; } = new();
 
-    // Classes pour représenter la structure du quiz
+    // Classes pour représenter la structure du quiz améliorée
     public class QuizStructure
     {
         public string Question { get; set; } = string.Empty;
@@ -275,6 +478,10 @@
         public List<QuizOption> Options { get; set; } = new();
         public string Explanation { get; set; } = string.Empty;
         public bool ShowValidationFeedback { get; set; } = true;
+        public bool ShowProgress { get; set; } = false;
+        public bool ShowStats { get; set; } = false;
+        public bool AllowHint { get; set; } = false;
+        public string Hint { get; set; } = string.Empty;
 
         public QuizStructure()
         {
@@ -290,23 +497,16 @@
         public bool IsCorrect { get; set; } = false;
     }
 
-    // Classe pour représenter les blocs de cours
-    public class CoursBlock
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Type { get; set; } = string.Empty;
-        public int Order { get; set; }
-        public string? Title { get; set; }
-        public string? Text { get; set; }
-        public object? Content { get; set; }
-        public string? Url { get; set; }
-        public List<string> FileUrls { get; set; } = new();
-    }
-
     protected override void OnInitialized()
     {
         LoadQuizData();
         InitializeUserAnswers();
+        InitializeValidation();
+    }
+
+    private void InitializeValidation()
+    {
+        optionErrors = new List<bool>(new bool[QuizData.Options.Count]);
     }
 
     private void LoadQuizData()
@@ -320,7 +520,6 @@
         }
         catch
         {
-            // Si la désérialisation échoue, garder la structure par défaut
             QuizData = new QuizStructure();
         }
     }
@@ -330,9 +529,71 @@
         UserAnswers = new List<bool>(new bool[Math.Max(QuizData.Options.Count, 2)]);
     }
 
-    private void OnContentChanged(string elementId, string content)
+    // Méthodes de validation améliorées
+    private void ValidateTitle()
     {
-        QuizData.Question = content;
+        titleError = !string.IsNullOrEmpty(Block.Title) && Block.Title.Length > 100;
+    }
+
+    private void ValidateQuestion()
+    {
+        questionError = false;
+        questionErrorMessage = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(QuizData.Question))
+        {
+            questionError = true;
+            questionErrorMessage = "La question est obligatoire";
+        }
+        else if (QuizData.Question.Length > 500)
+        {
+            questionError = true;
+            questionErrorMessage = "La question ne peut pas dépasser 500 caractères";
+        }
+    }
+
+    private void ValidateOptions()
+    {
+        optionsError = false;
+        optionsErrorMessage = string.Empty;
+
+        // Vérifier qu'il y a au moins une réponse correcte
+        if (!QuizData.Options.Any(o => o.IsCorrect))
+        {
+            optionsError = true;
+            optionsErrorMessage = "Au moins une réponse correcte est requise";
+            return;
+        }
+
+        // Vérifier que toutes les options ont du texte
+        if (QuizData.Options.Any(o => string.IsNullOrWhiteSpace(o.Text)))
+        {
+            optionsError = true;
+            optionsErrorMessage = "Toutes les options doivent avoir du texte";
+            return;
+        }
+    }
+
+    private void ValidateOption(int index)
+    {
+        if (index < optionErrors.Count)
+        {
+            optionErrors[index] = string.IsNullOrWhiteSpace(QuizData.Options[index].Text);
+        }
+    }
+
+    private string GetQuestionValidationClass()
+    {
+        return questionError ? "is-invalid" : (!string.IsNullOrEmpty(QuizData.Question) ? "is-valid" : "");
+    }
+
+    private string GetOptionValidationClass(int index)
+    {
+        if (index < optionErrors.Count)
+        {
+            return optionErrors[index] ? "is-invalid" : (!string.IsNullOrWhiteSpace(QuizData.Options[index].Text) ? "is-valid" : "");
+        }
+        return string.Empty;
     }
 
     private string GetTypeClass()
@@ -346,7 +607,26 @@
         return string.Join(" ", classList);
     }
 
-    private string GetOptionClass(int index)
+    private string GetOptionDisplayClass(int index)
+    {
+        var classes = new List<string> { "quiz-option" };
+
+        if (!IsAnswered)
+        {
+            if (UserAnswers[index]) classes.Add("selected");
+            classes.Add("interactive");
+        }
+        else
+        {
+            if (QuizData.Options[index].IsCorrect) classes.Add("correct");
+            else if (UserAnswers[index]) classes.Add("incorrect");
+            classes.Add("answered");
+        }
+
+        return string.Join(" ", classes);
+    }
+
+    private string GetOptionLabelClass(int index)
     {
         if (!IsAnswered) return string.Empty;
 
@@ -378,36 +658,47 @@
         }
 
         InitializeUserAnswers();
+        InitializeValidation();
     }
 
     private async Task ToggleEdit()
     {
         if (IsEditing)
         {
-            // Validation
-            if (Block.Title?.Length > 100)
+            // Validation avant sauvegarde
+            ValidateTitle();
+            ValidateQuestion();
+            ValidateOptions();
+
+            if (titleError || questionError || optionsError)
             {
-                titleError = true;
+                await JSRuntime.InvokeVoidAsync("alert", "Veuillez corriger les erreurs avant de sauvegarder.");
                 return;
             }
 
-            // Validation des options pour s'assurer qu'au moins une réponse correcte existe
-            if (!QuizData.Options.Any(o => o.IsCorrect))
+            isSaving = true;
+            StateHasChanged();
+
+            try
             {
-                await JSRuntime.InvokeVoidAsync("alert", "Veuillez sélectionner au moins une réponse correcte.");
-                return;
+                // Sauvegarder les données du quiz
+                Block.Content = System.Text.Json.JsonSerializer.Serialize(QuizData);
+
+                if (OnBlockChanged.HasDelegate)
+                {
+                    await OnBlockChanged.InvokeAsync(Block);
+                }
+
+                EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
+                EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
+
+                // Attendre un court délai pour l'effet visuel
+                await Task.Delay(500);
             }
-
-            // Sauvegarder les données du quiz
-            Block.Content = System.Text.Json.JsonSerializer.Serialize(QuizData);
-
-            if (OnBlockChanged.HasDelegate)
+            finally
             {
-                await OnBlockChanged.InvokeAsync(Block);
+                isSaving = false;
             }
-
-            EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Title)));
-            EditContext?.NotifyFieldChanged(new FieldIdentifier(Block, nameof(Block.Content)));
         }
         else
         {
@@ -415,8 +706,8 @@
             originalTitle = Block.Title ?? string.Empty;
         }
 
-        titleError = false;
         IsEditing = !IsEditing;
+        StateHasChanged();
     }
 
     private async Task CancelEdit()
@@ -435,6 +726,11 @@
         }
 
         Block.Title = originalTitle;
+        
+        // Réinitialiser les erreurs
+        titleError = false;
+        questionError = false;
+        optionsError = false;
 
         IsEditing = false;
         StateHasChanged();
@@ -442,7 +738,7 @@
 
     private async Task RequestDelete()
     {
-        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce quiz?");
+        bool confirmed = await JSRuntime.InvokeAsync<bool>("confirm", "Êtes-vous sûr de vouloir supprimer ce quiz ?");
         if (confirmed && OnDeleteRequested.HasDelegate)
         {
             await OnDeleteRequested.InvokeAsync(Block);
@@ -456,6 +752,7 @@
         {
             QuizData.Options.Add(new QuizOption());
             UserAnswers.Add(false);
+            optionErrors.Add(false);
         }
     }
 
@@ -468,6 +765,11 @@
             {
                 UserAnswers.RemoveAt(index);
             }
+            if (optionErrors.Count > index)
+            {
+                optionErrors.RemoveAt(index);
+            }
+            ValidateOptions();
         }
     }
 
@@ -479,28 +781,88 @@
         }
     }
 
-    // Méthodes pour gérer les réponses utilisateur
+    // Méthodes pour gérer les réponses utilisateur améliorées
+    private void HandleOptionClick(int index)
+    {
+        if (IsAnswered) return;
+
+        if (QuizData.Type == "multiple-select")
+        {
+            UserAnswers[index] = !UserAnswers[index];
+        }
+        else
+        {
+            SetUserAnswer(index);
+        }
+        StateHasChanged();
+    }
+
+    private async Task HandleOptionKeyPress(KeyboardEventArgs e, int index)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            HandleOptionClick(index);
+        }
+    }
+
     private void SetUserAnswer(int index)
     {
         for (int i = 0; i < UserAnswers.Count; i++)
         {
-            UserAnswers[i] = (i == index) && !UserAnswers[i];
+            UserAnswers[i] = (i == index);
         }
-
-        IsAnswered = UserAnswers.Any();
     }
 
-    private void SubmitAnswer()
+    private async Task SubmitAnswer()
     {
-        IsCorrect = QuizData.Options.Any(o => o.IsCorrect && UserAnswers[QuizData.Options.IndexOf(o)]);
+        if (IsAnswered || !HasUserAnswer()) return;
 
-        // Afficher le message de validation si l'option est activée
+        isSubmitting = true;
+        StateHasChanged();
+
+        // Attendre pour l'effet visuel
+        await Task.Delay(800);
+
+        IsCorrect = CheckAnswer();
+        IsAnswered = true;
+        isSubmitting = false;
+
         if (QuizData.ShowValidationFeedback)
         {
-            ValidationMessage = IsCorrect.GetValueOrDefault() ? "Bonne réponse !" : "Mauvaise réponse. Essayez encore.";
+            ValidationMessage = IsCorrect.GetValueOrDefault() 
+                ? "Parfait ! Vous avez donné la bonne réponse." 
+                : "Ce n'est pas correct, mais continuez à apprendre !";
         }
 
-        IsAnswered = true;
+        StateHasChanged();
+    }
+
+    private void ShowHint()
+    {
+        hintShown = true;
+        StateHasChanged();
+    }
+
+    private bool CheckAnswer()
+    {
+        if (QuizData.Type == "multiple-select")
+        {
+            for (int i = 0; i < QuizData.Options.Count; i++)
+            {
+                if (QuizData.Options[i].IsCorrect != UserAnswers[i])
+                    return false;
+            }
+            return true;
+        }
+        else
+        {
+            for (int i = 0; i < QuizData.Options.Count; i++)
+            {
+                if (UserAnswers[i] && QuizData.Options[i].IsCorrect)
+                    return true;
+            }
+            return false;
+        }
     }
 
     private bool HasUserAnswer()
