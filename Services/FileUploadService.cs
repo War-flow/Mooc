@@ -161,18 +161,16 @@ namespace Mooc.Services
             
             try
             {
-                // Conversion IBrowserFile -> IFormFile
-                var formFile = ConvertToIFormFile(file);
-
-                // Valider le fichier avant l'upload
-                var validationResult = await _validationService.ValidateFileAsync(formFile);
+                // ⭐ CORRECTION : Validation directe sans conversion IFormFile problématique
+                ValidateFile(file, "file", _allowedFileExtensions, _maxFileSizes["file"]);
+                
+                // ⭐ CORRECTION : Validation personnalisée pour IBrowserFile
+                var validationResult = await ValidateBrowserFileAsync(file);
                 if (!validationResult.IsValid)
                 {
                     _logger.LogWarning("Fichier rejeté: {Error}", validationResult.ErrorMessage);
                     throw new InvalidOperationException(validationResult.ErrorMessage ?? "Fichier invalide");
                 }
-
-                ValidateFile(file, "file", _allowedFileExtensions, _maxFileSizes["file"]);
                 
                 var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", "files");
                 EnsureDirectoryExists(uploadsFolder);
@@ -194,7 +192,133 @@ namespace Mooc.Services
             }
         }
 
-        // Méthodes utilitaires privées
+        // ⭐ NOUVELLE MÉTHODE : Validation directe pour IBrowserFile
+        private async Task<ValidationResult> ValidateBrowserFileAsync(IBrowserFile file)
+        {
+            try
+            {
+                if (file == null || file.Size == 0)
+                {
+                    return ValidationResult.Failure("Fichier vide ou invalide");
+                }
+
+                // Vérifier l'extension
+                var extension = Path.GetExtension(file.Name).ToLower();
+                var allowedExtensions = new[] { ".pdf", ".doc", ".docx", ".txt", ".zip", ".xlsx", ".pptx", ".xls", ".rar" };
+                
+                if (!allowedExtensions.Contains(extension))
+                {
+                    return ValidationResult.Failure($"Type de fichier non autorisé: {extension}");
+                }
+
+                // Vérifier le type MIME
+                var allowedMimeTypes = new[]
+                {
+                    "application/pdf",
+                    "application/msword",
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "text/plain",
+                    "application/zip",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    "application/vnd.ms-excel",
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "application/x-rar-compressed"
+                };
+                
+                if (!allowedMimeTypes.Contains(file.ContentType?.ToLower()))
+                {
+                    return ValidationResult.Failure("Type de fichier non autorisé");
+                }
+
+                // Validation de signature simplifiée pour IBrowserFile
+                try
+                {
+                    // ⭐ CORRECTION : Utiliser la taille maximale autorisée pour ce type de fichier au lieu de 1024
+                    using var stream = file.OpenReadStream(_maxFileSizes["file"]); // 50MB au lieu de 1024 bytes
+                    var buffer = new byte[512];
+                    var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    
+                    if (bytesRead > 0)
+                    {
+                        Array.Resize(ref buffer, bytesRead);
+                        
+                        if (!IsValidFileSignatureForBrowser(buffer, extension))
+                        {
+                            return ValidationResult.Failure("Fichier corrompu ou type invalide");
+                        }
+                    }
+                }
+                catch (NotSupportedException)
+                {
+                    // Si la lecture de signature échoue, accepter basé sur l'extension et MIME
+                    _logger.LogDebug("Validation de signature ignorée pour IBrowserFile: {FileName}", file.Name);
+                }
+
+                return ValidationResult.Success();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la validation de IBrowserFile");
+                return ValidationResult.Failure("Erreur de validation du fichier");
+            }
+        }
+
+        private bool IsValidFileSignatureForBrowser(byte[] buffer, string extension)
+        {
+            if (buffer.Length < 4) return false;
+            
+            // Signatures simplifiées pour validation browser
+            return extension switch
+            {
+                ".pdf" => buffer.Length >= 4 && buffer[0] == 0x25 && buffer[1] == 0x50 && buffer[2] == 0x44 && buffer[3] == 0x46, // %PDF
+                ".docx" or ".xlsx" or ".pptx" => buffer.Length >= 4 && buffer[0] == 0x50 && buffer[1] == 0x4B && buffer[2] == 0x03 && buffer[3] == 0x04, // ZIP
+                ".doc" or ".xls" => buffer.Length >= 4 && buffer[0] == 0xD0 && buffer[1] == 0xCF && buffer[2] == 0x11 && buffer[3] == 0xE0, // OLE
+                ".zip" or ".rar" => buffer.Length >= 4 && buffer[0] == 0x50 && buffer[1] == 0x4B && buffer[2] == 0x03 && buffer[3] == 0x04, // ZIP
+                ".txt" => true, // Texte peut avoir n'importe quelle signature
+                _ => true // Pour les autres types, accepter
+            };
+        }
+
+        /// <summary>
+        /// Supprime un fichier du serveur.
+        
+        public void DeleteFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return;
+
+            try
+            {
+                var fileName = Path.GetFileName(filePath);
+                var subfolder = DetermineSubfolder(filePath);
+                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", subfolder, fileName);
+                
+                if (File.Exists(fullPath))
+                {
+                    File.Delete(fullPath);
+                    _logger.LogInformation("Fichier supprimé: {FilePath}", fullPath);
+                }
+                else
+                {
+                    _logger.LogWarning("Tentative de suppression d'un fichier inexistant: {FilePath}", fullPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la suppression du fichier: {FilePath}", filePath);
+                throw new InvalidOperationException($"Erreur lors de la suppression du fichier : {ex.Message}", ex);
+            }
+        }
+
+        private static string DetermineSubfolder(string filePath)
+        {
+            if (filePath.Contains("/images/")) return "images";
+            if (filePath.Contains("/audio/")) return "audio";
+            if (filePath.Contains("/files/")) return "files";
+            if (filePath.Contains("/sessions/")) return "sessions";
+            return "files"; // Par défaut
+        }
+
         private void ValidateFile(IBrowserFile file, string fileType, string[] allowedExtensions, long maxSize)
         {
             if (file == null)
@@ -256,58 +380,6 @@ namespace Mooc.Services
         }
         // <summary>
         /// Supprime un fichier du serveur.
-        
-        public void DeleteFile(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath))
-                return;
-
-            try
-            {
-                var fileName = Path.GetFileName(filePath);
-                var subfolder = DetermineSubfolder(filePath);
-                var fullPath = Path.Combine(_environment.WebRootPath, "uploads", subfolder, fileName);
-                
-                if (File.Exists(fullPath))
-                {
-                    File.Delete(fullPath);
-                    _logger.LogInformation("Fichier supprimé: {FilePath}", fullPath);
-                }
-                else
-                {
-                    _logger.LogWarning("Tentative de suppression d'un fichier inexistant: {FilePath}", fullPath);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erreur lors de la suppression du fichier: {FilePath}", filePath);
-                throw new InvalidOperationException($"Erreur lors de la suppression du fichier : {ex.Message}", ex);
-            }
-        }
-
-        private static string DetermineSubfolder(string filePath)
-        {
-            if (filePath.Contains("/images/")) return "images";
-            if (filePath.Contains("/audio/")) return "audio";
-            if (filePath.Contains("/files/")) return "files";
-            if (filePath.Contains("/sessions/")) return "sessions";
-            return "files"; // Par défaut
-        }
-
-        private static IFormFile ConvertToIFormFile(IBrowserFile browserFile)
-        {
-            var stream = browserFile.OpenReadStream(browserFile.Size);
-            return new FormFile(stream, 0, browserFile.Size, browserFile.Name, browserFile.Name)
-            {
-                Headers = new HeaderDictionary(),
-                ContentType = browserFile.ContentType,
-                ContentDisposition = new ContentDispositionHeaderValue("form-data")
-                {
-                    Name = browserFile.Name,
-                    FileName = browserFile.Name
-                }.ToString()
-            };
-        }
 
         private bool IsValidImageSignature(byte[] buffer, string contentType)
         {

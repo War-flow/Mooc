@@ -495,22 +495,79 @@ namespace Mooc.Services
                     return ValidationResult.Failure("Type de fichier non autorisé");
                 }
 
-                // Vérification additionnelle du contenu du fichier si nécessaire
-                using var stream = file.OpenReadStream();
-                var buffer = new byte[512];
-                await stream.ReadAsync(buffer, 0, buffer.Length);
+                // ⭐ CORRECTION : Gestion spéciale pour les BrowserFileStream
+                byte[] buffer;
+                try
+                {
+                    // Essayer d'abord la lecture directe avec limitation de taille
+                    using var stream = file.OpenReadStream();
+                    
+                    // ⭐ CORRECTION : Lire directement sans manipuler Position
+                    buffer = new byte[Math.Min(512, file.Length)];
+                    var bytesRead = await stream.ReadAsync(buffer, 0, buffer.Length);
+                    
+                    // Ajuster la taille du buffer si moins d'octets lus
+                    if (bytesRead < buffer.Length)
+                    {
+                        Array.Resize(ref buffer, bytesRead);
+                    }
+                }
+                catch (NotSupportedException ex) when (ex.Message.Contains("Position"))
+                {
+                    // ⭐ CORRECTION : Si BrowserFileStream ne supporte pas Position,
+                    // utiliser une approche alternative
+                    _logger.LogWarning("BrowserFileStream détecté, utilisation de l'approche alternative pour la validation");
+                    
+                    try
+                    {
+                        // Lire tout le début du fichier en une seule fois
+                        using var stream = file.OpenReadStream();
+                        using var memoryStream = new MemoryStream();
+                        
+                        // Lire seulement les premiers 512 octets pour la signature
+                        var tempBuffer = new byte[4096];
+                        var totalRead = 0;
+                        
+                        while (totalRead < 512)
+                        {
+                            var remainingToRead = Math.Min(tempBuffer.Length, 512 - totalRead);
+                            var bytesRead = await stream.ReadAsync(tempBuffer, 0, remainingToRead);
+                            
+                            if (bytesRead == 0) break; // Fin de fichier
+                            
+                            await memoryStream.WriteAsync(tempBuffer, 0, bytesRead);
+                            totalRead += bytesRead;
+                        }
+                        
+                        buffer = memoryStream.ToArray();
+                    }
+                    catch (Exception innerEx)
+                    {
+                        _logger.LogError(innerEx, "Erreur lors de la lecture alternative du fichier pour validation");
+                        // ⭐ CORRECTION : En cas d'échec de lecture, valider seulement l'extension et le MIME
+                        _logger.LogInformation("Validation limitée appliquée (extension + MIME) pour le fichier: {FileName}", file.FileName);
+                        return ValidationResult.Success();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erreur lors de l'ouverture du flux de fichier pour validation");
+                    return ValidationResult.Failure("Erreur lors de la lecture du fichier");
+                }
                 
                 // Vérifier les signatures de fichiers pour détecter les faux types
-                if (!IsValidFileSignature(buffer, extension))
+                if (buffer.Length > 0 && !IsValidFileSignature(buffer, extension))
                 {
+                    _logger.LogWarning("Signature de fichier invalide pour l'extension {Extension}", extension);
                     return ValidationResult.Failure("Fichier corrompu ou type invalide");
                 }
 
+                _logger.LogDebug("Validation de fichier réussie: {FileName}, Taille: {Size} bytes", file.FileName, file.Length);
                 return ValidationResult.Success();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erreur lors de la validation du fichier");
+                _logger.LogError(ex, "Erreur lors de la validation du fichier: {FileName}", file?.FileName ?? "unknown");
                 return ValidationResult.Failure("Erreur de validation du fichier");
             }
         }
