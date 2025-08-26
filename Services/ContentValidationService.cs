@@ -37,11 +37,11 @@ namespace Mooc.Services
         {
             ["a"] = new[] { "href", "title", "target", "rel", "class", "style" },
             ["img"] = new[] { "src", "alt", "width", "height", "loading", "style", "class" },
-            ["iframe"] = new[] { "src", "width", "height", "frameborder", "allowfullscreen", "style", "class" },
+            ["iframe"] = new[] { "src", "width", "height", "frameborder", "allowfullscreen", "style", "class", "title", "allow" },
             ["video"] = new[] { "src", "controls", "width", "height", "preload", "style", "class", "poster", "autoplay", "loop", "muted" },
             ["audio"] = new[] { "src", "controls", "preload", "style", "class", "autoplay", "loop", "muted" },
-            ["source"] = new[] { "src", "type" },
-            ["div"] = new[] { "class", "style", "data-video-element", "align", "id" },
+            ["source"] = new[] { "src" , "type" },
+            ["div"] = new[] { "class", "style", "data-video-element", "data-preserved-video", "align", "id" },
             ["span"] = new[] { "class", "style" },
             ["table"] = new[] { "class", "style", "border", "cellpadding", "cellspacing" },
             ["td"] = new[] { "style", "contenteditable", "class", "colspan", "rowspan" },
@@ -67,7 +67,11 @@ namespace Mooc.Services
         public string[] AllowedProtocols { get; set; } = new[] { "http", "https", "mailto", "tel", "data" };
         public string[] BlacklistedDomains { get; set; } = new[] { "malicious.com", "phishing.net" };
         public string[] AllowedFileExtensions { get; set; } = new[] { ".pdf", ".doc", ".docx", ".txt", ".zip", ".xlsx", ".xls", ".pptx" };
-        public string[] AllowedVideoPlatforms { get; set; } = new[] { "youtube.com", "vimeo.com", "dailymotion.com" };
+        public string[] AllowedVideoPlatforms { get; set; } = new[] { 
+            "youtube.com", "www.youtube.com", "youtu.be", "m.youtube.com",
+            "vimeo.com", "player.vimeo.com", "www.vimeo.com",
+            "dailymotion.com", "www.dailymotion.com", "dai.ly"
+        };
     }
 
     public class ContentValidationService : IContentValidationService
@@ -463,32 +467,44 @@ namespace Mooc.Services
         {
             try
             {
+                _logger.LogDebug("Début sanitisation minimale. Contenu original longueur: {Length}", htmlContent.Length);
+                
                 var doc = new HtmlDocument();
                 doc.LoadHtml(htmlContent);
                 
-                // NE PAS supprimer les balises de formatage
+                // Compter les éléments vidéo avant traitement
+                var videoElementsBefore = doc.DocumentNode.SelectNodes("//iframe | //video | //div[@data-video-element]")?.Count ?? 0;
+                _logger.LogDebug("Éléments vidéo détectés avant traitement: {Count}", videoElementsBefore);
+                
+                // CORRECTION : Préserver explicitement les vidéos AVANT tout nettoyage
+                PreserveVideoElements(doc);
+                
                 // Supprimer uniquement les scripts dangereux
                 var scripts = doc.DocumentNode.SelectNodes("//script");
                 scripts?.ToList().ForEach(s => s.Remove());
                 
-                // Supprimer uniquement les attributs d'événements JavaScript
                 var allNodes = doc.DocumentNode.SelectNodes("//*");
                 if (allNodes != null)
                 {
                     foreach (var node in allNodes)
                     {
-                        // Préserver TOUS les éléments de formatage incluant ceux avec couleurs
                         var tagName = node.Name.ToLower();
+                        
+                        // CORRECTION : Ne pas traiter les éléments vidéo préservés
+                        if (node.GetAttributeValue("data-preserve-video", "") == "true")
+                        {
+                            continue;
+                        }
+                        
                         var formattingTags = new[] { "b", "i", "u", "strong", "em", "strike", "font", "span", "p", "div", "h1", "h2", "h3", "h4", "h5", "h6" };
                         
                         if (formattingTags.Contains(tagName))
                         {
-                            // Préserver ces balises mais nettoyer les attributs dangereux
                             PreserveColorFormatting(node);
                             continue;
                         }
                         
-                        // Supprimer seulement les attributs dangereux pour les autres balises
+                        // Supprimer seulement les attributs dangereux pour les autres éléments
                         var eventAttributes = node.Attributes
                             .Where(a => a.Name.StartsWith("on", StringComparison.OrdinalIgnoreCase))
                             .ToList();
@@ -498,7 +514,7 @@ namespace Mooc.Services
                             attr.Remove();
                         }
                         
-                        // Nettoyer les URLs JavaScript
+                        // Nettoyer les URLs JavaScript SAUF pour les vidéos préservées
                         var urlAttrs = node.Attributes.Where(a => 
                             (a.Name.ToLower() == "href" || a.Name.ToLower() == "src") &&
                             a.Value?.Contains("javascript:", StringComparison.OrdinalIgnoreCase) == true)
@@ -508,13 +524,30 @@ namespace Mooc.Services
                         {
                             if (attr.Name.ToLower() == "href")
                                 attr.Value = "#";
-                            else if (!IsVideoElement(node))
+                            else if (node.GetAttributeValue("data-preserve-video", "") != "true")
                                 node.Remove();
                         }
                     }
                 }
                 
-                return doc.DocumentNode.OuterHtml;
+                // Nettoyer les attributs temporaires
+                var preservedNodes = doc.DocumentNode.SelectNodes("//*[@data-preserve-video]");
+                preservedNodes?.ToList().ForEach(n => n.Attributes["data-preserve-video"].Remove());
+                
+                var result = doc.DocumentNode.OuterHtml;
+                
+                // Compter les éléments vidéo après traitement
+                var docAfter = new HtmlDocument();
+                docAfter.LoadHtml(result);
+                var videoElementsAfter = docAfter.DocumentNode.SelectNodes("//iframe | //video | //div[@data-video-element]")?.Count ?? 0;
+                _logger.LogDebug("Éléments vidéo après traitement: {Count}", videoElementsAfter);
+                
+                if (videoElementsBefore != videoElementsAfter)
+                {
+                    _logger.LogWarning("Perte d'éléments vidéo pendant la sanitisation: {Before} -> {After}", videoElementsBefore, videoElementsAfter);
+                }
+                
+                return result;
             }
             catch (Exception ex)
             {
@@ -523,85 +556,60 @@ namespace Mooc.Services
             }
         }
 
-        // Nouvelle méthode pour préserver le formatage couleur
-        private void PreserveColorFormatting(HtmlNode node)
+        // NOUVELLE MÉTHODE : Préserver explicitement les éléments vidéo
+        private void PreserveVideoElements(HtmlDocument doc)
         {
-            // Supprimer seulement les attributs d'événements dangereux
-            var dangerousAttributes = new[] { 
-                "onclick", "onload", "onerror", "onmouseover", "onmouseout", 
-                "onfocus", "onblur", "onchange", "onsubmit", "onreset", "onselect", 
-                "onkeydown", "onkeypress", "onkeyup", "onabort", "ondblclick",
-                "onmousedown", "onmouseup", "onmousemove", "oncontextmenu"
-            };
-            
-            var attributesToRemove = node.Attributes
-                .Where(attr => dangerousAttributes.Contains(attr.Name.ToLower()))
-                .ToList();
-            
-            foreach (var attr in attributesToRemove)
+            // Préserver les iframes vidéo
+            var videoIframes = doc.DocumentNode.SelectNodes("//iframe[contains(@src, 'youtube.com') or contains(@src, 'youtu.be') or contains(@src, 'vimeo.com') or contains(@src, 'dailymotion.com') or contains(@src, 'player.vimeo.com')]");
+            if (videoIframes != null)
             {
-                attr.Remove();
-            }
-            
-            // Valider et nettoyer les styles CSS tout en préservant les couleurs
-            var styleAttr = node.GetAttributeValue("style", "");
-            if (!string.IsNullOrEmpty(styleAttr))
-            {
-                var cleanedStyle = SanitizeStylesPreservingColors(styleAttr);
-                if (!string.IsNullOrEmpty(cleanedStyle))
+                foreach (var iframe in videoIframes)
                 {
-                    node.SetAttributeValue("style", cleanedStyle);
+                    iframe.SetAttributeValue("data-preserve-video", "true");
+                    _logger.LogDebug("Iframe vidéo préservé: {Src}", iframe.GetAttributeValue("src", ""));
                 }
             }
-        }
-
-        // Nouvelle méthode pour nettoyer les styles en préservant les couleurs
-        private string SanitizeStylesPreservingColors(string styleString)
-        {
-            var allowedProperties = new[] {
-                "color", "background-color", "font-size", "font-weight", "font-style",
-                "text-align", "text-decoration", "padding", "margin", "border",
-                "width", "height", "max-width", "max-height", "min-width", "min-height",
-                "display", "position", "top", "left", "right", "bottom", "float", 
-                "clear", "overflow", "z-index", "line-height", "font-family",
-                "border-radius", "box-shadow", "opacity", "visibility"
-            };
             
-            var styles = styleString.Split(';').Where(s => !string.IsNullOrWhiteSpace(s));
-            var cleanedStyles = new List<string>();
-            
-            foreach (var style in styles)
+            // Préserver les conteneurs vidéo
+            var videoContainers = doc.DocumentNode.SelectNodes("//div[@data-video-element='true']");
+            if (videoContainers != null)
             {
-                var parts = style.Split(':');
-                if (parts.Length == 2)
+                foreach (var container in videoContainers)
                 {
-                    var property = parts[0].Trim().ToLower();
-                    var value = parts[1].Trim();
+                    container.SetAttributeValue("data-preserve-video", "true");
                     
-                    if (allowedProperties.Contains(property))
+                    // Préserver aussi tous les enfants
+                    var children = container.SelectNodes(".//*");
+                    if (children != null)
                     {
-                        // Vérifier que la valeur ne contient pas de JavaScript
-                        if (!value.Contains("javascript:", StringComparison.OrdinalIgnoreCase) && 
-                            !value.Contains("expression(", StringComparison.OrdinalIgnoreCase))
+                        foreach (var child in children)
                         {
-                            cleanedStyles.Add($"{property}: {value}");
+                            child.SetAttributeValue("data-preserve-video", "true");
+                        }
+                    }
+                    _logger.LogDebug("Conteneur vidéo préservé avec {Count} enfants", children?.Count ?? 0);
+                }
+            }
+            
+            // Préserver les balises vidéo directes
+            var directVideos = doc.DocumentNode.SelectNodes("//video");
+            if (directVideos != null)
+            {
+                foreach (var video in directVideos)
+                {
+                    video.SetAttributeValue("data-preserve-video", "true");
+                    
+                    // Préserver aussi les sources
+                    var sources = video.SelectNodes(".//source");
+                    if (sources != null)
+                    {
+                        foreach (var source in sources)
+                        {
+                            source.SetAttributeValue("data-preserve-video", "true");
                         }
                     }
                 }
             }
-            
-            return string.Join("; ", cleanedStyles);
-        }
-
-        private bool IsVideoElement(HtmlNode node)
-        {
-            var tagName = node.Name.ToLower();
-            if (tagName == "iframe" || tagName == "video")
-                return true;
-                
-            var src = node.GetAttributeValue("src", "");
-            return !string.IsNullOrEmpty(src) && 
-                   (src.Contains("youtube.com") || src.Contains("vimeo.com") || src.Contains("dailymotion.com"));
         }
 
         private string StandardSanitization(string htmlContent)
@@ -616,17 +624,14 @@ namespace Mooc.Services
                 // Configuration pour préserver la mise en forme et les vidéos
                 sanitizer.AllowedTags.Clear();
 
-                // Ajouter toutes les balises configurées dans les settings
                 foreach (var tag in _settings.AllowedTags)
                 {
                     sanitizer.AllowedTags.Add(tag);
                 }
 
-                // Configuration des attributs autorisés
                 sanitizer.AllowedAttributes.Clear();
                 sanitizer.AllowDataAttributes = true;
 
-                // Ajouter tous les attributs configurés pour chaque balise
                 foreach (var kvp in _settings.AllowedAttributes)
                 {
                     foreach (var attr in kvp.Value)
@@ -635,18 +640,25 @@ namespace Mooc.Services
                     }
                 }
 
-                // Ajouter les attributs spéciaux pour les vidéos
-                sanitizer.AllowedAttributes.Add("data-video-element");
-                sanitizer.AllowedAttributes.Add("contenteditable");
+                // CORRECTION : Ajouter plus d'attributs pour les vidéos
+                var videoAttributes = new[] {
+                    "data-video-element", "data-preserved-video", "data-preserve-video",
+                    "contenteditable", "frameborder", "allowfullscreen", "controls",
+                    "preload", "poster", "autoplay", "loop", "muted", "width", "height"
+                };
 
-                // Autoriser les schémas d'URL nécessaires
+                foreach (var attr in videoAttributes)
+                {
+                    sanitizer.AllowedAttributes.Add(attr);
+                }
+
                 sanitizer.AllowedSchemes.Clear();
                 foreach (var scheme in _settings.AllowedProtocols)
                 {
                     sanitizer.AllowedSchemes.Add(scheme);
                 }
 
-                // Autoriser TOUTES les propriétés CSS nécessaires pour la mise en forme
+                // Propriétés CSS pour vidéos
                 sanitizer.AllowedCssProperties.Clear();
                 var cssProperties = new[] {
                     "color", "background-color", "font-size", "font-weight", "font-style",
@@ -655,10 +667,8 @@ namespace Mooc.Services
                     "display", "position", "top", "left", "right", "bottom", "float", 
                     "clear", "overflow", "z-index", "line-height", "font-family",
                     "border-radius", "box-shadow", "opacity", "visibility",
-                    // Propriétés pour les vidéos
-                    "padding-bottom", "aspect-ratio",
-                    // Propriétés de couleur spécifiques
-                    "border-color", "outline-color", "text-shadow"
+                    "padding-bottom", "aspect-ratio", "border-color", "outline-color", 
+                    "text-shadow", "object-fit", "object-position"
                 };
 
                 foreach (var prop in cssProperties)
@@ -666,26 +676,36 @@ namespace Mooc.Services
                     sanitizer.AllowedCssProperties.Add(prop);
                 }
 
-                // Garder les nœuds enfants
                 sanitizer.KeepChildNodes = true;
 
-                // Préserver les URLs et les styles de couleur
+                // CORRECTION : Améliorer la préservation des URLs vidéo avec logging
                 sanitizer.FilterUrl += (sender, e) =>
                 {
-                    // Vérifier si c'est une URL de vidéo autorisée
-                    if (IsAllowedVideoUrl(e.OriginalUrl))
+                    var isVideoUrl = IsAllowedVideoUrl(e.OriginalUrl);
+                    var isImageUrl = IsAllowedImageUrl(e.OriginalUrl);
+                    
+                    if (isVideoUrl || isImageUrl)
                     {
                         e.SanitizedUrl = e.OriginalUrl;
+                        if (isVideoUrl)
+                        {
+                            _logger.LogDebug("URL vidéo préservée: {Url}", e.OriginalUrl);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("URL filtrée: {Url}", e.OriginalUrl);
                     }
                 };
 
-                var sanitizedHtml = sanitizer.Sanitize(htmlContent);
-                return sanitizedHtml;
+                var result = sanitizer.Sanitize(htmlContent);
+                _logger.LogDebug("Sanitisation standard terminée. Longueur: {Length}", result.Length);
+                
+                return result;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors de la sanitisation du contenu HTML");
-                // En cas d'erreur, retourner au moins le contenu minimal
                 return MinimalSanitization(htmlContent);
             }
         }
@@ -847,7 +867,7 @@ namespace Mooc.Services
                     "onmousedown", "onmouseup", "onmousemove", "oncontextmenu"
                 };
                 
-                // Supprimer uniquement les attributs dangereux
+                // Supprime uniquement les attributs dangereux
                 foreach (var attr in node.Attributes.ToList())
                 {
                     var attrName = attr.Name.ToLower();
@@ -1014,6 +1034,78 @@ namespace Mooc.Services
             catch
             {
                 return false;
+            }
+        }
+
+        private bool IsAllowedImageUrl(string url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return false;
+                
+            try
+            {
+                var uri = new Uri(url);
+                
+                // Vérifier si c'est une image
+                var imageExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp" };
+                var path = uri.AbsolutePath.ToLower();
+                
+                return imageExtensions.Any(ext => path.EndsWith(ext)) || 
+                       path.Contains("/uploads/images/") ||
+                       uri.Host.Contains("imgur.com") ||
+                       uri.Host.Contains("unsplash.com");
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        // Améliorer la méthode IsVideoElement pour une meilleure détection
+        private bool IsVideoElement(HtmlNode node)
+        {
+            var tagName = node.Name.ToLower();
+            
+            // Vérifier les balises vidéo directes
+            if (tagName == "iframe" || tagName == "video" || tagName == "audio" || tagName == "source")
+                return true;
+            
+            // Vérifier les conteneurs vidéo
+            if (tagName == "div" && (
+                node.GetAttributeValue("data-video-element", "") == "true" ||
+                node.GetAttributeValue("class", "").Contains("video-container") ||
+                node.GetAttributeValue("class", "").Contains("video-wrapper")))
+                return true;
+                
+            // Vérifier les URLs de vidéo dans les attributs src
+            var src = node.GetAttributeValue("src", "");
+            if (!string.IsNullOrEmpty(src))
+            {
+                var videoHosts = new[] { 
+                    "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com", 
+                    "player.vimeo.com", "www.youtube.com", "www.vimeo.com", 
+                    "www.dailymotion.com", "dai.ly", "m.youtube.com" 
+                };
+                return videoHosts.Any(host => src.Contains(host, StringComparison.OrdinalIgnoreCase));
+            }
+            
+            return false;
+        }
+
+        private void PreserveColorFormatting(HtmlNode node)
+        {
+            // Préserver les styles de couleur sur les balises de formatage
+            if (node.Attributes["style"] != null)
+            {
+                var style = node.Attributes["style"].Value;
+                // Ici, vous pouvez ajouter une logique pour filtrer/valider les propriétés de couleur si besoin
+                node.Attributes["style"].Value = style; // (optionnel : nettoyer ou valider la valeur)
+            }
+            // Préserver l'attribut color sur <font>
+            if (node.Name.Equals("font", StringComparison.OrdinalIgnoreCase) && node.Attributes["color"] != null)
+            {
+                var color = node.Attributes["color"].Value;
+                node.Attributes["color"].Value = color; // (optionnel : valider la couleur)
             }
         }
     }

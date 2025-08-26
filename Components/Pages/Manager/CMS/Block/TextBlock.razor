@@ -383,6 +383,7 @@
         }
     }
 
+    // Améliorer la méthode SaveChanges pour mieux préserver le contenu vidéo
     private async Task SaveChanges()
     {
         if (!IsValid())
@@ -398,9 +399,26 @@
             StateHasChanged();
             ClearError();
 
-            // ⚠️ CORRECTION : Utiliser le contenu préservé
-            var finalContent = string.IsNullOrWhiteSpace(currentEditorContent) ? TypedContent.Text : currentEditorContent;
-            finalContent = PreserveMediaContent(finalContent);
+            // CORRECTION : Log du contenu avant traitement
+            var rawContent = string.IsNullOrWhiteSpace(currentEditorContent) ? TypedContent.Text : currentEditorContent;
+            Console.WriteLine($"Contenu brut avant traitement: {rawContent}");
+            
+            // Préserver le contenu média avec validation supplémentaire
+            var finalContent = PreserveMediaContent(rawContent);
+            Console.WriteLine($"Contenu après préservation: {finalContent}");
+            
+            // Vérifier que les vidéos sont toujours présentes
+            bool hadVideoBefore = HasVideoContent(rawContent);
+            bool hasVideoAfter = HasVideoContent(finalContent);
+            
+            if (hadVideoBefore && !hasVideoAfter)
+            {
+                Console.WriteLine("⚠️ ALERTE: Vidéo perdue pendant le traitement!");
+                errorMessage = "Erreur: Le contenu vidéo a été perdu. Veuillez réessayer.";
+                isSaving = false;
+                StateHasChanged();
+                return;
+            }
             
             Block.Title = TypedContent.Title;
             Block.Text = finalContent;

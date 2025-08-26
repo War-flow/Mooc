@@ -15,7 +15,6 @@ function throttle(func, limit) {
     }
 }
 
-
 // Fonction d'initialisation de l'éditeur
 export function initializeEditor(editorId, dotNetRef, options) {
     const element = document.getElementById(editorId);
@@ -30,8 +29,8 @@ export function initializeEditor(editorId, dotNetRef, options) {
         border: '1px solid #ced4da',
         borderRadius: '0 0 0.375rem 0.375rem',
         padding: '0.75rem',
-        outline: 'none', // Supprime le contour par défaut
-        cursor: 'text'    // Curseur de texte
+        outline: 'none',
+        cursor: 'text'
     });
 
     // Activer contentEditable APRÈS la configuration du style
@@ -61,12 +60,60 @@ export function initializeEditor(editorId, dotNetRef, options) {
             element.focus();
         }
     });
+
     // Assurer que le focus est sur l'éditeur au chargement
     if (options.enableStickyToolbar !== false) {
         initializeStickyToolbar(editorId);
     }
 
     console.log(`Éditeur ${editorId} initialisé avec succès`);
+}
+
+// ⭐ NOUVELLE FONCTION : setContent
+export function setContent(editorId, content) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) {
+        console.error(`Éditeur ${editorId} non trouvé`);
+        return;
+    }
+
+    try {
+        if (content && content.trim()) {
+            editor.element.innerHTML = content;
+        } else {
+            setPlaceholder(editor.element, editor.options.placeholder);
+        }
+        
+        // Déclencher l'événement input pour notifier les changements
+        editor.element.dispatchEvent(new Event('input', { bubbles: true }));
+        
+        console.log(`Contenu défini pour l'éditeur ${editorId}`);
+    } catch (error) {
+        console.error(`Erreur lors de la définition du contenu pour ${editorId}:`, error);
+    }
+}
+
+// ⭐ NOUVELLE FONCTION : getContent
+export function getContent(editorId) {
+    const editor = window.richTextEditors[editorId];
+    if (!editor) {
+        console.error(`Éditeur ${editorId} non trouvé`);
+        return '';
+    }
+
+    try {
+        let content = editor.element.innerHTML;
+        
+        // Si c'est un placeholder, retourner une chaîne vide
+        if (editor.element.querySelector('.placeholder-text')) {
+            return '';
+        }
+        
+        return content;
+    } catch (error) {
+        console.error(`Erreur lors de la récupération du contenu pour ${editorId}:`, error);
+        return '';
+    }
 }
 
 // Fonction pour créer les gestionnaires d'événements
@@ -184,6 +231,7 @@ const VIDEO_PLATFORMS = {
         idRegex: /^.+dailymotion.com\/(video|hub)\/([^_]+)[^#]*(#video=([^_&]+))?/
     }
 };
+
 // Types MIME pour les vidéos et audios
 const MIME_TYPES = {
     video: { mp4: 'video/mp4', webm: 'video/webm', ogg: 'video/ogg', mov: 'video/quicktime', avi: 'video/x-msvideo', mkv: 'video/x-matroska' },
@@ -213,12 +261,6 @@ function executeEditorCommand(editorId, command, value = null) {
         document.execCommand(command, false, value);
         editor.element.dispatchEvent(new Event('input', { bubbles: true }));
     }
-}
-
-// Insertion d'image optimisée
-export function insertLink(editorId) {
-    const url = prompt('Entrez l\'URL du lien:');
-    if (url) executeEditorCommand(editorId, 'createLink', url);
 }
 
 // Améliorer la validation des URLs
@@ -253,6 +295,7 @@ export function insertVideo(editorId) {
         alert('URL invalide ou non autorisée');
     }
 }
+
 // Insertion d'audio optimisée
 function insertMediaElement(editorId, url, type) {
     const editor = window.richTextEditors[editorId];
@@ -266,6 +309,7 @@ function insertMediaElement(editorId, url, type) {
         console.error(`Erreur insertion ${type}:`, error);
     }
 }
+
 // Création d'un élément vidéo optimisé
 function createVideoElement(url) {
     const urlObj = new URL(url);
@@ -288,6 +332,34 @@ function createVideoElement(url) {
 }
 
 // Création d'un élément audio optimisé
+function createAudioElement(url) {
+    const audio = Object.assign(document.createElement('audio'), {
+        controls: true,
+        preload: 'metadata'
+    });
+    
+    const source = Object.assign(document.createElement('source'), {
+        src: url,
+        type: getMimeType(url, 'audio')
+    });
+    
+    audio.appendChild(source);
+    
+    // Wrapper pour l'audio
+    const container = document.createElement('div');
+    container.className = 'audio-container';
+    container.setAttribute('data-audio-element', 'true');
+    Object.assign(audio.style, { 
+        width: '100%', 
+        display: 'block', 
+        margin: '10px 0' 
+    });
+    container.appendChild(audio);
+    
+    return container;
+}
+
+// Création d'un élément embed optimisé
 function createEmbed(src, platform) {
     const iframe = Object.assign(document.createElement('iframe'), {
         src, frameBorder: '0', allowFullscreen: true
@@ -307,7 +379,7 @@ function createDirectVideo(url) {
     return wrapMedia(video, 'direct');
 }
 
-// Création d'un élément audio optimisé
+// Création d'un élément media wrapper optimisé
 function wrapMedia(element, platform) {
     const container = document.createElement('div');
     container.className = `video-container video-${platform}`;
@@ -339,11 +411,6 @@ function getMimeType(url, type) {
     return MIME_TYPES[type]?.[ext] || (type === 'video' ? 'video/mp4' : 'audio/mpeg');
 }
 
-// Fonction pour insérer une image à partir d'une URL
-export function insertImageFromUrl(editorId, imageUrl) {
-    insertMediaFromUrl(editorId, imageUrl, 'image');
-}
-
 // Fonction pour insérer un média à partir d'une URL
 function insertMediaFromUrl(editorId, url, type) {
     const editor = window.richTextEditors[editorId];
@@ -371,7 +438,7 @@ function createImageElement(url) {
     });
 }
 
-// Fonction pour insérer un élément dans l'editor
+// Fonction pour insérer un élément dans l'éditeur
 function insertIntoEditor(editor, element) {
     // Supprimer le placeholder
     if (editor.element.querySelector('.placeholder-text')) {
@@ -393,32 +460,6 @@ function insertIntoEditor(editor, element) {
     }
 
     editor.element.dispatchEvent(new Event('input', { bubbles: true }));
-}
-
-// Fonctions utilitaires consolidées
-export function setContent(editorId, content) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        if (content && content.trim()) {
-            // Sanitiser le contenu avant de l'injecter
-            editor.element.innerHTML = sanitizeHtml(content);
-        } else {
-            setPlaceholder(editor.element, editor.options.placeholder);
-        }
-        enhanceDisplay();
-    }
-}
-// Fonction pour obtenir le contenu de l'éditeur
-export function getContent(editorId) {
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        // Ne pas retourner le placeholder
-        if (editor.element.querySelector('.placeholder-text')) {
-            return '';
-        }
-        return editor.element.innerHTML;
-    }
-    return '';
 }
 
 // Fonction pour détruire l'éditeur
@@ -493,33 +534,6 @@ if (typeof window !== 'undefined') {
         new MutationObserver(mutations => {
             if (mutations.some(m => m.addedNodes.length)) enhanceDisplay();
         }).observe(document.body, { childList: true, subtree: true });
-    }
-}
-
-// Fonction pour déclencher le clic sur un input de fichier
-export function triggerFileInputClick(selector) {
-    document.querySelector(selector)?.click();
-}
-
-// Fonction pour insérer un tableau
-export function insertTable(editorId) {
-    const rows = prompt('Nombre de lignes (1-10):');
-    const cols = prompt('Nombre de colonnes (1-10):');
-
-    if (!rows || !cols) return;
-
-    const numRows = parseInt(rows);
-    const numCols = parseInt(cols);
-
-    if (isNaN(numRows) || isNaN(numCols) || numRows < 1 || numRows > 10 || numCols < 1 || numCols > 10) {
-        alert('Veuillez entrer des nombres valides entre 1 et 10');
-        return;
-    }
-
-    const table = createTableElement(numRows, numCols);
-    const editor = window.richTextEditors[editorId];
-    if (editor) {
-        insertIntoEditor(editor, table);
     }
 }
 
@@ -735,166 +749,151 @@ function deleteTable(table) {
     }
 }
 
-// Ajouter une fonction de sanitisation
-function sanitizeHtml(html) {
-    // Créer un parser DOM temporaire
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-    
-    // Liste blanche des balises autorisées
-    const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i', 'div', 'iframe', 'font','span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'iframe', 'video', 'audio', 'source', 'strike', "blockquote"];
-    
-    // Liste blanche des attributs par balise
-    const allowedAttributes = {
-        'a': ['href', 'title', 'target', 'rel', 'style'],
-        'img': ['src', 'alt', 'width', 'height', 'loading', 'style','class'],
-        'iframe': ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style'],
-        'video': ['src', 'controls', 'width', 'height', 'preload', 'style'],
-        'audio': ['src', 'controls', 'preload', 'style'],
-        'source': ['src', 'type'],
-        'div': ['class', 'style', 'data-video-element', 'align'],
-        'span': ['class', 'style'],
-        'table': ['class', 'style'],
-        'td': ['style', 'contenteditable'],
-        'th': ['style', 'contenteditable'],
-        // Ajouter style à toutes les balises de formatage
-        'p': ['style', 'class'],
-        'h1': ['style', 'class'],
-        'h2': ['style', 'class'],
-        'h3': ['style', 'class'],
-        'h4': ['style', 'class'],
-        'h5': ['style', 'class'],
-        'h6': ['style', 'class'],
-        'b': ['style', 'class'],
-        'i': ['style', 'class'],
-        'u': ['style', 'class'],
-        'strong': ['style', 'class'],
-        'em': ['style', 'class'],
-        'strike': ['style', 'class'],
-        'font': ['color', 'size', 'face', 'style']
-    };
-    
-    // Fonction récursive pour nettoyer les nœuds
-    function cleanNode(node) {
-        // Traiter les nœuds enfants d'abord (en sens inverse pour éviter les problèmes d'index)
-        for (let i = node.childNodes.length - 1; i >= 0; i--) {
-            const child = node.childNodes[i];
+// Fonction récursive pour nettoyer les nœuds
+function cleanNode(node) {
+    // Traiter les nœuds enfants d'abord (en sens inverse pour éviter les problèmes d'index)
+    for (let i = node.childNodes.length - 1; i >= 0; i--) {
+        const child = node.childNodes[i];
+        
+        if (child.nodeType === Node.ELEMENT_NODE) {
+            const tagName = child.tagName.toLowerCase();
             
-            if (child.nodeType === Node.ELEMENT_NODE) {
-                const tagName = child.tagName.toLowerCase();
+            // Vérifier si la balise est autorisée
+            const allowedTags = ['p', 'br', 'strong', 'em', 'u', 'a', 'ul', 'ol', 'li', 'img', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'b', 'i', 'div', 'iframe', 'font', 'span', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'video', 'audio', 'source', 'strike', 'blockquote', 'pre', 'code'];
+            
+            if (!allowedTags.includes(tagName)) {
+                // Remplacer la balise non autorisée par son contenu texte
+                const textNode = document.createTextNode(child.textContent);
+                node.replaceChild(textNode, child);
+            } else {
+                // Nettoyer les attributs
+                const allowedAttributes = {
+                    'a': ['href', 'title', 'target', 'rel', 'class', 'style'],
+                    'img': ['src', 'alt', 'width', 'height', 'loading', 'style', 'class'],
+                    'iframe': ['src', 'width', 'height', 'frameborder', 'allowfullscreen', 'style', 'class', 'title', 'allow'],
+                    'video': ['src', 'controls', 'width', 'height', 'preload', 'style', 'class', 'poster', 'autoplay', 'loop', 'muted'],
+                    'audio': ['src', 'controls', 'preload', 'style', 'class', 'autoplay', 'loop', 'muted'],
+                    'source': ['src', 'type'],
+                    'div': ['class', 'style', 'data-video-element', 'data-preserved-video', 'align', 'id'],
+                    'span': ['class', 'style'],
+                    'table': ['class', 'style', 'border', 'cellpadding', 'cellspacing'],
+                    'td': ['style', 'contenteditable', 'class', 'colspan', 'rowspan'],
+                    'th': ['style', 'contenteditable', 'class', 'colspan', 'rowspan'],
+                    'p': ['class', 'style', 'align'],
+                    'font': ['color', 'size', 'face', 'style'],
+                    'blockquote': ['class', 'style', 'cite'],
+                    'strong': ['class', 'style'],
+                    'em': ['class', 'style'],
+                    'b': ['class', 'style'],
+                    'i': ['class', 'style'],
+                    'u': ['class', 'style'],
+                    'strike': ['class', 'style'],
+                    'h1': ['class', 'style'],
+                    'h2': ['class', 'style'],
+                    'h3': ['class', 'style'],
+                    'h4': ['class', 'style'],
+                    'h5': ['class', 'style'],
+                    'h6': ['class', 'style']
+                };
                 
-                // Vérifier si la balise est autorisée
-                if (!allowedTags.includes(tagName)) {
-                    // Remplacer la balise non autorisée par son contenu texte
-                    const textNode = document.createTextNode(child.textContent);
-                    node.replaceChild(textNode, child);
-                } else {
-                    // Nettoyer les attributs
-                    const allowedAttrs = allowedAttributes[tagName] || [];
-                    const attrs = Array.from(child.attributes);
-                    
-                    attrs.forEach(attr => {
-                        if (!allowedAttrs.includes(attr.name)) {
-                            child.removeAttribute(attr.name);
+                const allowedAttrs = allowedAttributes[tagName] || [];
+                const attrs = Array.from(child.attributes);
+                
+                attrs.forEach(attr => {
+                    if (!allowedAttrs.includes(attr.name)) {
+                        child.removeAttribute(attr.name);
+                    } else {
+                        // Valider les valeurs des attributs
+                        const cleanValue = sanitizeAttributeValue(attr.name, attr.value, tagName);
+                        if (cleanValue !== false) {
+                            child.setAttribute(attr.name, cleanValue);
                         } else {
-                            // Valider les valeurs des attributs
-                            const cleanValue = sanitizeAttributeValue(attr.name, attr.value, tagName);
-                            if (cleanValue !== false) {
-                                child.setAttribute(attr.name, cleanValue);
-                            } else {
-                                child.removeAttribute(attr.name);
-                            }
+                            child.removeAttribute(attr.name);
                         }
-                    });
-                    
-                    // Nettoyer récursivement les enfants
-                    cleanNode(child);
-                }
+                    }
+                });
+                
+                // Nettoyer récursivement les enfants
+                cleanNode(child);
             }
         }
     }
-    
-    // Fonction pour valider et nettoyer les valeurs d'attributs
-    function sanitizeAttributeValue(attrName, value, tagName) {
-        switch (attrName) {
-            case 'href':
-            case 'src':
-                // Valider les URLs
-                try {
-                    const url = new URL(value, window.location.href);
-                    // Autoriser uniquement certains protocoles
-                    const allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
-                    
-                    // Pour les iframes de vidéo, autoriser seulement les domaines de confiance
-                    if (tagName === 'iframe') {
-                        const trustedVideoHosts = [
-                            'youtube.com', 'www.youtube.com',
-                            'vimeo.com', 'player.vimeo.com',
-                            'dailymotion.com', 'www.dailymotion.com'
-                        ];
-                        if (!trustedVideoHosts.some(host => url.hostname.includes(host))) {
-                            return false;
-                        }
-                    }
-                    
-                    if (!allowedProtocols.includes(url.protocol)) {
+}
+
+// Fonction pour valider et nettoyer les valeurs d'attributs
+function sanitizeAttributeValue(attrName, value, tagName) {
+    switch (attrName) {
+        case 'href':
+        case 'src':
+            // Valider les URLs
+            try {
+                const url = new URL(value, window.location.href);
+                // Autoriser uniquement certains protocoles
+                const allowedProtocols = ['http:', 'https:', 'mailto:', 'tel:'];
+                
+                // Pour les iframes de vidéo, autoriser seulement les domaines de confiance
+                if (tagName === 'iframe') {
+                    const trustedVideoHosts = [
+                        'youtube.com', 'www.youtube.com',
+                        'vimeo.com', 'player.vimeo.com',
+                        'dailymotion.com', 'www.dailymotion.com'
+                    ];
+                    if (!trustedVideoHosts.some(host => url.hostname.includes(host))) {
                         return false;
                     }
-                    return value;
-                } catch {
+                }
+                
+                if (!allowedProtocols.includes(url.protocol)) {
                     return false;
                 }
-                
-            case 'style':
-                // Nettoyer les styles dangereux
-                return sanitizeStyles(value);
-                
-            case 'target':
-                // Autoriser seulement _blank et _self
-                return ['_blank', '_self'].includes(value) ? value : '_self';
-                
-            case 'rel':
-                // Forcer noopener noreferrer pour les liens externes
-                return 'noopener noreferrer';
-                
-            default:
                 return value;
-        }
-    }
-    
-    // Fonction pour nettoyer les styles CSS (améliorer la fonction existante)
-    function sanitizeStyles(styleString) {
-        const allowedProperties = [
-            'color', 'background-color', 'font-size', 'font-weight', 'font-style',
-            'text-align', 'text-decoration', 'padding', 'margin', 'border',
-            'width', 'height', 'max-width', 'max-height', 'display', 'position',
-            'top', 'left', 'right', 'bottom', 'float', 'clear',
-            // Ajouter plus de propriétés de couleur
-            'border-color', 'outline-color', 'text-shadow', 'box-shadow'
-        ];
-        
-        const styles = styleString.split(';').filter(s => s.trim());
-        const cleanedStyles = [];
-        
-        styles.forEach(style => {
-            const [property, value] = style.split(':').map(s => s.trim());
-            
-            if (property && value && allowedProperties.includes(property)) {
-                // Vérifier que la valeur ne contient pas de JavaScript
-                if (!value.includes('javascript:') && !value.includes('expression(')) {
-                    cleanedStyles.push(`${property}: ${value}`);
-                }
+            } catch {
+                return false;
             }
-        });
-        
-        return cleanedStyles.join('; ');
+            
+        case 'style':
+            // Nettoyer les styles dangereux
+            return sanitizeStyles(value);
+            
+        case 'target':
+            // Autoriser seulement _blank et _self
+            return ['_blank', '_self'].includes(value) ? value : '_self';
+            
+        case 'rel':
+            // Forcer noopener noreferrer pour les liens externes
+            return 'noopener noreferrer';
+            
+        default:
+            return value;
     }
+}
+
+// Fonction pour nettoyer les styles CSS (améliorer la fonction existante)
+function sanitizeStyles(styleString) {
+    const allowedProperties = [
+        'color', 'background-color', 'font-size', 'font-weight', 'font-style',
+        'text-align', 'text-decoration', 'padding', 'margin', 'border',
+        'width', 'height', 'max-width', 'max-height', 'display', 'position',
+        'top', 'left', 'right', 'bottom', 'float', 'clear',
+        // Ajouter plus de propriétés de couleur
+        'border-color', 'outline-color', 'text-shadow', 'box-shadow'
+    ];
     
-    // Nettoyer le document
-    cleanNode(doc.body);
+    const styles = styleString.split(';').filter(s => s.trim());
+    const cleanedStyles = [];
     
-    // Retourner le HTML nettoyé
-    return doc.body.innerHTML;
+    styles.forEach(style => {
+        const [property, value] = style.split(':').map(s => s.trim());
+        
+        if (property && value && allowedProperties.includes(property)) {
+            // Vérifier que la valeur ne contient pas de JavaScript
+            if (!value.includes('javascript:') && !value.includes('expression(')) {
+                cleanedStyles.push(`${property}: ${value}`);
+            }
+        }
+    });
+    
+    return cleanedStyles.join('; ');
 }
 
 // Ajouter un mécanisme pour inclure les tokens CSRF
