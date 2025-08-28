@@ -18,7 +18,9 @@ namespace Mooc.Data
         
         // Ordre d'affichage dans la session
         public int Order { get; set; } = 1;
-        
+
+        public int Duration { get; set; } = 0; // Durée en minutes
+
         // Indique si le cours est publié
         public bool IsPublished { get; set; } = false;
         

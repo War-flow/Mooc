@@ -89,7 +89,34 @@ namespace Mooc.Data
                       .IsRequired()
                       .HasColumnType("varchar")
                       .HasMaxLength(100);
-                
+
+                entity.Property(e => e.Description)
+                      .HasColumnType("varchar")
+                      .HasMaxLength(300);
+
+                entity.Property(e => e.Content)
+                        .HasColumnType("text");
+
+                entity.Property(e => e.Order)
+                        .HasColumnType("int")
+                        .HasDefaultValue(1);
+
+                entity.Property(e => e.Duration)
+                        .HasColumnType("int")
+                        .HasDefaultValue(0);
+
+                entity.Property(e => e.IsPublished)
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                entity.Property(e => e.CreatedAt)
+                        .HasColumnType("timestamp")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(e => e.UpdatedAt)
+                        .HasColumnType("timestamp")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
                 entity.HasOne(c => c.Session)
                       .WithMany(s => s.Courses)
                       .HasForeignKey(c => c.SessionId);
