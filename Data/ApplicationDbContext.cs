@@ -110,11 +110,11 @@ namespace Mooc.Data
                         .HasDefaultValue(false);
 
                 entity.Property(e => e.CreatedAt)
-                        .HasColumnType("timestamp")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(e => e.UpdatedAt)
-                        .HasColumnType("timestamp")
+                        .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.HasOne(c => c.Session)

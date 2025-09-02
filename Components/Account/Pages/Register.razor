@@ -30,6 +30,12 @@
                 <label for="Input.Email">Email</label>
                 <ValidationMessage For="() => Input.Email" class="text-danger" />
             </div>
+
+            <div class="form-floating">
+                <InputText @bind-Value="Input.Pseudo" id="Input.Pseudo" class="form-control" aria-required="true" />
+                <label for="Input.Pseudo">Pseudo</label>
+                <ValidationMessage For="() => Input.Pseudo" class="text-danger" />
+            </div>
             
             <div class="form-floating">
                 <InputText @bind-Value="Input.FirstName" id="Input.FirstName" class="form-control" aria-required="true" />
@@ -102,6 +108,7 @@
             // Ajout des propriétés nom et prénom
             user.FirstName = Input.FirstName;
             user.LastName = Input.LastName;
+            user.Pseudo = Input.Pseudo;
 
             var result = await UserManager.CreateAsync(user, Input.Password);
 
@@ -209,6 +216,12 @@
         [Display(Name = "Confirm password")]
         [Compare("Password", ErrorMessage = "Le mot de passe et le mot de passe de confirmation ne correspondent pas.")]
         public string ConfirmPassword { get; set; } = "";
+
+        [Required(ErrorMessage = "Le pseudo est obligatoire")]
+        [StringLength(50, ErrorMessage = "Le pseudo ne peut pas dépasser {1} caractères")]
+        [RegularExpression(@"^[a-zA-ZÀ-ÿ\s\-0-9']+$", ErrorMessage = "Le pseudo ne peut contenir que des lettres, chiffres, espaces, tirets et apostrophes")]
+        [Display(Name = "Pseudo")]
+        public string Pseudo { get; set; } = "";
 
         [Required(ErrorMessage = "Le prénom est obligatoire")]
         [StringLength(50, ErrorMessage = "Le prénom ne peut pas dépasser {1} caractères")]

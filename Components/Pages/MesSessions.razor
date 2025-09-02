@@ -12,6 +12,7 @@
 @inject INotificationService NotificationService
 @inject IJSRuntime JSRuntime
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject ISessionCompletionService SessionCompletionService
 @attribute [Authorize(Policy = "VoirCours")]
 @implements IDisposable
 
@@ -29,8 +30,6 @@
 </div>
 
 <div class="container mt-4">
-    
-
     <!-- Notifications en haut de page -->
     @if (sessionNotifications.Any())
     {
@@ -58,7 +57,8 @@
         <div class="sessions-grid">
             @foreach (var session in enrolledSessions)
             {
-                <div class="session-card @(IsSessionEnded(session) ? "border-secondary" : IsSessionActive(session) ? "border-success" : "border-warning")">
+                var completionInfo = sessionCompletionInfos.GetValueOrDefault(session.Id);
+                <div class="session-card @(GetSessionBorderClass(session, completionInfo))">
                     <div class="session-image">
                         @if (!string.IsNullOrEmpty(session.Image))
                         {
@@ -71,14 +71,71 @@
                             </div>
                         }
                         <div class="session-status">
-                            <span class="badge @(IsSessionActive(session) ? "bg-success" : IsSessionUpcoming(session) ? "bg-warning" : "bg-secondary")">
-                                @(IsSessionActive(session) ? "En cours" : IsSessionUpcoming(session) ? "À venir" : "Terminée")
-                            </span>
+                            @if (completionInfo?.IsCompleted == true)
+                            {
+                                <span class="badge bg-success">
+                                    <i class="bi bi-check-circle-fill me-1"></i>Terminée
+                                </span>
+                            }
+                            else if (IsSessionActive(session))
+                            {
+                                <span class="badge bg-primary">
+                                    <i class="bi bi-play-circle me-1"></i>En cours
+                                </span>
+                            }
+                            else if (IsSessionUpcoming(session))
+                            {
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-hourglass me-1"></i>À venir
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-stop-circle me-1"></i>Expirée
+                                </span>
+                            }
                         </div>
                     </div>
                     <div class="session-content">
                         <h5 class="session-title">@session.Title</h5>
                         <p class="session-description">@session.Description</p>
+                        
+                        <!-- **NOUVEAU** : Affichage du progrès de completion -->
+                        @if (completionInfo != null)
+                        {
+                            <div class="completion-info mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">Progression</small>
+                                    <small class="text-muted">@completionInfo.CompletedCoursesCount/@completionInfo.TotalCoursesCount cours</small>
+                                </div>
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar @(completionInfo.IsCompleted ? "bg-success" : "bg-primary")" 
+                                         role="progressbar" 
+                                         style="width: @(completionInfo.CompletionPercentage)%"
+                                         aria-valuenow="@completionInfo.CompletionPercentage" 
+                                         aria-valuemin="0" 
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                @if (completionInfo.IsCompleted && completionInfo.CompletionDate.HasValue)
+                                {
+                                    <small class="text-success">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Terminée le @completionInfo.CompletionDate.Value.ToString("dd/MM/yyyy")
+                                    </small>
+                                }
+                                @if (completionInfo.HasCertificate)
+                                {
+                                    <div class="mt-1">
+                                        <small class="text-warning">
+                                            <i class="bi bi-award me-1"></i>Certificat disponible
+                                        </small>
+                                    </div>
+                                }
+                            </div>
+                        }
+
                         <div class="session-meta">
                             <div>
                                 <i class="bi bi-calendar3 me-1"></i>
@@ -92,12 +149,31 @@
                     </div>
                     <div class="session-actions">
                         <div class="btn-group w-100" role="group">
-                            @if (IsSessionActive(session))
+                            @if (completionInfo?.IsCompleted == true)
                             {
                                 <a href="/session/@session.Id" class="btn btn-success flex-fill">
-                                    <i class="bi bi-play-circle me-2"></i> Accéder à la session
+                                    <i class="bi bi-eye me-2"></i> Revoir les cours
+                                </a>
+                                @if (completionInfo.HasCertificate)
+                                {
+                                    <a href="/certificat/@session.Id" class="btn btn-outline-warning flex-fill">
+                                        <i class="bi bi-award me-2"></i> Certificat
+                                    </a>
+                                }
+                            }
+                            else if (IsSessionActive(session))
+                            {
+                                <a href="/session/@session.Id" class="btn btn-primary flex-fill">
+                                    <i class="bi bi-play-circle me-2"></i> Continuer
                                 </a>
                             }
+                            else if (!IsSessionEnded(session))
+                            {
+                                <a href="/session/@session.Id" class="btn btn-outline-primary flex-fill">
+                                    <i class="bi bi-eye me-2"></i> Voir la session
+                                </a>
+                            }
+                            
                             @if (AllowUnsubscribeFromEndedSessions || !IsSessionEnded(session))
                             {
                                 <button class="btn btn-outline-danger flex-fill" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
@@ -172,6 +248,9 @@
     private Timer? refreshTimer;
     private NotificationToast notificationToast = null!;
 
+    // **NOUVEAU** : Dictionnaire pour stocker les informations de completion
+    private Dictionary<int, SessionCompletionInfo> sessionCompletionInfos = new();
+
     // Paramètre pour contrôler si on permet la désinscription des sessions terminées
     private bool AllowUnsubscribeFromEndedSessions = true;
 
@@ -184,6 +263,7 @@
         {
             await LoadCurrentUser();
             await LoadEnrolledSessions();
+            await LoadSessionCompletionInfos(); // **NOUVEAU**
             await CheckForSessionNotifications();
             
             // Actualiser automatiquement toutes les 2 minutes
@@ -208,8 +288,41 @@
     {
         var previousCount = enrolledSessions?.Count ?? 0;
         await LoadEnrolledSessions();
+        await LoadSessionCompletionInfos(); // **NOUVEAU**
         await CheckForSessionNotifications();
         await InvokeAsync(StateHasChanged);
+    }
+
+    // **NOUVELLE MÉTHODE** : Charger les informations de completion
+    private async Task LoadSessionCompletionInfos()
+    {
+        if (string.IsNullOrEmpty(currentUserId) || enrolledSessions == null)
+        {
+            sessionCompletionInfos.Clear();
+            return;
+        }
+
+        try
+        {
+            sessionCompletionInfos = await SessionCompletionService.GetUserSessionsCompletionInfoAsync(currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des informations de completion : {ex.Message}");
+            sessionCompletionInfos.Clear();
+        }
+    }
+
+    // **NOUVELLE MÉTHODE** : Obtenir la classe CSS pour la bordure selon le statut
+    private string GetSessionBorderClass(Session session, SessionCompletionInfo? completionInfo)
+    {
+        if (completionInfo?.IsCompleted == true)
+            return "border-success";
+        if (IsSessionEnded(session))
+            return "border-secondary";
+        if (IsSessionActive(session))
+            return "border-primary";
+        return "border-warning";
     }
 
     private async Task CheckForSessionNotifications()
@@ -221,6 +334,37 @@
 
         foreach (var session in enrolledSessions)
         {
+            var completionInfo = sessionCompletionInfos.GetValueOrDefault(session.Id);
+            
+            // **NOUVEAU** : Notification pour session complétée récemment
+            if (completionInfo?.IsCompleted == true && completionInfo.CompletionDate.HasValue)
+            {
+                var daysSinceCompletion = (now - completionInfo.CompletionDate.Value).TotalDays;
+                if (daysSinceCompletion <= 3) // Dans les 3 derniers jours
+                {
+                    sessionNotifications.Add(new SessionNotification
+                    {
+                        Id = $"completed-{session.Id}",
+                        Title = "🎉 Félicitations !",
+                        Message = $"Vous avez terminé la session '{session.Title}' avec succès !",
+                        Type = "success",
+                        Icon = "trophy"
+                    });
+
+                    if (completionInfo.HasCertificate)
+                    {
+                        sessionNotifications.Add(new SessionNotification
+                        {
+                            Id = $"certificate-{session.Id}",
+                            Title = "🏆 Certificat disponible",
+                            Message = $"Votre certificat pour '{session.Title}' est prêt à être téléchargé.",
+                            Type = "info",
+                            Icon = "award"
+                        });
+                    }
+                }
+            }
+
             // Session se terminant dans les 24h
             if (IsSessionActive(session))
             {
@@ -371,6 +515,7 @@
                     
                     // Recharger les sessions après la désinscription
                     await LoadEnrolledSessions();
+                    await LoadSessionCompletionInfos(); // **NOUVEAU**
                     StateHasChanged();
 
                     // Notification de succès
@@ -407,17 +552,6 @@
         }
     }
 
-    private string GetCardClass(Session session)
-    {
-        if (IsSessionActive(session))
-            return "border-success";
-        if (IsSessionUpcoming(session))
-            return "border-warning";
-        if (IsSessionEnded(session))
-            return "border-secondary";
-        return "";
-    }
-
     /// <summary>
     /// Retourne une chaîne lisible pour le temps restant (jours, heures, minutes).
     /// </summary>
@@ -431,6 +565,7 @@
             return $"{(int)timeSpan.TotalHours} heure(s) et {timeSpan.Minutes} minute(s)";
         return $"{(int)timeSpan.TotalDays} jour(s), {timeSpan.Hours} heure(s)";
     }
+    
     // Ajoutez cette classe à la fin du fichier ou dans un fichier partagé approprié
     public class SessionNotification
     {

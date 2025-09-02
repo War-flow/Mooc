@@ -27,5 +27,8 @@ namespace Mooc.Data
         // Propriétés pour les notifications
         public bool NotificationSent24h { get; set; } = false;
         public bool NotificationSent1h { get; set; } = false;
+
+        // **NOUVEAU** : Propriété calculée pour indiquer si la session peut être marquée comme terminée
+        public bool CanBeCompleted => IsActive && DateTime.Now >= StartDate;
     }
 }

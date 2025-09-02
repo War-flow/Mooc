@@ -3,7 +3,6 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
-@using Mooc.Components.Shared
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
@@ -17,138 +16,147 @@
 
 <PageTitle>Gestion des Sessions</PageTitle>
 
-<!-- Intégration du composant ErrorComp au niveau global -->
-<ErrorComp @ref="globalErrorComponent" OnRetry="RetryLastOperation">
-    <!-- En-tête de page avec design moderne -->
-    <div class="page-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col">
-                    <h1 class="page-title">
-                        Gestion des Sessions
-                    </h1>
-                    <p class="page-subtitle">Créez et gérez vos sessions de formation</p>
-                </div>
-                <div class="col-auto">
-                    <button class="btn btn-primary btn-lg session-create-btn" @onclick="ShowCreateSessionModal">
-                        <i class="bi bi-plus-circle me-2"></i>
-                        Nouvelle Session
-                    </button>
-                </div>
+<!-- En-tête de page avec design moderne -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">
+                    Gestion des Sessions
+                </h1>
+                <p class="page-subtitle">Créez et gérez vos sessions de formation</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary btn-lg session-create-btn" @onclick="ShowCreateSessionModal">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Nouvelle Session
+                </button>
             </div>
         </div>
     </div>
+</div>
 
-    <div class="container mt-4">
-        <!-- ErrorComp pour les erreurs de chargement des sessions -->
-        <ErrorComp @ref="loadingErrorComponent" OnRetry="LoadSessions">
-            @if (sessions != null)
-            {
-                @if (sessions.Any())
+<div class="container mt-4">
+    @if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <div class="alert alert-danger" role="alert">
+            <div class="d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <div class="flex-grow-1">
+                    <strong>Erreur:</strong> @errorMessage
+                </div>
+                <button class="btn btn-sm btn-outline-danger ms-2" @onclick="ClearError">
+                    <i class="bi bi-x"></i>
+                </button>
+            </div>
+        </div>
+    }
+
+    @if (sessions != null)
+    {
+        @if (sessions.Any())
+        {
+            <!-- Vue en cartes pour un meilleur design -->
+            <div class="sessions-grid">
+                @foreach (var session in sessions)
                 {
-                    <!-- Vue en cartes pour un meilleur design -->
-                    <div class="sessions-grid">
-                        @foreach (var session in sessions)
-                        {
-                            <div class="session-card">
-                                <div class="session-image">
-                                    @if (!string.IsNullOrEmpty(session.Image))
-                                    {
-                                        <img src="@session.Image" alt="@session.Title" />
-                                    }
-                                    else
-                                    {
-                                        <div class="session-image-placeholder">
-                                            <i class="bi bi-image"></i>
-                                        </div>
-                                    }
-                                    <div class="session-status">
-                                        <span class="badge @GetSessionStatusClass(session)">
-                                            <i class="bi @GetSessionStatusIcon(session)"></i>
-                                            @GetSessionStatusText(session)
-                                        </span>
+                    <div class="session-card">
+                        <div class="session-image">
+                            @if (!string.IsNullOrEmpty(session.Image))
+                            {
+                                <img src="@session.Image" alt="@session.Title" />
+                            }
+                            else
+                            {
+                                <div class="session-image-placeholder">
+                                    <i class="bi bi-image"></i>
+                                </div>
+                            }
+                            <div class="session-status">
+                                <span class="badge @GetSessionStatusClass(session)">
+                                    <i class="bi @GetSessionStatusIcon(session)"></i>
+                                    @GetSessionStatusText(session)
+                                </span>
 
-                                        <span class="badge bg-secondary">
-                                            <i class="bi bi-people-fill text-info me-2"></i>
-                                            @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
-                                            @if (IsCountUpdating(session.Id))
-                                            {
-                                                <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
-                                            }
-                                        </span>
-                                    </div>
+                                <span class="badge bg-secondary">
+                                    <i class="bi bi-people-fill text-info me-2"></i>
+                                    @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
+                                    @if (IsCountUpdating(session.Id))
+                                    {
+                                        <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <div class="session-content">
+                            <h5 class="session-title">@session.Title</h5>
+                            <p class="session-description">
+                                @(session.Description?.Length > 100 ? session.Description.Substring(0, 100) + "..." : session.Description)
+                            </p>
+                            
+                            <div class="session-meta">
+                                <div class="session-date">
+                                    <i class="bi bi-calendar3 me-1"></i>
+                                    <small>@session.StartDate.ToString("dd/MM/yyyy") - @session.EndDate.ToString("dd/MM/yyyy")</small>
                                 </div>
-                                
-                                <div class="session-content">
-                                    <h5 class="session-title">@session.Title</h5>
-                                    <p class="session-description">
-                                        @(session.Description?.Length > 100 ? session.Description.Substring(0, 100) + "..." : session.Description)
-                                    </p>
-                                    
-                                    <div class="session-meta">
-                                        <div class="session-date">
-                                            <i class="bi bi-calendar3 me-1"></i>
-                                            <small>@session.StartDate.ToString("dd/MM/yyyy") - @session.EndDate.ToString("dd/MM/yyyy")</small>
-                                        </div>
-                                        <div class="session-work">
-                                            <i class="bi bi-clock me-1"></i>
-                                            <small>@session.Work heures</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <div class="session-actions">
-                                    <div class="btn-group w-100" role="group">
-                                        <button class="btn btn-outline-primary" @onclick="() => EditSession(session.Id)">
-                                            <i class="bi bi-pencil"></i>
-                                        </button>
-                                        <button class="btn @(session.IsActive ? "btn-success" : "btn-outline-secondary")" 
-                                                @onclick="() => ToggleSessionStatus(session.Id)">
-                                            <i class="bi @(session.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
-                                        </button>
-                                        <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id">
-                                            <i class="bi bi-book"></i>
-                                        </a>
-                                        <button class="btn btn-outline-danger" @onclick="() => DeleteSessionConfirmation(session.Id)">
-                                            <i class="bi bi-trash"></i>
-                                        </button>
-                                    </div>
+                                <div class="session-work">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <small>@session.Work heures</small>
                                 </div>
                             </div>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <!-- État vide amélioré -->
-                    <div class="empty-state">
-                        <div class="empty-state-icon">
-                            <i class="bi bi-calendar-x"></i>
                         </div>
-                        <h3 class="empty-state-title">Aucune session créée</h3>
-                        <p class="empty-state-text">Créez votre première session de formation pour commencer.</p>
-                        <button class="btn btn-primary btn-lg" @onclick="ShowCreateSessionModal">
-                            <i class="bi bi-plus-circle me-2"></i>
-                            Créer ma première session
-                        </button>
+                        
+                        <div class="session-actions">
+                            <div class="btn-group w-100" role="group">
+                                <button class="btn btn-outline-primary" @onclick="() => EditSession(session.Id)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn @(session.IsActive ? "btn-success" : "btn-outline-secondary")" 
+                                        @onclick="() => ToggleSessionStatus(session.Id)">
+                                    <i class="bi @(session.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
+                                </button>
+                                <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id">
+                                    <i class="bi bi-book"></i>
+                                </a>
+                                <button class="btn btn-outline-danger" @onclick="() => DeleteSessionConfirmation(session.Id)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 }
-            }
-            else
-            {
-                <!-- Loading state amélioré -->
-                <div class="loading-state">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Chargement...</span>
-                    </div>
-                    <p class="mt-3">Chargement des sessions...</p>
+            </div>
+        }
+        else
+        {
+            <!-- État vide amélioré -->
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-calendar-x"></i>
                 </div>
-            }
-        </ErrorComp>
-    </div>
-</ErrorComp>
+                <h3 class="empty-state-title">Aucune session créée</h3>
+                <p class="empty-state-text">Créez votre première session de formation pour commencer.</p>
+                <button class="btn btn-primary btn-lg" @onclick="ShowCreateSessionModal">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    Créer ma première session
+                </button>
+            </div>
+        }
+    }
+    else
+    {
+        <!-- Loading state amélioré -->
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-3">Chargement des sessions...</p>
+        </div>
+    }
+</div>
 
-<!-- Modal amélioré avec ErrorComp intégré -->
+<!-- Modal amélioré -->
 @if (showModal)
 {
     <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
@@ -162,95 +170,91 @@
                     <button type="button" class="btn-close" @onclick="CloseModal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- ErrorComp pour les erreurs du formulaire -->
-                    <ErrorComp @ref="formErrorComponent" OnRetry="ClearFormError">
-                        <EditForm Model="@sessionModel" OnValidSubmit="HandleValidSubmit">
-                            <DataAnnotationsValidator />
+                    @if (!string.IsNullOrEmpty(formErrorMessage))
+                    {
+                        <div class="alert alert-danger" role="alert">
+                            @formErrorMessage
+                        </div>
+                    }
+                    
+                    <EditForm Model="@sessionModel" OnValidSubmit="HandleValidSubmit">
+                        <DataAnnotationsValidator />
 
-                            <div class="row">
-                                <div class="col-md-8">
-                                    <div class="form-floating mb-3">
-                                        <InputText @bind-Value="sessionModel.Title" class="form-control" placeholder="Titre de la session" />
-                                        <label>Titre de la session</label>
-                                        <ValidationMessage For="@(() => sessionModel.Title)" />
-                                    </div>
-                                    
-                                    <div class="form-floating mb-3">
-                                        <InputTextArea @bind-Value="sessionModel.Description" class="form-control" style="height: 120px" placeholder="Description" />
-                                        <label>Description</label>
-                                        <ValidationMessage For="@(() => sessionModel.Description)" />
-                                    </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="form-floating mb-3">
+                                    <InputText @bind-Value="sessionModel.Title" class="form-control" placeholder="Titre de la session" />
+                                    <label>Titre de la session</label>
+                                    <ValidationMessage For="@(() => sessionModel.Title)" />
                                 </div>
                                 
-                                <div class="col-md-4">
-                                    <div class="image-upload-section">
-                                        <label class="form-label">Image de la session</label>
-                                        <div class="image-preview">
-                                            @if (!string.IsNullOrEmpty(sessionModel.Image))
-                                            {
-                                                <img src="@sessionModel.Image" alt="Aperçu" />
-                                            }
-                                            else
-                                            {
-                                                <div class="image-placeholder">
-                                                    <i class="bi bi-image"></i>
-                                                    <p>Aucune image</p>
-                                                </div>
-                                            }
-                                        </div>
-                                        <InputFile OnChange="OnImageFileSelected" class="form-control mt-2" accept=".jpg,.jpeg,.png,.gif" />
-                                        <small class="text-muted">JPG, PNG, GIF. Max: 3MB</small>
-                                    </div>
+                                <div class="form-floating mb-3">
+                                    <InputTextArea @bind-Value="sessionModel.Description" class="form-control" style="height: 120px" placeholder="Description" />
+                                    <label>Description</label>
+                                    <ValidationMessage For="@(() => sessionModel.Description)" />
                                 </div>
                             </div>
                             
-                            <div class="row mt-1">
-                                <div class="col-md-6">
-                                    <div class="form-floating mb-3">
-                                        <InputDate @bind-Value="sessionModel.StartDate" class="form-control" />
-                                        <label>Date de début</label>
-                                        <ValidationMessage For="@(() => sessionModel.StartDate)" />
+                            <div class="col-md-4">
+                                <div class="image-upload-section">
+                                    <label class="form-label">Image de la session</label>
+                                    <div class="image-preview">
+                                        @if (!string.IsNullOrEmpty(sessionModel.Image))
+                                        {
+                                            <img src="@sessionModel.Image" alt="Aperçu" />
+                                        }
+                                        else
+                                        {
+                                            <div class="image-placeholder">
+                                                <i class="bi bi-image"></i>
+                                                <p>Aucune image</p>
+                                            </div>
+                                        }
                                     </div>
+                                    <InputFile OnChange="OnImageFileSelected" class="form-control mt-2" accept=".jpg,.jpeg,.png,.gif" />
+                                    <small class="text-muted">JPG, PNG. Max:5MB</small>
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="form-floating mb-3">
-                                        <InputDate @bind-Value="sessionModel.EndDate" class="form-control" />
-                                        <label>Date de fin</label>
-                                        <ValidationMessage For="@(() => sessionModel.EndDate)" />
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="form-floating mb-3">
-                                        <InputNumber @bind-Value="sessionModel.Work" class="form-control" />
-                                        <label>Durée (heures)</label>
-                                        <ValidationMessage For="@(() => sessionModel.Work)" />
-                                    </div>
-                                </div>
-                                <div class="col-md-6 d-flex align-items-center">
-                                    <div class="form-check form-switch form-check-lg">
-                                        <InputCheckbox @bind-Value="sessionModel.IsActive" class="form-check-input" id="isActiveCheck" />
-                                        <label class="form-check-label" for="isActiveCheck">
-                                            Session en ligne
-                                        </label>
-                                    </div>
+                            </div>  
+                        </div>
+                        
+                        <div class="row mt-1">
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3">
+                                    <InputDate @bind-Value="sessionModel.StartDate" class="form-control" />
+                                    <label>Date de début</label>
+                                    <ValidationMessage For="@(() => sessionModel.StartDate)" />
                                 </div>
                             </div>
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3">
+                                    <InputDate @bind-Value="sessionModel.EndDate" class="form-control" />
+                                    <label>Date de fin</label>
+                                    <ValidationMessage For="@(() => sessionModel.EndDate)" />
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-floating mb-3">
+                                    <InputNumber @bind-Value="sessionModel.Work" class="form-control" />
+                                    <label>Durée (heures)</label>
+                                    <ValidationMessage For="@(() => sessionModel.Work)" />
+                                </div>
+                            </div>
+                        </div>
 
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">
-                                    <i class="bi bi-x-circle me-1"></i>
-                                    Annuler
-                                </button>
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="bi @(isEditing ? "bi-check-circle" : "bi-plus-circle") me-1"></i>
-                                    @(isEditing ? "Modifier" : "Créer")
-                                </button>
-                            </div>
-                        </EditForm>
-                    </ErrorComp>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CloseModal">
+                                <i class="bi bi-x-circle me-1"></i>
+                                Annuler
+                            </button>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi @(isEditing ? "bi-check-circle" : "bi-plus-circle") me-1"></i>
+                                @(isEditing ? "Modifier" : "Créer")
+                            </button>
+                        </div>
+                    </EditForm>
                 </div>
             </div>
         </div>
@@ -304,15 +308,10 @@
     private string? oldImagePath;
     private Dictionary<int, int> enrolledCounts = new();
     private HashSet<int> updatingCounts = new();
-
-    // **NOUVELLES VARIABLES pour ErrorComp**
-    private ErrorComp? globalErrorComponent;
-    private ErrorComp? loadingErrorComponent;
-    private ErrorComp? formErrorComponent;
-
-    // Variables pour gérer la dernière opération ayant échoué
-    private string? lastFailedOperation;
-    private int? lastFailedSessionId;
+    
+    // Variables d'erreur simplifiées
+    private string? errorMessage;
+    private string? formErrorMessage;
 
     protected override async Task OnInitializedAsync()
     {
@@ -328,18 +327,17 @@
         }
         catch (Exception ex)
         {
-            loadingErrorComponent?.SetError($"Erreur lors du chargement des sessions : {ex.Message}");
-            lastFailedOperation = "LoadSessions";
+            errorMessage = $"Erreur lors du chargement des sessions : {ex.Message}";
         }
     }
 
     private async Task LoadSessions()
     {
         using var context = await DbContextFactory.CreateDbContextAsync();
-        
+
         // Vérification immédiate des sessions expirées avant l'affichage
         await CheckAndUpdateExpiredSessions(context);
-        
+
         sessions = await context.Sessions.ToListAsync();
     }
 
@@ -356,7 +354,7 @@
             {
                 session.IsActive = false;
             }
-            
+
             await context.SaveChangesAsync();
         }
     }
@@ -398,16 +396,12 @@
                 session.IsActive = !session.IsActive;
                 await context.SaveChangesAsync();
                 await LoadSessions();
-                
-                // Réinitialiser les erreurs en cas de succès
-                globalErrorComponent?.Reset();
+                ClearError();
             }
         }
         catch (Exception ex)
         {
-            globalErrorComponent?.SetError($"Erreur lors du changement de statut : {ex.Message}");
-            lastFailedOperation = "ToggleStatus";
-            lastFailedSessionId = sessionId;
+            errorMessage = $"Erreur lors du changement de statut : {ex.Message}";
         }
     }
 
@@ -419,9 +413,7 @@
         modalTitle = "Créer une session";
         isEditing = false;
         showModal = true;
-        
-        // Réinitialiser les erreurs du formulaire
-        formErrorComponent?.Reset();
+        formErrorMessage = null;
     }
 
     private async Task EditSession(int sessionId)
@@ -450,16 +442,12 @@
                 isEditing = true;
                 showModal = true;
                 selectedImageFile = null;
-                
-                // Réinitialiser les erreurs du formulaire
-                formErrorComponent?.Reset();
+                formErrorMessage = null;
             }
         }
         catch (Exception ex)
         {
-            globalErrorComponent?.SetError($"Erreur lors du chargement de la session : {ex.Message}");
-            lastFailedOperation = "EditSession";
-            lastFailedSessionId = sessionId;
+            errorMessage = $"Erreur lors du chargement de la session : {ex.Message}";
         }
     }
 
@@ -471,24 +459,23 @@
         {
             if (!selectedImageFile.ContentType.StartsWith("image/"))
             {
-                formErrorComponent?.SetError("Le fichier doit être une image.");
+                formErrorMessage = "Le fichier doit être une image.";
                 selectedImageFile = null;
                 return;
             }
 
             if (selectedImageFile.Size > 3 * 1024 * 1024)
             {
-                formErrorComponent?.SetError("La taille de l'image ne doit pas dépasser 3MB.");
+                formErrorMessage = "La taille de l'image ne doit pas dépasser 3MB.";
                 selectedImageFile = null;
                 return;
             }
 
-            // Réinitialiser les erreurs en cas de succès
-            formErrorComponent?.Reset();
+            formErrorMessage = null;
         }
         catch (Exception ex)
         {
-            formErrorComponent?.SetError($"Erreur lors de la sélection de l'image : {ex.Message}");
+            formErrorMessage = $"Erreur lors de la sélection de l'image : {ex.Message}";
             selectedImageFile = null;
         }
     }
@@ -516,18 +503,14 @@
                 context.Sessions.Remove(session);
                 await context.SaveChangesAsync();
                 await LoadSessions();
-                
-                // Réinitialiser les erreurs en cas de succès
-                globalErrorComponent?.Reset();
+                ClearError();
             }
 
             showDeleteConfirmation = false;
         }
         catch (Exception ex)
         {
-            globalErrorComponent?.SetError($"Erreur lors de la suppression : {ex.Message}");
-            lastFailedOperation = "DeleteSession";
-            lastFailedSessionId = currentSessionId;
+            errorMessage = $"Erreur lors de la suppression : {ex.Message}";
             showDeleteConfirmation = false;
         }
     }
@@ -563,7 +546,7 @@
                     session.StartDate = sessionModel.StartDate;
                     session.EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30);
                     session.Work = sessionModel.Work;
-                    session.IsActive = sessionModel.IsActive;
+                    session.IsActive = false;
 
                     await context.SaveChangesAsync();
                 }
@@ -578,7 +561,7 @@
                     StartDate = sessionModel.StartDate,
                     EndDate = sessionModel.EndDate ?? DateTime.Today.AddDays(30),
                     Work = sessionModel.Work,
-                    IsActive = sessionModel.IsActive
+                    IsActive = false
                 };
 
                 context.Sessions.Add(session);
@@ -587,65 +570,18 @@
 
             await LoadSessions();
             CloseModal();
-            
-            // Réinitialiser toutes les erreurs en cas de succès
-            globalErrorComponent?.Reset();
-            formErrorComponent?.Reset();
+            ClearError();
         }
         catch (Exception ex)
         {
-            formErrorComponent?.SetError($"Erreur lors de l'enregistrement : {ex.Message}");
-            lastFailedOperation = "SaveSession";
+            formErrorMessage = $"Erreur lors de l'enregistrement : {ex.Message}";
         }
     }
 
-    // **NOUVELLES MÉTHODES pour la gestion d'erreurs**
-    
-    /// <summary>
-    /// Réessaie la dernière opération qui a échoué
-    /// </summary>
-    private async Task RetryLastOperation()
+    private void ClearError()
     {
-        if (string.IsNullOrEmpty(lastFailedOperation)) return;
-
-        try
-        {
-            switch (lastFailedOperation)
-            {
-                case "LoadSessions":
-                    await LoadSessionsWithErrorHandling();
-                    break;
-                case "ToggleStatus" when lastFailedSessionId.HasValue:
-                    await ToggleSessionStatus(lastFailedSessionId.Value);
-                    break;
-                case "EditSession" when lastFailedSessionId.HasValue:
-                    await EditSession(lastFailedSessionId.Value);
-                    break;
-                case "DeleteSession" when lastFailedSessionId.HasValue:
-                    currentSessionId = lastFailedSessionId.Value;
-                    await ConfirmDeleteSession();
-                    break;
-                case "SaveSession":
-                    await HandleValidSubmit();
-                    break;
-            }
-            
-            // Réinitialiser après une tentative réussie
-            lastFailedOperation = null;
-            lastFailedSessionId = null;
-        }
-        catch (Exception ex)
-        {
-            globalErrorComponent?.SetError($"La nouvelle tentative a échoué : {ex.Message}");
-        }
-    }
-
-    /// <summary>
-    /// Efface les erreurs du formulaire
-    /// </summary>
-    private void ClearFormError()
-    {
-        formErrorComponent?.Reset();
+        errorMessage = null;
+        formErrorMessage = null;
     }
 
     // Méthodes existantes
@@ -658,7 +594,7 @@
     {
         showModal = false;
         selectedImageFile = null;
-        formErrorComponent?.Reset();
+        formErrorMessage = null;
     }
 
     private bool IsCountUpdating(int sessionId)
@@ -687,11 +623,8 @@
         [Range(1, 1000, ErrorMessage = "Le temps de travail doit être entre 1 et 1000 heures")]
         public int Work { get; set; } = 10;
 
-        [Required(ErrorMessage = "le nombre de places est requis")]
-        [Range(1, 100, ErrorMessage = "Le nombre maximal de place par session est de 100")]
         public bool IsActive { get; set; } = false;
     }
-
     private string GetSessionStatusClass(Mooc.Data.Session session)
     {
         var now = DateTime.Now;

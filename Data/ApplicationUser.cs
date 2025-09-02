@@ -18,6 +18,11 @@ namespace Mooc.Data
         [Column(TypeName = "varchar(100)")]
         public string LastName { get; set; } = string.Empty;
 
+        [Required]
+        [StringLength(100)]
+        [Column(TypeName = "varchar(100)")]
+        public string Pseudo { get; set; } = string.Empty;
+
         [NotMapped]
         public string FullName => $"{FirstName} {LastName}";
 

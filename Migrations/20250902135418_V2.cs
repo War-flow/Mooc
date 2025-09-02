@@ -5,25 +5,26 @@
 namespace Mooc.Migrations
 {
     /// <inheritdoc />
-    public partial class BaseV2 : Migration
+    public partial class V2 : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<int>(
-                name: "LimitUser",
-                table: "Session",
-                type: "int",
+            migrationBuilder.AddColumn<string>(
+                name: "Pseudo",
+                table: "AspNetUsers",
+                type: "varchar(100)",
+                maxLength: 100,
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: "");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "LimitUser",
-                table: "Session");
+                name: "Pseudo",
+                table: "AspNetUsers");
         }
     }
 }

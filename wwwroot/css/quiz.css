@@ -491,77 +491,6 @@
     100% { transform: rotate(360deg); }
 }
 
-/* ========================= */
-/* THÈME SOMBRE (OPTIONNEL) */
-/* ========================= */
-
-@media (prefers-color-scheme: dark) {
-    .quiz-block {
-        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-        border-color: #475569;
-        color: #f1f5f9;
-    }
-    
-    .quiz-display .question {
-        background: linear-gradient(135deg, #334155 0%, #475569 100%);
-        color: #f1f5f9;
-    }
-    
-    .quiz-display .form-check {
-        background: #334155;
-        border-color: #475569;
-    }
-    
-    .quiz-display .form-check-label {
-        color: #cbd5e1;
-    }
-}
-.stat-item {
-    padding: 1rem;
-    border-radius: 8px;
-    background: rgba(79, 70, 229, 0.1);
-    margin-bottom: 0.5rem;
-}
-
-.stat-value {
-    font-size: 1.5rem;
-    font-weight: bold;
-    color: #4f46e5;
-}
-
-.stat-label {
-    font-size: 0.9rem;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.difficulty-indicator .badge {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.8rem;
-}
-
-.quiz-stats {
-    text-align: center;
-    padding: 0.5rem;
-    background: rgba(79, 70, 229, 0.05);
-    border-radius: 8px;
-}
-
-.result-icon {
-    font-size: 1.2rem;
-    margin-left: 0.5rem;
-    animation: bounce 1s ease-in-out;
-}
-
-.result-badge.success .result-icon {
-    transform: scale(1.2);
-}
-
-.result-badge.error .result-icon {
-    transform: scale(1.2);
-}
-
 /* === QUIZ BLOCK STYLES === */
 .quiz-block-viewer {
     background: #ffffff;
@@ -625,7 +554,7 @@
     background: #ffffff;
     border: 2px solid #e9ecef;
     border-radius: 8px;
-    padding: 16px;
+    padding: 12px;
     margin-bottom: 12px;
     transition: all 0.3s ease;
     cursor: pointer;
@@ -633,11 +562,20 @@
     overflow: hidden;
 }
 
-    .form-check:hover:not(.disabled) {
-        border-color: #007bff;
-        box-shadow: 0 2px 8px rgba(0,123,255,0.15);
-        transform: translateY(-1px);
-    }
+.form-check-input {
+    width: 12px;
+    height: 12px;
+    margin-left:10px;
+    border: 2px solid #cbd5e1;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.form-check:hover:not(.disabled) {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+    transform: translateY(-1px);
+}
 
     .form-check.selected {
         border-color: #007bff;
@@ -658,13 +596,8 @@
 
 .form-check-label {
     cursor: pointer;
-    font-weight: 500;
     color: #495057;
-    margin-left: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
+    margin-left: 20px;
 }
 
 /* === RESULT ICONS === */
@@ -896,9 +829,4 @@
         color: #e2e8f0;
     }
 
-    .form-check {
-        background: #4a5568;
-        border-color: #718096;
-        color: #e2e8f0;
-    }
 }

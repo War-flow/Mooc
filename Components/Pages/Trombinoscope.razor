@@ -1,0 +1,210 @@
+﻿@page "/trombinoscope"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> UserManagerService
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject NavigationManager NavigationManager
+@attribute [StreamRendering]
+
+<PageTitle>Trombinoscope</PageTitle>
+
+<!-- En-tête de page avec design moderne -->
+<div class="page-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <h1 class="page-title">
+                    Trombinoscope
+                </h1>
+                <p class="page-subtitle">Découvrez notre équipe pédagogique</p>
+            </div>
+            <div class="col-auto">
+                <div class="team-stats">
+                    <span class="badge bg-light text-dark fs-6">
+                        @(teamMembers?.Count ?? 0) membre@(teamMembers?.Count > 1 ? "s" : "") dans l'équipe
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container mt-4">
+    @if (teamMembers != null)
+    {
+        @if (teamMembers.Any())
+        {
+            <!-- Grille du trombinoscope -->
+            <div class="trombinoscope-grid">
+                @foreach (var member in filteredMembers)
+                {
+                    <div class="team-member-card" data-role="@GetUserRole(member)">
+                        <div class="member-photo">
+                            <div class="photo-placeholder">
+                                <i class="bi bi-person-circle"></i>
+                            </div>
+                            <div class="member-role-indicator">
+                                <span class="role-badge @GetRoleBadgeClass(member)">
+                                    <i class="@GetRoleIcon(member) me-1"></i>
+                                    @GetUserRole(member)
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="member-info">
+                            <h4 class="member-name">@member.Pseudo</h4>
+                            <p class="member-title">@GetMemberTitle(member)</p>
+
+                            <div class="member-contact">
+                                <a href="mailto:@member.Email" class="contact-link">
+                                    <i class="bi bi-envelope"></i>
+                                    <span>@member.Email</span>
+                                </a>
+
+                            </div>
+
+                            <div class="member-specialties">
+                                @foreach (var specialty in GetMemberSpecialties(member))
+                                {
+                                    <span class="specialty-tag">@specialty</span>
+                                }
+                            </div>
+                        </div>
+
+                        <div class="member-actions">
+                            <a href="mailto:@member.Email" class="btn btn-outline-primary btn-sm">
+                                <i class="bi bi-envelope me-1"></i>
+                                Contacter
+                            </a>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <!-- État vide -->
+            <div class="empty-state">
+                <div class="empty-state-icon">
+                    <i class="bi bi-people"></i>
+                </div>
+                <h3 class="empty-state-title">Équipe en construction</h3>
+                <p class="empty-state-text">Notre équipe pédagogique sera bientôt présentée ici.</p>
+            </div>
+        }
+    }
+    else
+    {
+        <!-- État de chargement -->
+        <div class="loading-state">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Chargement...</span>
+            </div>
+            <p class="mt-3">Chargement de l'équipe...</p>
+        </div>
+    }
+</div>
+
+@code {
+    private List<ApplicationUser>? teamMembers;
+    private List<ApplicationUser> filteredMembers = new();
+    private Dictionary<string, string> userRoles = new();
+    private string selectedFilter = "All";
+    private int adminCount = 0;
+    private int formateurCount = 0;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTeamMembers();
+    }
+
+    private async Task LoadTeamMembers()
+    {
+        using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        var allUsers = await dbContext.Users.ToListAsync();
+
+        teamMembers = new List<ApplicationUser>();
+        userRoles.Clear();
+
+        foreach (var user in allUsers)
+        {
+            if (user.Id == null) continue;
+
+            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
+            bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+
+            // Inclure seulement les formateurs et administrateurs dans le trombinoscope
+            if (isFormateur || isAdmin)
+            {
+                teamMembers.Add(user);
+
+                if (isAdmin)
+                {
+                    userRoles[user.Id] = "Admin";
+                    adminCount++;
+                }
+                else if (isFormateur)
+                {
+                    userRoles[user.Id] = "Formateur";
+                    formateurCount++;
+                }
+            }
+        }
+    }
+
+    private string GetUserRole(ApplicationUser user)
+    {
+        if (user?.Id == null) return "Membre";
+
+        if (userRoles.TryGetValue(user.Id, out string role))
+            return role;
+        return "Membre";
+    }
+
+    private string GetRoleBadgeClass(ApplicationUser user)
+    {
+        var role = GetUserRole(user);
+        return role switch
+        {
+            "Admin" => "bg-danger text-white",
+            "Formateur" => "bg-success text-white",
+            _ => "bg-secondary text-white"
+        };
+    }
+
+    private string GetRoleIcon(ApplicationUser user)
+    {
+        var role = GetUserRole(user);
+        return role switch
+        {
+            "Admin" => "bi-shield-fill",
+            "Formateur" => "bi-mortarboard",
+            _ => "bi-person"
+        };
+    }
+
+    private string GetMemberTitle(ApplicationUser user)
+    {
+        var role = GetUserRole(user);
+        return role switch
+        {
+            "Admin" => "Administrateur de la plateforme",
+            "Formateur" => "Formateur expert",
+            _ => "Membre de l'équipe"
+        };
+    }
+
+    private List<string> GetMemberSpecialties(ApplicationUser user)
+    {
+        var role = GetUserRole(user);
+        return role switch
+        {
+            "Admin" => new List<string> { "Gestion", "Administration", "Support" },
+            "Formateur" => new List<string> { "Formation", "Pédagogie", "Accompagnement" },
+            _ => new List<string> { "Équipe" }
+        };
+    }
+}

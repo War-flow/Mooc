@@ -30,6 +30,7 @@ IF NOT EXISTS (
 BEGIN
     CREATE TABLE [AspNetUsers] (
         [Id] nvarchar(450) NOT NULL,
+        [Pseudo] nvarchar(256) NOT NULL,
         [UserName] nvarchar(256) NULL,
         [LastName] nvarchar(max) NOT NULL,
         [FirstName] nvarchar(max) NOT NULL,
