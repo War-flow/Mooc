@@ -3,7 +3,8 @@
 @inject NavigationManager NavigationManager
 @using Microsoft.AspNetCore.Identity
 @using Mooc.Data
-@inject UserManager<ApplicationUser> UserManager
+@using Mooc.Services
+@inject IUserNavigationService UserNavigationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
 <div class="top-row ps-3 navbar navbar-dark">
@@ -21,107 +22,149 @@
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"> </span> Accueil
+                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Accueil
             </NavLink>
         </div>
-        <AuthorizeView>
-            <Authorized>
-                @if (currentUser != null)
-                {
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="Account/Manage">
-                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"> </span> @currentUser.Pseudo
-                        </NavLink>
-                    </div>
-                }
-                else
-                {
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="Account/Manage">
-                            <span class="bi bi-person-fill-nav-menu" aria-hidden="true"></span> @context.User.Identity?.Name
-                        </NavLink>
-                    </div>
-                }
-                <AuthorizeView Policy="GérerUtilisateurs" Context="adminContext">
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/manager/user">
-                           Gestion des utilisateurs
-                        </NavLink>
-                    </div>
-                </AuthorizeView>
+        
+        @if (isLoading)
+        {
+            <div class="nav-item px-3">
+                <span class="nav-link">
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Chargement...
+                </span>
+            </div>
+        }
+        else
+        {
+            <AuthorizeView>
+                <Authorized>
+                    @if (currentUser != null)
+                    {
+                        <div class="nav-item px-3">
+                            <NavLink class="nav-link" href="@GetUserProfileUrl()">
+                                <span aria-hidden="true"></span> @GetUserDisplayName()
+                            </NavLink>
+                        </div>
+                    }
 
-                <AuthorizeView Policy="GestionFormation" Context="FormateurContext">
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/Manager/Session">
-                            Gestion des sessions
-                        </NavLink>
-                    </div>
-                </AuthorizeView>
+                    <AuthorizeView Policy="GérerUtilisateurs" Context="userManagementContext">
+                        <Authorized>
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/manager/user">
+                                    <span aria-hidden="true"></span> Gestion des utilisateurs
+                                </NavLink>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
 
-                <AuthorizeView Policy="VoirCours" Context="UsersContext">
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/mes-sessions">
-                           Mes Formations
-                        </NavLink>
-                    </div>
-                    <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/certification">
-                            Mes Certifications
-                        </NavLink>
-                    </div>
+                    <AuthorizeView Policy="GestionFormation" Context="trainingManagementContext">
+                        <Authorized>
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/manager/session">
+                                    <span aria-hidden="true"></span> Gestion des sessions
+                                </NavLink>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
 
+                    <AuthorizeView Policy="VoirCours" Context="courseViewContext">
+                        <Authorized>
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/mes-sessions">
+                                    <span aria-hidden="true"></span> Mes Formations
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/certification">
+                                    <span aria-hidden="true"></span> Mes Certifications
+                                </NavLink>
+                            </div>
+                            <div class="nav-item px-3">
+                                <NavLink class="nav-link" href="/trombinoscope">
+                                    <span aria-hidden="true"></span> Trombinoscope
+                                </NavLink>
+                            </div>
+                        </Authorized>
+                    </AuthorizeView>
+
+                    <div class="nav-item px-3 mt-auto">
+                        <form action="Account/Logout" method="post">
+                            <AntiforgeryToken />
+                            <input type="hidden" name="ReturnUrl" value="@currentUrl" />
+                            <button type="submit" class="nav-link btn-logout">
+                                <span aria-hidden="true"></span> Déconnexion
+                            </button>
+                        </form>
+                    </div>
+                </Authorized>
+                <NotAuthorized>
                     <div class="nav-item px-3">
-                        <NavLink class="nav-link" href="/trombinoscope">
-                            Trombinoscope
+                        <NavLink class="nav-link" href="/compte/connexion">
+                            <span aria-hidden="true"></span> Connexion
                         </NavLink>
                     </div>
-                </AuthorizeView>
-                <div class="nav-item px-3">
-                    <form action="Account/Logout" method="post">
-                        <AntiforgeryToken />
-                        <input type="hidden" name="ReturnUrl" value="@currentUrl" />
-                        <button type="submit" class="nav-link">
-                           Déconnexion
-                        </button>
-                    </form>
-                </div>
-            </Authorized>
-            <NotAuthorized>
-                <div class="nav-item px-3">
-                    <NavLink class="nav-link" href="Account/Login">
-                           Connexion
-                    </NavLink>
-                </div>
-            </NotAuthorized>
-        </AuthorizeView>
+                </NotAuthorized>
+            </AuthorizeView>
+        }
     </nav>
 </div>
 
 @code {
     private string? currentUrl;
-
-    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
-    {
-        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
-        StateHasChanged();
-    }
-
-    public void Dispose()
-    {
-        NavigationManager.LocationChanged -= OnLocationChanged;
-    }
-
-    private ApplicationUser? currentUser;
+    private ApplicationUser? currentUser; // Changement du type de UserNavigationService à ApplicationUser?
+    private string? userRole;
+    private bool isLoading = true;
 
     protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            NavigationManager.LocationChanged += OnLocationChanged;
+            currentUrl = NavigationManager.ToBaseRelativePath(NavigationManager.Uri);
+
+            await LoadUserDataAsync();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadUserDataAsync()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated == true && !string.IsNullOrEmpty(user.Identity.Name))
         {
-            currentUser = await UserManager.FindByNameAsync(user.Identity.Name);
+            (currentUser, userRole) = await UserNavigationService.GetUserDataAsync(user.Identity.Name);
         }
+    }
+
+    private string GetUserProfileUrl()
+    {
+        return userRole == "Admin" ? "/manager/user" : "Account/Manage";
+    }
+
+    private string GetUserDisplayName()
+    {
+        if (currentUser == null) return "Utilisateur";
+        
+        return userRole == "Admin" || userRole == "Formateur"
+            ? $"{currentUser.LastName} {currentUser.FirstName}" 
+            : currentUser.Pseudo ?? currentUser.UserName ?? "Utilisateur";
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        currentUrl = NavigationManager.ToBaseRelativePath(e.Location);
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
 

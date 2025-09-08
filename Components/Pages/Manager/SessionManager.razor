@@ -1,4 +1,4 @@
-﻿@page "/Manager/Session"
+﻿@page "/manager/session"
 
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components
@@ -73,18 +73,24 @@
                                 </div>
                             }
                             <div class="session-status">
-                                <span class="badge @GetSessionStatusClass(session)">
+                                <span class="bag @GetSessionStatusClass(session)">
                                     <i class="bi @GetSessionStatusIcon(session)"></i>
                                     @GetSessionStatusText(session)
                                 </span>
 
-                                <span class="badge bg-secondary">
+                                <span class="bag bg-secondary">
                                     <i class="bi bi-people-fill text-info me-2"></i>
                                     @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
                                     @if (IsCountUpdating(session.Id))
                                     {
                                         <span class="spinner-border spinner-border-sm ms-1" style="width: 0.75rem; height: 0.75rem;"></span>
                                     }
+                                </span>
+
+                                <!-- Badge cours -->
+                                <span class="bag @(GetPublishedCoursesCount(session.Id) > 0 ? "bg-info" : "bg-warning")">
+                                    <i class="bi bi-book me-1"></i>
+                                    @GetPublishedCoursesCount(session.Id) cours@(GetPublishedCoursesCount(session.Id) > 1 ? "s" : "")
                                 </span>
                             </div>
                         </div>
@@ -106,20 +112,22 @@
                                 </div>
                             </div>
                         </div>
-                        
+
+                        <!-- **SECTION ACTIONS RESTAURÉE** -->
                         <div class="session-actions">
                             <div class="btn-group w-100" role="group">
-                                <button class="btn btn-outline-primary" @onclick="() => EditSession(session.Id)">
+                                <button class="btn btn-outline-primary" @onclick="() => EditSession(session.Id)" title="Modifier">
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 <button class="btn @(session.IsActive ? "btn-success" : "btn-outline-secondary")" 
-                                        @onclick="() => ToggleSessionStatus(session.Id)">
+                                        @onclick="() => ToggleSessionStatus(session.Id)" 
+                                        title="@(session.IsActive ? "Désactiver" : "Activer")">
                                     <i class="bi @(session.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
                                 </button>
-                                <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id">
+                                <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id" title="Gérer les cours">
                                     <i class="bi bi-book"></i>
                                 </a>
-                                <button class="btn btn-outline-danger" @onclick="() => DeleteSessionConfirmation(session.Id)">
+                                <button class="btn btn-outline-danger" @onclick="() => DeleteSessionConfirmation(session.Id)" title="Supprimer">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -309,6 +317,9 @@
     private Dictionary<int, int> enrolledCounts = new();
     private HashSet<int> updatingCounts = new();
     
+    // **NOUVEAU** : Cache pour les cours publiés
+    private Dictionary<int, int> publishedCoursesCache = new();
+    
     // Variables d'erreur simplifiées
     private string? errorMessage;
     private string? formErrorMessage;
@@ -324,6 +335,7 @@
         {
             await LoadSessions();
             await LoadEnrolledCounts();
+            await LoadPublishedCoursesCount(); // **NOUVEAU**
         }
         catch (Exception ex)
         {
@@ -339,6 +351,28 @@
         await CheckAndUpdateExpiredSessions(context);
 
         sessions = await context.Sessions.ToListAsync();
+    }
+
+    // **NOUVEAU** : Charger tous les compteurs de cours publiés en une seule fois
+    private async Task LoadPublishedCoursesCount()
+    {
+        if (sessions == null) return;
+
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        
+        var sessionIds = sessions.Select(s => s.Id).ToList();
+        var courseCounts = await context.Courses
+            .Where(c => sessionIds.Contains(c.SessionId) && c.IsPublished)
+            .GroupBy(c => c.SessionId)
+            .Select(g => new { SessionId = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        publishedCoursesCache.Clear();
+        foreach (var session in sessions)
+        {
+            var count = courseCounts.FirstOrDefault(cc => cc.SessionId == session.Id);
+            publishedCoursesCache[session.Id] = count?.Count ?? 0;
+        }
     }
 
     private async Task CheckAndUpdateExpiredSessions(ApplicationDbContext context)
@@ -389,13 +423,28 @@
         try
         {
             using var context = await DbContextFactory.CreateDbContextAsync();
-            var session = await context.Sessions.FindAsync(sessionId);
+            var session = await context.Sessions.Include(s => s.Courses).FirstOrDefaultAsync(s => s.Id == sessionId);
 
             if (session != null)
             {
+                // Vérification : bloquer l'activation si aucun cours n'existe
+                if (!session.IsActive && (session.Courses == null || !session.Courses.Any()))
+                {
+                    errorMessage = "Impossible d'activer cette session : aucun cours n'a été créé. Veuillez d'abord ajouter des cours à cette session.";
+                    return;
+                }
+
+                // Vérification supplémentaire : bloquer l'activation s'il n'y a pas de cours publiés
+                if (!session.IsActive && session.Courses != null && !session.Courses.Any(c => c.IsPublished))
+                {
+                    errorMessage = "Impossible d'activer cette session : aucun cours n'est publié. Veuillez publier au moins un cours avant d'activer la session.";
+                    return;
+                }
+
                 session.IsActive = !session.IsActive;
                 await context.SaveChangesAsync();
                 await LoadSessions();
+                await LoadPublishedCoursesCount(); // **MISE À JOUR** du cache
                 ClearError();
             }
         }
@@ -569,6 +618,7 @@
             }
 
             await LoadSessions();
+            await LoadPublishedCoursesCount(); // **MISE À JOUR** du cache
             CloseModal();
             ClearError();
         }
@@ -578,13 +628,21 @@
         }
     }
 
+    // **NOUVELLE** méthode synchrone pour obtenir le nombre de cours publiés
+    private int GetPublishedCoursesCount(int sessionId)
+    {
+        return publishedCoursesCache.TryGetValue(sessionId, out var count) ? count : 0;
+    }
+
+    // **SUPPRIMÉE** : Suppression de l'ancienne méthode async
+    // private async Task<int> GetPublishedCoursesCount(int sessionId) { ... }
+
     private void ClearError()
     {
         errorMessage = null;
         formErrorMessage = null;
     }
 
-    // Méthodes existantes
     private int GetEnrolledCount(int sessionId)
     {
         return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
@@ -662,5 +720,23 @@
             return "Hors ligne";
             
         return "En ligne";
+    }
+
+    private async Task<bool> CanActivateSession(int sessionId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var session = await context.Sessions.Include(s => s.Courses).FirstOrDefaultAsync(s => s.Id == sessionId);
+            
+            if (session == null) return false;
+            
+            // Vérifier s'il y a des cours publiés
+            return session.Courses != null && session.Courses.Any(c => c.IsPublished);
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

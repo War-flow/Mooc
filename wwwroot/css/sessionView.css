@@ -398,11 +398,13 @@
 }
 
 /* Badges de statut */
-.badge {
-    font-size: 0.875rem;
+.bag {
+    font-size: 0.750rem;
     padding: 0.5rem 0.75rem;
     border-radius: 20px;
-    font-weight: 500;
+    font-weight: bold;
+    color: snow;
+    text-transform: uppercase;
 }
 
 /* Amélioration des boutons */

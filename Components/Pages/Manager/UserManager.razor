@@ -270,32 +270,48 @@
 
     private async Task RefreshUsers()
     {
-        using var dbContext = await DbContextFactory.CreateDbContextAsync();
-        var allUsers = await dbContext.Users.ToListAsync();
-        
-        users = new List<ApplicationUser>();
-        userRoles.Clear();
-        
-        foreach (var user in allUsers)
+        try
         {
-            if (user.Id == null) continue;
+            using var dbContext = await DbContextFactory.CreateDbContextAsync();
             
-            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
-            bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
-            bool isUser = await UserManagerService.IsInRoleAsync(user, "Utilisateur");
+            // Récupérer les utilisateurs avec leurs rôles en une seule requête
+            var usersWithRoles = await (from user in dbContext.Users
+                                      join userRole in dbContext.UserRoles on user.Id equals userRole.UserId into userRolesGroup
+                                      from userRole in userRolesGroup.DefaultIfEmpty()
+                                      join role in dbContext.Roles on userRole.RoleId equals role.Id into rolesGroup
+                                      from role in rolesGroup.DefaultIfEmpty()
+                                      select new 
+                                      {
+                                          User = user,
+                                          RoleName = role != null ? role.Name : "Utilisateur"
+                                      }).ToListAsync();
+
+            users = new List<ApplicationUser>();
+            userRoles.Clear();
             
-            // Modification pour inclure tous les utilisateurs avec des rôles
-            if (isFormateur || isAdmin || isUser)
+            // Grouper par utilisateur et prendre le rôle le plus élevé
+            var userRoleGroups = usersWithRoles.GroupBy(ur => ur.User.Id);
+            
+            foreach (var group in userRoleGroups)
             {
-                users.Add(user);
+                var user = group.First().User;
+                var roles = group.Select(g => g.RoleName).Where(r => !string.IsNullOrEmpty(r)).ToList();
                 
-                if (isAdmin)
-                    userRoles[user.Id] = "Admin";
-                else if (isFormateur)
-                    userRoles[user.Id] = "Formateur";
-                else
-                    userRoles[user.Id] = "Utilisateur";
+                // Déterminer le rôle principal (priorité: Admin > Formateur > Utilisateur)
+                string primaryRole = "Utilisateur";
+                if (roles.Contains("Admin"))
+                    primaryRole = "Admin";
+                else if (roles.Contains("Formateur"))
+                    primaryRole = "Formateur";
+                
+                users.Add(user);
+                userRoles[user.Id] = primaryRole;
             }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du chargement des utilisateurs: {ex.Message}";
+            showError = true;
         }
     }
 
@@ -313,18 +329,26 @@
         selectedUserId = userId;
     }
 
-private async Task ViewUserSessions(string userId)
-{
-selectedUser = users?.FirstOrDefault(u => u.Id == userId);
-if (selectedUser != null)
-{
- using var dbContext = await DbContextFactory.CreateDbContextAsync();
- userSessions = await dbContext.Sessions
- .Where(s => s.EnrolledUsers.Any(u => u.Id == userId))
-.ToListAsync();
- showUserSessions = true;
-}
-} 
+    private async Task ViewUserSessions(string userId)
+    {
+        try
+        {
+            selectedUser = users?.FirstOrDefault(u => u.Id == userId);
+            if (selectedUser != null)
+            {
+                using var dbContext = await DbContextFactory.CreateDbContextAsync();
+                userSessions = await dbContext.Sessions
+                    .Where(s => s.EnrolledUsers.Any(u => u.Id == userId))
+                    .ToListAsync();
+                showUserSessions = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors du chargement des sessions: {ex.Message}";
+            showError = true;
+        }
+    }
 
     private void DeleteUserConfirmation(string userId)
     {
@@ -339,31 +363,45 @@ if (selectedUser != null)
     {
         if (selectedUser?.Id != null)
         {
-            var user = await UserManagerService.FindByIdAsync(selectedUser.Id);
-            if (user != null)
+            try
             {
-                var isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+                // Utiliser un DbContext dédié pour cette opération
+                using var dbContext = await DbContextFactory.CreateDbContextAsync();
+                using var userManager = new UserManager<ApplicationUser>(
+                    new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(dbContext),
+                    null, null, null, null, null, null, null, null);
                 
-                if (isAdmin)
+                var user = await userManager.FindByIdAsync(selectedUser.Id);
+                if (user != null)
                 {
-                    errorMessage = "Impossible de supprimer un administrateur.";
-                    showError = true;
-                    showDeleteConfirmation = false;
-                    return;
+                    var isAdmin = await userManager.IsInRoleAsync(user, "Admin");
+                    
+                    if (isAdmin)
+                    {
+                        errorMessage = "Impossible de supprimer un administrateur.";
+                        showError = true;
+                        showDeleteConfirmation = false;
+                        return;
+                    }
+                    
+                    var result = await userManager.DeleteAsync(user);
+                    if (result.Succeeded)
+                    {
+                        await RefreshUsers();
+                        showError = false;
+                        errorMessage = string.Empty;
+                    }
+                    else
+                    {
+                        errorMessage = "Erreur lors de la suppression de l'utilisateur.";
+                        showError = true;
+                    }
                 }
-                
-                var result = await UserManagerService.DeleteAsync(user);
-                if (result.Succeeded)
-                {
-                    await RefreshUsers();
-                    showError = false;
-                    errorMessage = string.Empty;
-                }
-                else
-                {
-                    errorMessage = "Erreur lors de la suppression de l'utilisateur.";
-                    showError = true;
-                }
+            }
+            catch (Exception ex)
+            {
+                errorMessage = $"Erreur lors de la suppression: {ex.Message}";
+                showError = true;
             }
         }
         
@@ -373,25 +411,38 @@ if (selectedUser != null)
 
     private async Task DeleteUser(string userId)
     {
-        var user = await UserManagerService.FindByIdAsync(userId);
-        if (user != null)
+        try
         {
-            var isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+            using var dbContext = await DbContextFactory.CreateDbContextAsync();
+            using var userManager = new UserManager<ApplicationUser>(
+                new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<ApplicationUser>(dbContext),
+                null, null, null, null, null, null, null, null);
             
-            if (isAdmin)
+            var user = await userManager.FindByIdAsync(userId);
+            if (user != null)
             {
-                errorMessage = "Impossible de supprimer Super Admin.";
-                showError = true;
-                return;
+                var isAdmin = await userManager.IsInRoleAsync(user, "Admin");
+                
+                if (isAdmin)
+                {
+                    errorMessage = "Impossible de supprimer Super Admin.";
+                    showError = true;
+                    return;
+                }
+                
+                var result = await userManager.DeleteAsync(user);
+                if (result.Succeeded)
+                {
+                    await RefreshUsers();
+                    showError = false;
+                    errorMessage = string.Empty;
+                }
             }
-            
-            var result = await UserManagerService.DeleteAsync(user);
-            if (result.Succeeded)
-            {
-                await RefreshUsers();
-                showError = false;
-                errorMessage = string.Empty;
-            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la suppression: {ex.Message}";
+            showError = true;
         }
     }
 

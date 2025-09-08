@@ -3,6 +3,7 @@
 @inherits ErrorBoundary
 @inject IErrorHandlingService ErrorHandlingService
 @inject ILogger<GlobalErrorBoundary> Logger
+@inject IJSRuntime JSRuntime
 
 @if (CurrentException is null)
 {
@@ -23,7 +24,7 @@ else
                     <i class="bi bi-info-circle me-1"></i>
                     Voir les détails
                 </button>
-                <button class="btn btn-outline-secondary" @onclick="Recover">
+                <button class="btn btn-outline-secondary" @onclick="RecoverFromError">
                     <i class="bi bi-arrow-clockwise me-1"></i>
                     Réessayer
                 </button>
@@ -38,29 +39,113 @@ else
 
 @code {
     [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    
+    private int _errorCount = 0;
+    private readonly TimeSpan _errorCooldown = TimeSpan.FromMinutes(1);
+    private DateTime _lastErrorTime = DateTime.MinValue;
 
-    protected override Task OnErrorAsync(Exception exception)
+    protected override async Task OnErrorAsync(Exception exception)
     {
-        // Log l'erreur
-        Logger.LogError(exception, "Erreur capturée par ErrorBoundary global: {Message}", exception.Message);
-        
-        return Task.CompletedTask;
+        try
+        {
+            _errorCount++;
+            _lastErrorTime = DateTime.Now;
+
+            // Enrichir les informations d'erreur
+            var errorContext = new
+            {
+                ErrorId = Guid.NewGuid(),
+                Timestamp = DateTime.UtcNow,
+                UserAgent = await GetUserAgent(),
+                Url = NavigationManager.Uri,
+                UserId = await GetCurrentUserId(),
+                ErrorCount = _errorCount,
+                ExceptionType = exception.GetType().Name,
+                Message = exception.Message,
+                StackTrace = exception.StackTrace
+            };
+
+            // Log structuré
+            Logger.LogError(exception, 
+                "ErrorBoundary captured exception {ErrorId}. Count: {ErrorCount}, Type: {ExceptionType}, Message: {Message}, Context: {@ErrorContext}",
+                errorContext.ErrorId, _errorCount, exception.GetType().Name, exception.Message, errorContext);
+
+            // Notification côté client pour le debugging
+            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+            {
+                await JSRuntime.InvokeVoidAsync("console.error", "ErrorBoundary Exception:", exception.ToString());
+            }
+
+            await Task.CompletedTask;
+        }
+        catch (Exception loggingException)
+        {
+            // Fallback si même le logging échoue
+            Console.WriteLine($"Critical error in ErrorBoundary logging: {loggingException}");
+        }
     }
 
     private void NavigateToErrorPage()
     {
-        // Utilise votre service existant pour naviguer vers la page d'erreur
-        ErrorHandlingService.NavigateToError(CurrentException!, "Erreur capturée par le système de gestion d'erreurs");
+        try
+        {
+            ErrorHandlingService.NavigateToError(CurrentException!, "Erreur capturée par le système de gestion d'erreurs");
+        }
+        catch
+        {
+            // Fallback si le service échoue
+            NavigationManager.NavigateTo("/Error", true);
+        }
     }
 
-    private void Recover()
+    private new void RecoverFromError()
     {
-        // Réinitialise l'ErrorBoundary pour réessayer
-        Recover();
+        try
+        {
+            // Vérifier si on peut récupérer (éviter les boucles infinies)
+            if (_errorCount > 3 || (DateTime.Now - _lastErrorTime) < _errorCooldown)
+            {
+                // Trop d'erreurs récentes, rediriger vers la page d'erreur
+                NavigateToErrorPage();
+                return;
+            }
+
+            // Réinitialiser l'ErrorBoundary
+            base.Recover();
+        }
+        catch
+        {
+            GoHome();
+        }
     }
 
     private void GoHome()
     {
-        NavigationManager.NavigateTo("/");
+        NavigationManager.NavigateTo("/", true);
+    }
+
+    private async Task<string> GetUserAgent()
+    {
+        try
+        {
+            return await JSRuntime.InvokeAsync<string>("eval", "navigator.userAgent");
+        }
+        catch
+        {
+            return "Unknown";
+        }
+    }
+
+    private async Task<string> GetCurrentUserId()
+    {
+        try
+        {
+            // Récupérer l'ID utilisateur depuis le contexte d'authentification
+            return await JSRuntime.InvokeAsync<string>("eval", "window.userId || 'Anonymous'");
+        }
+        catch
+        {
+            return "Unknown";
+        }
     }
 }

@@ -199,7 +199,10 @@ namespace Mooc
 
             // Ajout du service AutomaticCertificateService
             builder.Services.AddScoped<IAutomaticCertificateService, AutomaticCertificateService>();
-            
+
+            // Ajout du service UserNavigationService
+            builder.Services.AddScoped<IUserNavigationService, UserNavigationService>();
+
             builder.Services.Configure<CertificateGenerationOptions>(builder.Configuration.GetSection("CertificateGeneration"));
 
             // Ajouter HtmlAgilityPack pour la validation HTML

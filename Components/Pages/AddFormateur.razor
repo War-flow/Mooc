@@ -84,7 +84,7 @@
             if (result.Succeeded)
             {
                 // Ajouter le rôle de formateur
-                await UserManagerService.AddToRoleAsync(user, "formateur");
+                await UserManagerService.AddToRoleAsync(user, "Formateur");
                 
                 // Rediriger vers la page de gestion des utilisateurs
                 NavigationManager.NavigateTo("/manager/user");
