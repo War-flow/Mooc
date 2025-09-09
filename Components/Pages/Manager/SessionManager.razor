@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Logging
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
@@ -11,6 +12,8 @@
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
 @inject FileUploadService FileUploadService
+@inject ILogger<SessionManager> Logger
+@inject IJSRuntime JSRuntime
 @attribute [Authorize(Policy = "GestionFormation")]
 @attribute [StreamRendering]
 
@@ -207,13 +210,43 @@
                                 <div class="image-upload-section">
                                     <label class="form-label">Image de la session</label>
                                     <div class="image-preview">
-                                        @if (!string.IsNullOrEmpty(sessionModel.Image))
+                                        @if (!string.IsNullOrEmpty(previewImageUrl))
                                         {
+                                            <!-- **NOUVEAU** : Affichage de la prévisualisation de l'image sélectionnée -->
+                                            <img src="@previewImageUrl" alt="Aperçu de l'image sélectionnée" />
+                                            <div class="image-overlay">
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-circle me-1"></i>
+                                                    Nouvelle image sélectionnée
+                                                </span>
+                                            </div>
+                                        }
+                                        else if (!string.IsNullOrEmpty(sessionModel.Image))
+                                        {
+                                            <!-- Image existante (en mode édition) -->
                                             <img src="@sessionModel.Image" alt="Aperçu" />
+                                        }
+                                        else
+                                        {
+                                            <!-- Placeholder quand aucune image -->
+                                            <div class="image-placeholder">
+                                                <i class="bi bi-image"></i>
+                                                <p>Aucune image</p>
+                                            </div>
                                         }
                                     </div>
                                     <InputFile OnChange="OnImageFileSelected" class="form-control mt-2" accept=".jpg,.jpeg,.png,.gif" />
-                                    <small class="text-muted">JPG, PNG. Max:5MB</small>
+                                    <small class="text-muted">JPG, PNG, GIF. Max: 3MB</small>
+                                    
+                                    @if (!string.IsNullOrEmpty(previewImageUrl))
+                                    {
+                                        <div class="mt-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="ClearImageSelection">
+                                                <i class="bi bi-x-circle me-1"></i>
+                                                Annuler la sélection
+                                            </button>
+                                        </div>
+                                    }
                                 </div>
                             </div>  
                         </div>
@@ -307,28 +340,54 @@
     private bool showDeleteConfirmation = false;
     private IBrowserFile? selectedImageFile;
     private string? oldImagePath;
+
+    // **NOUVEAU** : Variable pour la prévisualisation
+    private string? previewImageUrl;
+
     private Dictionary<int, int> enrolledCounts = new();
     private HashSet<int> updatingCounts = new();
-    
+
     // **NOUVEAU** : Cache pour les cours publiés
     private Dictionary<int, int> publishedCoursesCache = new();
-    
+
     // Variables d'erreur simplifiées
     private string? errorMessage;
     private string? formErrorMessage;
+
+    // **NOUVEAU** : Token d'annulation pour gérer les timeouts
+    private CancellationTokenSource? cancellationTokenSource;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadSessionsWithErrorHandling();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Initialiser le gestionnaire d'images
+            await JSRuntime.InvokeVoidAsync("ImageHandler.initializeAllImages");
+        }
+    }
+
+    // **OPTIMISÉ** : Méthode de chargement avec gestion de timeout améliorée
     private async Task LoadSessionsWithErrorHandling()
     {
         try
         {
-            await LoadSessions();
-            await LoadEnrolledCounts();
-            await LoadPublishedCoursesCount(); // **NOUVEAU**
+            // Annuler toute opération en cours
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource = new CancellationTokenSource();
+
+            // Définir un timeout de 30 secondes
+            cancellationTokenSource.CancelAfter(TimeSpan.FromSeconds(30));
+
+            await LoadSessionsOptimized(cancellationTokenSource.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            errorMessage = "L'opération a pris trop de temps. Veuillez réessayer.";
         }
         catch (Exception ex)
         {
@@ -336,44 +395,92 @@
         }
     }
 
-    private async Task LoadSessions()
+    // **NOUVELLE** : Méthode optimisée qui charge tout en une seule fois
+    // ⭐ CORRECTION : Créer un nouveau DbContext pour chaque opération
+    private async Task LoadSessionsOptimized(CancellationToken cancellationToken = default)
     {
-        using var context = await DbContextFactory.CreateDbContextAsync();
+        using var context = await DbContextFactory.CreateDbContextAsync(cancellationToken);
 
         // Vérification immédiate des sessions expirées avant l'affichage
-        await CheckAndUpdateExpiredSessions(context);
+        await CheckAndUpdateExpiredSessions(context, cancellationToken);
 
-        sessions = await context.Sessions.ToListAsync();
-    }
+        // Charger les sessions
+        sessions = await context.Sessions.AsNoTracking().ToListAsync(cancellationToken);
 
-    // **NOUVEAU** : Charger tous les compteurs de cours publiés en une seule fois
-    private async Task LoadPublishedCoursesCount()
-    {
-        if (sessions == null) return;
-
-        using var context = await DbContextFactory.CreateDbContextAsync();
-        
-        var sessionIds = sessions.Select(s => s.Id).ToList();
-        var courseCounts = await context.Courses
-            .Where(c => sessionIds.Contains(c.SessionId) && c.IsPublished)
-            .GroupBy(c => c.SessionId)
-            .Select(g => new { SessionId = g.Key, Count = g.Count() })
-            .ToListAsync();
-
-        publishedCoursesCache.Clear();
-        foreach (var session in sessions)
+        if (sessions?.Any() == true)
         {
-            var count = courseCounts.FirstOrDefault(cc => cc.SessionId == session.Id);
-            publishedCoursesCache[session.Id] = count?.Count ?? 0;
+            var sessionIds = sessions.Select(s => s.Id).ToList();
+
+            // ⭐ CORRECTION : Utiliser un nouveau contexte pour les compteurs
+            await LoadAllCountsOptimized(sessionIds, cancellationToken);
         }
     }
 
-    private async Task CheckAndUpdateExpiredSessions(ApplicationDbContext context)
+    // ⭐ CORRECTION : Séparer la logique des compteurs avec son propre contexte
+    private async Task LoadAllCountsOptimized(List<int> sessionIds, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync(cancellationToken);
+
+            // Charger les compteurs d'inscriptions en une seule requête
+            var enrollmentCounts = await context.Sessions
+                .Where(s => sessionIds.Contains(s.Id))
+                .Select(s => new
+                {
+                    SessionId = s.Id,
+                    Count = s.EnrolledUsers.Count()
+                })
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            enrolledCounts.Clear();
+            foreach (var item in enrollmentCounts)
+            {
+                enrolledCounts[item.SessionId] = item.Count;
+            }
+
+            // Charger les compteurs de cours publiés
+            var courseCounts = await context.Courses
+                .Where(c => sessionIds.Contains(c.SessionId) && c.IsPublished)
+                .GroupBy(c => c.SessionId)
+                .Select(g => new { SessionId = g.Key, Count = g.Count() })
+                .AsNoTracking()
+                .ToListAsync(cancellationToken);
+
+            publishedCoursesCache.Clear();
+            foreach (var session in sessions!)
+            {
+                var courseCount = courseCounts.FirstOrDefault(cc => cc.SessionId == session.Id);
+                publishedCoursesCache[session.Id] = courseCount?.Count ?? 0;
+
+                // Initialiser le compteur d'inscriptions si pas trouvé
+                if (!enrolledCounts.ContainsKey(session.Id))
+                {
+                    enrolledCounts[session.Id] = 0;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // En cas d'erreur, initialiser avec des valeurs par défaut
+            foreach (var sessionId in sessionIds)
+            {
+                enrolledCounts.TryAdd(sessionId, 0);
+                publishedCoursesCache.TryAdd(sessionId, 0);
+            }
+
+            Logger?.LogError(ex, "Erreur lors du chargement des compteurs");
+        }
+    }
+
+    // **OPTIMISÉ** : Méthode avec timeout
+    private async Task CheckAndUpdateExpiredSessions(ApplicationDbContext context, CancellationToken cancellationToken = default)
     {
         var now = DateTime.Now;
         var expiredSessions = await context.Sessions
             .Where(s => s.IsActive && s.EndDate < now)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (expiredSessions.Any())
         {
@@ -382,34 +489,12 @@
                 session.IsActive = false;
             }
 
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
         }
     }
 
-    private async Task LoadEnrolledCounts()
-    {
-        using var context = await DbContextFactory.CreateDbContextAsync();
-        enrolledCounts.Clear();
-        if (sessions != null)
-        {
-            foreach (var session in sessions)
-            {
-                try
-                {
-                    var count = await context.Entry(session)
-                        .Collection(s => s.EnrolledUsers)
-                        .Query()
-                        .CountAsync();
-                    enrolledCounts[session.Id] = count;
-                }
-                catch (Exception ex)
-                {
-                    // Erreur silencieuse pour le comptage - pas critique
-                    enrolledCounts[session.Id] = 0;
-                }
-            }
-        }
-    }
+    // **SUPPRIMÉE** : Ancienne méthode LoadEnrolledCounts remplacée par LoadAllCountsOptimized
+    // **SUPPRIMÉE** : Ancienne méthode LoadPublishedCoursesCount remplacée par LoadAllCountsOptimized
 
     private async Task ToggleSessionStatus(int sessionId)
     {
@@ -436,8 +521,9 @@
 
                 session.IsActive = !session.IsActive;
                 await context.SaveChangesAsync();
-                await LoadSessions();
-                await LoadPublishedCoursesCount(); // **MISE À JOUR** du cache
+
+                // **OPTIMISÉ** : Recharger seulement si nécessaire
+                await LoadSessionsOptimized();
                 ClearError();
             }
         }
@@ -451,6 +537,7 @@
     {
         sessionModel = new SessionModel();
         selectedImageFile = null;
+        previewImageUrl = null;
         oldImagePath = null;
         modalTitle = "Créer une session";
         isEditing = false;
@@ -469,6 +556,7 @@
             {
                 currentSessionId = sessionId;
                 oldImagePath = session.Image;
+                previewImageUrl = null;
                 sessionModel = new SessionModel
                 {
                     Title = session.Title,
@@ -503,6 +591,7 @@
             {
                 formErrorMessage = "Le fichier doit être une image.";
                 selectedImageFile = null;
+                previewImageUrl = null;
                 return;
             }
 
@@ -510,15 +599,55 @@
             {
                 formErrorMessage = "La taille de l'image ne doit pas dépasser 3MB.";
                 selectedImageFile = null;
+                previewImageUrl = null;
                 return;
             }
 
+            // ⭐ CORRECTION : Lecture sécurisée et complète du fichier
+            const int maxBufferSize = 3 * 1024 * 1024; // 3MB
+            byte[] buffer;
+            
+            using (var stream = selectedImageFile.OpenReadStream(maxBufferSize))
+            {
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                buffer = memoryStream.ToArray();
+                
+                // ⭐ Vérification de l'intégrité
+                if (buffer.Length == 0)
+                {
+                    formErrorMessage = "Erreur : Le fichier semble vide ou corrompu.";
+                    selectedImageFile = null;
+                    previewImageUrl = null;
+                    return;
+                }
+            }
+
+            // ⭐ Validation de la signature de l'image avant preview
+            if (!IsValidImageSignature(buffer, selectedImageFile.ContentType))
+            {
+                formErrorMessage = "Le fichier sélectionné n'est pas une image valide.";
+                selectedImageFile = null;
+                previewImageUrl = null;
+                return;
+            }
+
+            var base64String = Convert.ToBase64String(buffer);
+            previewImageUrl = $"data:{selectedImageFile.ContentType};base64,{base64String}";
+
             formErrorMessage = null;
+            StateHasChanged();
+
+            // Initialiser le redimensionnement automatique après la mise à jour
+            await Task.Delay(100);
+            await JSRuntime.InvokeVoidAsync("ImageHandler.initializeAllImages");
         }
         catch (Exception ex)
         {
-            formErrorMessage = $"Erreur lors de la sélection de l'image : {ex.Message}";
+            Logger?.LogError(ex, "Erreur lors de la sélection de l'image");
+            formErrorMessage = "Erreur lors de la lecture du fichier. Veuillez réessayer avec une autre image.";
             selectedImageFile = null;
+            previewImageUrl = null;
         }
     }
 
@@ -544,7 +673,9 @@
 
                 context.Sessions.Remove(session);
                 await context.SaveChangesAsync();
-                await LoadSessions();
+
+                // **OPTIMISÉ** : Recharger seulement si nécessaire
+                await LoadSessionsOptimized();
                 ClearError();
             }
 
@@ -610,8 +741,8 @@
                 await context.SaveChangesAsync();
             }
 
-            await LoadSessions();
-            await LoadPublishedCoursesCount(); // **MISE À JOUR** du cache
+            // **OPTIMISÉ** : Recharger seulement si nécessaire
+            await LoadSessionsOptimized();
             CloseModal();
             ClearError();
         }
@@ -621,14 +752,19 @@
         }
     }
 
-    // **NOUVELLE** méthode synchrone pour obtenir le nombre de cours publiés
+    private void ClearImageSelection()
+    {
+        selectedImageFile = null;
+        previewImageUrl = null;
+        formErrorMessage = null;
+        StateHasChanged();
+    }
+
+    // **OPTIMISÉE** : Méthode synchrone pour obtenir le nombre de cours publiés
     private int GetPublishedCoursesCount(int sessionId)
     {
         return publishedCoursesCache.TryGetValue(sessionId, out var count) ? count : 0;
     }
-
-    // **SUPPRIMÉE** : Suppression de l'ancienne méthode async
-    // private async Task<int> GetPublishedCoursesCount(int sessionId) { ... }
 
     private void ClearError()
     {
@@ -640,17 +776,25 @@
     {
         return enrolledCounts.TryGetValue(sessionId, out var count) ? count : 0;
     }
-    
+
     private void CloseModal()
     {
         showModal = false;
         selectedImageFile = null;
+        previewImageUrl = null;
         formErrorMessage = null;
     }
 
     private bool IsCountUpdating(int sessionId)
     {
         return updatingCounts.Contains(sessionId);
+    }
+
+    // **NOUVEAU** : Nettoyer les ressources
+    public void Dispose()
+    {
+        cancellationTokenSource?.Cancel();
+        cancellationTokenSource?.Dispose();
     }
 
     private class SessionModel
@@ -676,42 +820,43 @@
 
         public bool IsActive { get; set; } = false;
     }
+
     private string GetSessionStatusClass(Mooc.Data.Session session)
     {
         var now = DateTime.Now;
-        
+
         if (now > session.EndDate)
             return "bg-secondary"; // Session terminée
-        
+
         if (!session.IsActive)
             return "bg-danger"; // Hors ligne manuellement
-            
+
         return "bg-success"; // En ligne
     }
 
     private string GetSessionStatusIcon(Mooc.Data.Session session)
     {
         var now = DateTime.Now;
-        
+
         if (now > session.EndDate)
             return "bi-clock-history"; // Session terminée
-        
+
         if (!session.IsActive)
             return "bi bi-wifi-off"; // Hors ligne
-            
+
         return "bi bi-wifi"; // En ligne
     }
 
     private string GetSessionStatusText(Mooc.Data.Session session)
     {
         var now = DateTime.Now;
-        
+
         if (now > session.EndDate)
             return "Terminée";
-        
+
         if (!session.IsActive)
             return "Hors ligne";
-            
+
         return "En ligne";
     }
 
@@ -721,9 +866,9 @@
         {
             using var context = await DbContextFactory.CreateDbContextAsync();
             var session = await context.Sessions.Include(s => s.Courses).FirstOrDefaultAsync(s => s.Id == sessionId);
-            
+
             if (session == null) return false;
-            
+
             // Vérifier s'il y a des cours publiés
             return session.Courses != null && session.Courses.Any(c => c.IsPublished);
         }
@@ -731,5 +876,31 @@
         {
             return false;
         }
+    }
+
+    private bool IsValidImageSignature(byte[] buffer, string contentType)
+    {
+        // Vérification simple des signatures pour PNG, JPEG, GIF
+        if (buffer == null || buffer.Length < 4)
+            return false;
+
+        // PNG : 89 50 4E 47
+        if (contentType.Contains("png") && buffer.Length >= 4 &&
+            buffer[0] == 0x89 && buffer[1] == 0x50 && buffer[2] == 0x4E && buffer[3] == 0x47)
+            return true;
+
+        // JPEG : FF D8 FF
+        if (contentType.Contains("jpeg") || contentType.Contains("jpg"))
+        {
+            if (buffer.Length >= 3 && buffer[0] == 0xFF && buffer[1] == 0xD8 && buffer[2] == 0xFF)
+                return true;
+        }
+
+        // GIF : 47 49 46 38
+        if (contentType.Contains("gif") && buffer.Length >= 4 &&
+            buffer[0] == 0x47 && buffer[1] == 0x49 && buffer[2] == 0x46 && buffer[3] == 0x38)
+            return true;
+
+        return false;
     }
 }

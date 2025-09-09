@@ -58,6 +58,352 @@
     transform: scale(1.05);
 }
 
+/* ========================================
+   STYLES POUR LE REDIMENSIONNEMENT AUTOMATIQUE DES IMAGES
+   ======================================== */
+
+/* Styles globaux pour toutes les images */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Styles spécifiques pour les sessions */
+.sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.session-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.session-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.session-image {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.session-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.3s ease;
+    border: none;
+    border-radius: 0;
+    display: block;
+}
+
+.session-card:hover .session-image img {
+    transform: scale(1.05);
+}
+
+.session-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.session-image-placeholder i {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.6;
+}
+
+.session-status {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.bag {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.4rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.session-content {
+    padding: 1.5rem;
+}
+
+.session-title {
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 0.75rem;
+    font-size: 1.25rem;
+    line-height: 1.3;
+}
+
+.session-description {
+    color: #4a5568;
+    margin-bottom: 1rem;
+    line-height: 1.5;
+}
+
+.session-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: #718096;
+    font-size: 0.875rem;
+}
+
+.session-actions {
+    padding: 1rem 1.5rem;
+    background: #f8f9fa;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* Styles pour la prévisualisation d'image dans les modals */
+.image-upload-section {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 10px;
+    border: 1px solid #dee2e6;
+}
+
+.image-preview {
+    position: relative;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    min-height: 200px;
+    max-height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: #ffffff;
+    margin-bottom: 1rem;
+}
+
+.image-preview img {
+    max-width: 100%;
+    max-height: 240px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.image-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+
+.image-placeholder {
+    text-align: center;
+    color: #6c757d;
+    padding: 2rem;
+}
+
+.image-placeholder i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+.image-placeholder p {
+    margin: 0;
+    font-weight: 500;
+}
+
+/* Styles pour les images dans les cartes MOOC (page d'accueil) */
+.card-img-top {
+    width: 100% !important;
+    height: 225px !important;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.3s ease;
+}
+
+.mooc:hover .card-img-top {
+    transform: scale(1.05);
+}
+
+/* Styles pour les images dans l'éditeur de contenu */
+.ql-editor img {
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 1rem auto;
+    display: block;
+}
+
+/* Styles responsive pour les images */
+@media (max-width: 1200px) {
+    .sessions-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+    
+    .session-image {
+        height: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sessions-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        padding: 0 1rem;
+    }
+    
+    .session-image {
+        height: 180px;
+    }
+    
+    .image-preview {
+        min-height: 150px;
+        max-height: 180px;
+    }
+    
+    .image-preview img {
+        max-height: 170px;
+    }
+    
+    .session-content {
+        padding: 1rem;
+    }
+    
+    .session-actions {
+        padding: 1rem;
+    }
+    
+    .session-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .sessions-grid {
+        padding: 0 0.5rem;
+    }
+    
+    .session-image {
+        height: 160px;
+    }
+    
+    .card-img-top {
+        height: 180px !important;
+    }
+    
+    .image-upload-section {
+        padding: 1rem;
+    }
+    
+    .image-preview {
+        min-height: 120px;
+        max-height: 150px;
+    }
+    
+    .image-preview img {
+        max-height: 140px;
+    }
+}
+
+/* Styles pour les images en mode sombre (si applicable) */
+@media (prefers-color-scheme: dark) {
+    .image-preview {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .image-placeholder {
+        color: #a0aec0;
+    }
+    
+    .session-image-placeholder {
+        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+        color: #a0aec0;
+    }
+}
+
+/* Animation de chargement pour les images */
+.image-loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Amélioration pour la gestion des erreurs d'images */
+.image-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.image-error i {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+/* États visuels pour les différents types d'images */
+.image-preview.has-image {
+    border-color: #28a745;
+    border-style: solid;
+}
+
+.image-preview.has-error {
+    border-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.image-preview.is-loading {
+    border-color: #007bff;
+    background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
 /*MQ tableau pour mobile */
 
 @media (max-width: 768px) {
@@ -914,3 +1260,38 @@
     width: 1rem;
     height: 1rem;
 }
+
+.image-preview {
+    position: relative;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+    .image-preview img {
+        max-width: 100%;
+        max-height: 200px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+.image-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.image-placeholder {
+    text-align: center;
+    color: #6c757d;
+}
+
+    .image-placeholder i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
