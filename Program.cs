@@ -97,6 +97,17 @@ namespace Mooc
             {
                 options.ExpireTimeSpan = TimeSpan.FromHours(2);
                 options.SlidingExpiration = true;
+                
+                // 🔧 CORRECTION du problème de redirection
+                options.LoginPath = "/compte/connexion";        // ✅ Route française
+                options.LogoutPath = "/Account/Logout";         // Garder l'existant
+                options.AccessDeniedPath = "/Account/AccessDenied"; // Vous devrez peut-être créer cette page
+                options.ReturnUrlParameter = "ReturnUrl";
+                
+                // Configuration de sécurité
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             });
 
             // Configuration des politiques
