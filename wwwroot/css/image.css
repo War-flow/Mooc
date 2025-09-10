@@ -1,0 +1,246 @@
+﻿.image-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+
+.image-placeholder {
+    text-align: center;
+    color: #6c757d;
+}
+
+.image-placeholder i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+}
+
+.image-preview {
+    position: relative;
+    border: 2px dashed #dee2e6;
+    border-radius: 8px;
+    min-height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background-color: #f8f9fa;
+}
+
+    .image-preview img {
+        max-width: 100%;
+        max-height: 200px;
+        object-fit: cover;
+        border-radius: 6px;
+    }
+
+/* Animation de chargement pour les images */
+.image-loading {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Amélioration pour la gestion des erreurs d'images */
+.image-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 1rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+    .image-error i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+/* États visuels pour les différents types d'images */
+.image-preview.has-image {
+    border-color: #28a745;
+    border-style: solid;
+}
+
+.image-preview.has-error {
+    border-color: #dc3545;
+    background-color: #f8d7da;
+}
+
+.image-preview.is-loading {
+    border-color: #007bff;
+    background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+/* Styles pour les images en mode sombre (si applicable) */
+@media (prefers-color-scheme: dark) {
+    .image-preview {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+
+    .image-placeholder {
+        color: #a0aec0;
+    }
+
+    .session-image-placeholder {
+        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+        color: #a0aec0;
+    }
+}
+
+/* Styles responsive pour les images */
+@media (max-width: 1200px) {
+    .sessions-grid {
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+    }
+
+    .session-image {
+        height: 200px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sessions-grid {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+        padding: 0 1rem;
+    }
+
+    .session-image {
+        height: 180px;
+    }
+
+    .image-preview {
+        min-height: 150px;
+        max-height: 180px;
+    }
+
+        .image-preview img {
+            max-height: 170px;
+        }
+
+    .session-content {
+        padding: 1rem;
+    }
+
+    .session-actions {
+        padding: 1rem;
+    }
+
+    .session-meta {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .sessions-grid {
+        padding: 0 0.5rem;
+    }
+
+    .session-image {
+        height: 160px;
+    }
+
+    .card-img-top {
+        height: 180px !important;
+    }
+
+    .image-upload-section {
+        padding: 1rem;
+    }
+
+    .image-preview {
+        min-height: 120px;
+        max-height: 150px;
+    }
+
+        .image-preview img {
+            max-height: 140px;
+        }
+}
+/* ========================================
+   STYLES POUR LE REDIMENSIONNEMENT AUTOMATIQUE DES IMAGES
+   ======================================== */
+
+/* Styles globaux pour toutes les images */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Styles spécifiques pour les sessions */
+.sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.session-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+    .session-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+.session-image {
+    position: relative;
+    width: 100%;
+    height: 220px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+    .session-image img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        transition: transform 0.3s ease;
+        border: none;
+        border-radius: 0;
+        display: block;
+    }
+
+.session-card:hover .session-image img {
+    transform: scale(1.05);
+}
+
+.session-image-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #6c757d;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+    .session-image-placeholder i {
+        font-size: 3rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.6;
+    }

@@ -129,7 +129,10 @@ namespace Mooc
 
             // Configuration des services additionnels
             builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection(EmailSettings.SectionName));
+
             
+
+
             // IMPORTANT: Enregistrer le service d'email AVANT d'autres services qui pourraient l'utiliser
             builder.Services.AddScoped<IEmailSender<ApplicationUser>, EmailSender>();
             
@@ -207,9 +210,20 @@ namespace Mooc
 
             // Ajouter HtmlAgilityPack pour la validation HTML
             builder.Services.AddScoped<IContentValidationService, ContentValidationService>();
-            
-            builder.Services.Configure<ContentValidationSettings>(
-                builder.Configuration.GetSection("ContentValidation"));
+
+            builder.Services.Configure<ContentValidationSettings>(options =>
+            {
+                // D'abord, appliquer les valeurs par défaut (déjà définies dans la classe)
+                // Puis surcharger avec les valeurs du fichier de configuration si elles existent
+                var configSection = builder.Configuration.GetSection("ContentValidation");
+                if (configSection.Exists())
+                {
+                    // Bind seulement les propriétés présentes dans le JSON
+                    configSection.Bind(options);
+
+                    // Les AllowedAttributes ne sont pas dans le JSON, donc les valeurs par défaut seront conservées
+                }
+            });
 
             builder.Services.AddHttpClient("ValidationClient", client =>
             {

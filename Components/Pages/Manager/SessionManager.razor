@@ -76,12 +76,11 @@
                                 </div>
                             }
                             <div class="session-status">
-                                <span class="bag @GetSessionStatusClass(session)">
-                                    <i class="bi @GetSessionStatusIcon(session)"></i>
-                                    @GetSessionStatusText(session)
+                                <span class="bage @GetSessionStatusClass(session)">
+                                    <i class="bi @GetSessionStatusIcon(session)"> </i> @GetSessionStatusText(session)
                                 </span>
 
-                                <span class="bag bg-secondary">
+                                <span class="bage bg-secondary">
                                     <i class="bi bi-people-fill text-info me-2"></i>
                                     @GetEnrolledCount(session.Id) inscrit@(GetEnrolledCount(session.Id) > 1 ? "s" : "")
                                     @if (IsCountUpdating(session.Id))
@@ -91,7 +90,7 @@
                                 </span>
 
                                 <!-- Badge cours -->
-                                <span class="bag @(GetPublishedCoursesCount(session.Id) > 0 ? "bg-info" : "bg-warning")">
+                                <span class="bage @(GetPublishedCoursesCount(session.Id) > 0 ? "bg-info" : "bg-warning")">
                                     <i class="bi bi-book me-1"></i>
                                     @GetPublishedCoursesCount(session.Id) cours@(GetPublishedCoursesCount(session.Id) > 1 ? "s" : "")
                                 </span>
@@ -493,13 +492,12 @@
         }
     }
 
-    // **SUPPRIMÉE** : Ancienne méthode LoadEnrolledCounts remplacée par LoadAllCountsOptimized
-    // **SUPPRIMÉE** : Ancienne méthode LoadPublishedCoursesCount remplacée par LoadAllCountsOptimized
-
     private async Task ToggleSessionStatus(int sessionId)
     {
         try
         {
+            var now = DateTime.Now;
+
             using var context = await DbContextFactory.CreateDbContextAsync();
             var session = await context.Sessions.Include(s => s.Courses).FirstOrDefaultAsync(s => s.Id == sessionId);
 
@@ -508,14 +506,21 @@
                 // Vérification : bloquer l'activation si aucun cours n'existe
                 if (!session.IsActive && (session.Courses == null || !session.Courses.Any()))
                 {
-                    errorMessage = "Impossible d'activer cette session : aucun cours n'a été créé. Veuillez d'abord ajouter des cours à cette session.";
+                    errorMessage = "Impossible de publier cette session : aucun cours n'a été créé. Veuillez d'abord ajouter des cours à cette session.";
                     return;
                 }
 
-                // Vérification supplémentaire : bloquer l'activation s'il n'y a pas de cours publiés
+                // Vérification : bloquer l'activation s'il n'y a pas de cours publiés
                 if (!session.IsActive && session.Courses != null && !session.Courses.Any(c => c.IsPublished))
                 {
-                    errorMessage = "Impossible d'activer cette session : aucun cours n'est publié. Veuillez publier au moins un cours avant d'activer la session.";
+                    errorMessage = "Impossible de publier  cette session : aucun cours n'est publié. Veuillez publier au moins un cours avant d'activer la session.";
+                    return;
+                }
+
+                // Vérification : Session terminé
+                if (session.EndDate < now)
+                {
+                    errorMessage = "Impossible de publier  cette session : la période de formation est expirée";
                     return;
                 }
 

@@ -56,12 +56,12 @@ namespace Mooc.Services
             ["u"] = new[] { "class", "style" },
             ["strike"] = new[] { "class", "style" },
             // Ajouter des balises pour les couleurs
-            ["h1"] = new[] { "class", "style" },
-            ["h2"] = new[] { "class", "style" },
-            ["h3"] = new[] { "class", "style" },
-            ["h4"] = new[] { "class", "style" },
-            ["h5"] = new[] { "class", "style" },
-            ["h6"] = new[] { "class", "style" }
+            ["h1"] = new[] { "class", "style", "align" },
+            ["h2"] = new[] { "class", "style", "align" },
+            ["h3"] = new[] { "class", "style", "align" },
+            ["h4"] = new[] { "class", "style", "align" },
+            ["h5"] = new[] { "class", "style", "align" },
+            ["h6"] = new[] { "class", "style", "align" }
         };
         
         public string[] AllowedProtocols { get; set; } = new[] { "http", "https", "mailto", "tel", "data" };
@@ -198,6 +198,7 @@ namespace Mooc.Services
             if (node.NodeType == HtmlNodeType.Element)
             {
                 var tagName = node.Name.ToLower();
+                              
                 if (!_settings.AllowedTags.Contains(tagName))
                 {
                     errors.Add($"Balise non autorisée: <{tagName}>");
@@ -206,12 +207,22 @@ namespace Mooc.Services
                 {
                     foreach (var attr in node.Attributes.ToList())
                     {
+                        var attrNameLower = attr.Name.ToLower();
                         // Autoriser les attributs data-* pour flexibilité
-                        if (!attr.Name.StartsWith("data-") && !allowedAttrs.Contains(attr.Name.ToLower()))
+                        if (!attrNameLower.StartsWith("data-") && !allowedAttrs.Contains(attrNameLower))
                         {
+                            // Ajouter une vérification de débogage
+                            _logger.LogDebug("Validation attribut: '{AttrName}' (minuscule: '{AttrNameLower}') sur <{TagName}>. Attributs autorisés: [{AllowedAttrs}]", 
+                                attr.Name, attrNameLower, tagName, string.Join(", ", allowedAttrs));
+                    
                             errors.Add($"Attribut non autorisé '{attr.Name}' sur <{tagName}>");
                         }
                     }
+                }
+                else
+                {
+                    // Si aucune configuration d'attribut trouvée pour cette balise, ajouter du débogage
+                    _logger.LogDebug("Aucune configuration d'attribut trouvée pour la balise <{TagName}>", tagName);
                 }
             }
 
@@ -890,211 +901,6 @@ namespace Mooc.Services
             }
         }
 
-        private void PreserveImportantElements(HtmlNode node)
-        {
-            // Préserver les conteneurs vidéo
-            var videoContainers = node.SelectNodes("//div[@data-video-element='true']");
-            if (videoContainers != null)
-            {
-                foreach (var container in videoContainers)
-                {
-                    container.SetAttributeValue("data-preserved", "true");
-                    container.SetAttributeValue("data-video-element", "true");
-                    
-                    var className = container.GetAttributeValue("class", "");
-                    if (!string.IsNullOrEmpty(className))
-                    {
-                        container.SetAttributeValue("class", className);
-                    }
-
-                    // Préserver les iframes vidéo à l'intérieur
-                    var iframes = container.SelectNodes(".//iframe");
-                    if (iframes != null)
-                    {
-                        foreach (var iframe in iframes)
-                        {
-                            iframe.SetAttributeValue("data-preserved", "true");
-                        }
-                    }
-
-                    // Préserver les balises video à l'intérieur
-                    var videos = container.SelectNodes(".//video");
-                    if (videos != null)
-                    {
-                        foreach (var video in videos)
-                        {
-                            video.SetAttributeValue("data-preserved", "true");
-                        }
-                    }
-                }
-            }
-
-            // Préserver les iframes vidéo standalone
-            var standaloneIframes = node.SelectNodes("//iframe[contains(@src, 'youtube.com') or contains(@src, 'vimeo.com') or contains(@src, 'dailymotion.com')]");
-            if (standaloneIframes != null)
-            {
-                foreach (var iframe in standaloneIframes)
-                {
-                    iframe.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les éléments de formatage de texte
-            var formattingElements = node.SelectNodes("//b | //i | //u | //strong | //em | //strike | //font | //blockquote");
-            if (formattingElements != null)
-            {
-                foreach (var element in formattingElements)
-                {
-                    element.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les liens
-            var links = node.SelectNodes("//a[@href]");
-            if (links != null)
-            {
-                foreach (var link in links)
-                {
-                    link.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les listes
-            var listElements = node.SelectNodes("//ul | //ol | //li");
-            if (listElements != null)
-            {
-                foreach (var element in listElements)
-                {
-                    element.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les tableaux
-            var tableElements = node.SelectNodes("//table | //thead | //tbody | //tr | //td | //th");
-            if (tableElements != null)
-            {
-                foreach (var element in tableElements)
-                {
-                    element.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les images
-            var images = node.SelectNodes("//img[@src]");
-            if (images != null)
-            {
-                foreach (var img in images)
-                {
-                    img.SetAttributeValue("data-preserved", "true");
-                }
-            }
-
-            // Préserver les éléments audio
-            var audioElements = node.SelectNodes("//audio");
-            if (audioElements != null)
-            {
-                foreach (var audio in audioElements)
-                {
-                    audio.SetAttributeValue("data-preserved", "true");
-                }
-            }
-        }
-
-        private void CleanAttributes(HtmlNode node)
-        {
-            if (node.NodeType == HtmlNodeType.Element)
-            {
-                var tagName = node.Name.ToLower();
-                var dangerousAttributes = new[] { 
-                    "onclick", "onload", "onerror", "onmouseover", "onmouseout", 
-                    "onfocus", "onblur", "onchange", "onsubmit", "onreset", "onselect", 
-                    "onkeydown", "onkeypress", "onkeyup", "onabort", "ondblclick",
-                    "onmousedown", "onmouseup", "onmousemove", "oncontextmenu"
-                };
-                
-                // Supprime uniquement les attributs dangereux
-                foreach (var attr in node.Attributes.ToList())
-                {
-                    var attrName = attr.Name.ToLower();
-                    
-                    // Supprimer les attributs de gestionnaire d'événements
-                    if (dangerousAttributes.Contains(attrName))
-                    {
-                        attr.Remove();
-                        continue;
-                    }
-                    
-                    // Supprimer les attributs avec des valeurs JavaScript
-                    if (attr.Value != null && 
-                        (attr.Value.ToLower().Contains("javascript:") || 
-                         attr.Value.ToLower().Contains("vbscript:") ||
-                         attr.Value.Contains("expression(")))
-                    {
-                        attr.Remove();
-                    }
-                }
-            }
-
-            foreach (var child in node.ChildNodes.ToList())
-            {
-                CleanAttributes(child);
-            }
-        }
-
-        private string CleanPlaceholders(string html)
-        {
-            // Utiliser des expressions régulières pour nettoyer plus efficacement
-            var patterns = new[]
-            {
-                @"<div[^>]*style=""[^""]*color:\s*#6c757d[^""]*""[^>]*>Commencez à écrire\.{0,3}</div>",
-                @"<div[^>]*class=""placeholder-text""[^>]*>[^<]*</div>",
-                @"<!--.*?-->", // Supprimer tous les commentaires HTML
-                @"\s*data-preserved=""true""" // Nettoyer l'attribut temporaire après traitement
-            };
-
-            foreach (var pattern in patterns)
-            {
-                html = Regex.Replace(html, pattern, "", RegexOptions.IgnoreCase);
-            }
-
-            return html.Trim();
-        }
-
-        private void ValidateHtmlNodes(HtmlNode node, List<string> errors)
-        {
-            if (node.NodeType == HtmlNodeType.Element)
-            {
-                var tagName = node.Name.ToLower();
-                if (!_settings.AllowedTags.Contains(tagName))
-                {
-                    errors.Add($"Balise non autorisée: <{tagName}>");
-                }
-                else if (_settings.AllowedAttributes.TryGetValue(tagName, out var allowedAttrs))
-                {
-                    foreach (var attr in node.Attributes.ToList())
-                    {
-                        if (!allowedAttrs.Contains(attr.Name.ToLower()))
-                        {
-                            errors.Add($"Attribut non autorisé '{attr.Name}' sur <{tagName}>");
-                        }
-                    }
-                }
-                else
-                {
-                    // Si la balise n'a pas d'attributs autorisés, aucun attribut ne doit être présent
-                    if (node.Attributes.Count > 0)
-                    {
-                        errors.Add($"Aucun attribut autorisé sur <{tagName}>");
-                    }
-                }
-            }
-
-            foreach (var child in node.ChildNodes)
-            {
-                ValidateHtmlNodes(child, errors);
-            }
-        }
-
         private async Task<bool> ValidateCsrfTokenAsync(string token)
         {
             // Implémentation basique - à améliorer selon vos besoins
@@ -1148,20 +954,6 @@ namespace Mooc.Services
             return false;
         }
 
-        private void NormalizeWhitespace(HtmlNode node)
-        {
-            if (node.NodeType == HtmlNodeType.Text)
-            {
-                // Remplacer plusieurs espaces par un seul espace
-                node.InnerHtml = Regex.Replace(node.InnerHtml, @"\s+", " ");
-            }
-
-            foreach (var child in node.ChildNodes)
-            {
-                NormalizeWhitespace(child);
-            }
-        }
-
         private bool IsAllowedVideoUrl(string url)
         {
             if (string.IsNullOrEmpty(url))
@@ -1211,36 +1003,6 @@ namespace Mooc.Services
             }
         }
 
-        // Améliorer la méthode IsVideoElement pour une meilleure détection
-        private bool IsVideoElement(HtmlNode node)
-        {
-            var tagName = node.Name.ToLower();
-            
-            // Vérifier les balises vidéo directes
-            if (tagName == "iframe" || tagName == "video" || tagName == "audio" || tagName == "source")
-                return true;
-            
-            // Vérifier les conteneurs vidéo
-            if (tagName == "div" && (
-                node.GetAttributeValue("data-video-element", "") == "true" ||
-                node.GetAttributeValue("class", "").Contains("video-container") ||
-                node.GetAttributeValue("class", "").Contains("video-wrapper")))
-                return true;
-                
-            // Vérifier les URLs de vidéo dans les attributs src
-            var src = node.GetAttributeValue("src", "");
-            if (!string.IsNullOrEmpty(src))
-            {
-                var videoHosts = new[] { 
-                    "youtube.com", "youtu.be", "vimeo.com", "dailymotion.com", 
-                    "player.vimeo.com", "www.youtube.com", "www.vimeo.com", 
-                    "www.dailymotion.com", "dai.ly", "m.youtube.com" 
-                };
-                return videoHosts.Any(host => src.Contains(host, StringComparison.OrdinalIgnoreCase));
-            }
-            
-            return false;
-        }
 
         private void PreserveColorFormatting(HtmlNode node)
         {
