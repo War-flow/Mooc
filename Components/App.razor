@@ -9,17 +9,24 @@
     <base href="/" />
     <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" >
-    
-    <link rel="stylesheet" href="@Assets["app.css"]" />
-    <link rel="stylesheet" href="@Assets["Mooc.styles.css"]" />
-    <link rel="stylesheet" href="@Assets["css/anime.css"]" />
-    <link rel="stylesheet" href="@Assets["css/quiz.css"]" />
-    <link rel="stylesheet" href="@Assets["css/view.css"]" />
-    <link rel="stylesheet" href="@Assets["css/editor.css"]" />
-    <link rel="stylesheet" href="@Assets["css/userView.css"]" />
-    <link rel="stylesheet" href="@Assets["css/sessionView.css"]" />
-    <link rel="stylesheet" href="@Assets["css/coursView.css"]" />
-    <link rel="stylesheet" href="@Assets["css/image.css"]" />
+
+        <!-- ... autres métadonnées ... -->
+        <link rel="stylesheet" href="@Assets["lib/bootstrap/dist/css/bootstrap.min.css"]" />
+        <link rel="stylesheet" href="@Assets["app.css"]" />
+        <link rel="stylesheet" href="@Assets["Mooc.styles.css"]" />
+
+        <!-- Placer vos CSS personnalisés APRÈS Bootstrap -->
+        <link rel="stylesheet" href="@Assets["css/anime.css"]" />
+        <link rel="stylesheet" href="@Assets["css/quiz.css"]" />
+        <link rel="stylesheet" href="@Assets["css/view.css"]" />
+        <link rel="stylesheet" href="@Assets["css/editor.css"]" />
+        <link rel="stylesheet" href="@Assets["css/userView.css"]" />
+        <link rel="stylesheet" href="@Assets["css/sessionView.css"]" />
+
+        <!-- CourView.css en DERNIER pour priorité maximum -->
+        <link rel="stylesheet" href="@Assets["css/courView.css"]" />
+        <link rel="stylesheet" href="@Assets["css/image.css"]" />
+
     <link rel="icon" type="image/png" href="27.png" />
     
     <!-- ✅ CSP CORRIGÉE pour Bootstrap Icons -->

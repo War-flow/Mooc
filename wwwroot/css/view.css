@@ -341,12 +341,13 @@
 
 /* Formulaires d'authentification - Version améliorée */
 .auth-container {
-    min-height: 100vh;
+    min-height: 95vh;
     display: flex;
     align-items: center;
     justify-content: center;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     padding: 20px;
+    border-radius: 15px;
 }
 
 .auth-card {

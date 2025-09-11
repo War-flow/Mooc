@@ -1,9 +1,11 @@
 ﻿@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Authorization
 @using Mooc.Services
 @inherits ErrorBoundary
 @inject IErrorHandlingService ErrorHandlingService
 @inject ILogger<GlobalErrorBoundary> Logger
 @inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 @if (CurrentException is null)
 {
@@ -20,15 +22,15 @@ else
             <p>L'application a rencontré une erreur technique. Nos équipes ont été automatiquement notifiées.</p>
             <hr>
             <div class="d-flex gap-2">
-                <button class="btn btn-primary" @onclick="NavigateToErrorPage">
+                <button class="btn btn-primary" @onclick="NavigateToErrorPage" disabled="@_isProcessing">
                     <i class="bi bi-info-circle me-1"></i>
                     Voir les détails
                 </button>
-                <button class="btn btn-outline-secondary" @onclick="RecoverFromError">
+                <button class="btn btn-outline-secondary" @onclick="RecoverFromError" disabled="@_isProcessing">
                     <i class="bi bi-arrow-clockwise me-1"></i>
                     Réessayer
                 </button>
-                <button class="btn btn-outline-primary" @onclick="GoHome">
+                <button class="btn btn-outline-primary" @onclick="GoHome" disabled="@_isProcessing">
                     <i class="bi bi-house me-1"></i>
                     Retour à l'accueil
                 </button>
@@ -43,109 +45,346 @@ else
     private int _errorCount = 0;
     private readonly TimeSpan _errorCooldown = TimeSpan.FromMinutes(1);
     private DateTime _lastErrorTime = DateTime.MinValue;
+    private readonly SemaphoreSlim _errorProcessingSemaphore = new(1, 1);
+    private bool _isProcessing = false;
+    private bool _hasRendered = false;
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _hasRendered = true;
+            StateHasChanged();
+        }
+        base.OnAfterRender(firstRender);
+    }
 
     protected override async Task OnErrorAsync(Exception exception)
     {
+        // Utiliser un semaphore pour éviter les conditions de course
+        await _errorProcessingSemaphore.WaitAsync();
+        
         try
         {
             _errorCount++;
-            _lastErrorTime = DateTime.Now;
+            _lastErrorTime = DateTime.UtcNow;
+
+            // Créer un identifiant unique pour cette erreur
+            var errorId = Guid.NewGuid();
+            var timestamp = DateTime.UtcNow;
+
+            // Récupérer les informations d'authentification de manière sécurisée
+            var userInfo = await GetUserInfoAsync();
+            var browserInfo = await GetBrowserInfoAsync();
 
             // Enrichir les informations d'erreur
             var errorContext = new
             {
-                ErrorId = Guid.NewGuid(),
-                Timestamp = DateTime.UtcNow,
-                UserAgent = await GetUserAgent(),
+                ErrorId = errorId,
+                Timestamp = timestamp,
+                UserAgent = browserInfo.UserAgent,
                 Url = NavigationManager.Uri,
-                UserId = await GetCurrentUserId(),
+                UserId = userInfo.UserId,
+                UserEmail = userInfo.UserEmail,
+                IsAuthenticated = userInfo.IsAuthenticated,
                 ErrorCount = _errorCount,
                 ExceptionType = exception.GetType().Name,
                 Message = exception.Message,
-                StackTrace = exception.StackTrace
+                StackTrace = exception.StackTrace,
+                InnerException = exception.InnerException?.Message,
+                ViewportSize = browserInfo.ViewportSize,
+                ConnectionType = browserInfo.ConnectionType
             };
 
-            // Log structuré
+            // Log structuré avec plus de détails
             Logger.LogError(exception, 
-                "ErrorBoundary captured exception {ErrorId}. Count: {ErrorCount}, Type: {ExceptionType}, Message: {Message}, Context: {@ErrorContext}",
-                errorContext.ErrorId, _errorCount, exception.GetType().Name, exception.Message, errorContext);
+                "ErrorBoundary captured exception {ErrorId}. User: {UserId} ({UserEmail}), Count: {ErrorCount}, Type: {ExceptionType}, URL: {Url}, Context: {@ErrorContext}",
+                errorId, userInfo.UserId, userInfo.UserEmail, _errorCount, exception.GetType().Name, NavigationManager.Uri, errorContext);
 
-            // Notification côté client pour le debugging
-            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development")
+            // Utiliser le service d'erreur existant pour une gestion centralisée
+            await ErrorHandlingService.LogErrorAsync(exception, "ErrorBoundary", new Dictionary<string, object>
             {
-                await JSRuntime.InvokeVoidAsync("console.error", "ErrorBoundary Exception:", exception.ToString());
+                ["ErrorId"] = errorId,
+                ["ErrorCount"] = _errorCount,
+                ["UserContext"] = userInfo,
+                ["BrowserContext"] = browserInfo
+            });
+
+            // Notifications pour les erreurs critiques
+            if (_errorCount >= 3 || IsCriticalException(exception))
+            {
+                await ErrorHandlingService.NotifyAdministratorsAsync(exception, errorId.ToString());
             }
 
-            await Task.CompletedTask;
+            // Notification côté client améliorée - seulement après le rendu
+            if (Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development" && _hasRendered)
+            {
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("console.group", $"ErrorBoundary Exception #{_errorCount}");
+                    await JSRuntime.InvokeVoidAsync("console.error", "Exception:", exception.ToString());
+                    await JSRuntime.InvokeVoidAsync("console.info", "Context:", errorContext);
+                    await JSRuntime.InvokeVoidAsync("console.groupEnd");
+                }
+                catch (InvalidOperationException)
+                {
+                    // Ignore les erreurs JS pendant le prerendering
+                }
+            }
         }
         catch (Exception loggingException)
         {
             // Fallback si même le logging échoue
             Console.WriteLine($"Critical error in ErrorBoundary logging: {loggingException}");
+            
+            // Log minimal en cas d'échec
+            try
+            {
+                Logger.LogCritical(loggingException, "Failed to log original exception in ErrorBoundary. Original: {OriginalException}", exception.Message);
+            }
+            catch
+            {
+                // Dernier recours
+                Console.WriteLine($"Complete logging failure. Original: {exception.Message}, Logging: {loggingException.Message}");
+            }
+        }
+        finally
+        {
+            _errorProcessingSemaphore.Release();
         }
     }
 
-    private void NavigateToErrorPage()
+    private async Task NavigateToErrorPage()
     {
+        if (_isProcessing) return;
+        _isProcessing = true;
+        StateHasChanged();
+
         try
         {
+            // Attendre un peu pour s'assurer que le composant est rendu
+            await Task.Delay(50);
+            
             ErrorHandlingService.NavigateToError(CurrentException!, "Erreur capturée par le système de gestion d'erreurs");
         }
-        catch
+        catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed to navigate to error page via ErrorHandlingService");
+            
             // Fallback si le service échoue
-            NavigationManager.NavigateTo("/Error", true);
+            try
+            {
+                NavigationManager.NavigateTo("/Error", true);
+            }
+            catch (Exception navEx)
+            {
+                Logger.LogCritical(navEx, "Complete navigation failure in ErrorBoundary");
+                
+                // Fallback JS seulement si le composant est rendu
+                if (_hasRendered)
+                {
+                    try
+                    {
+                        await JSRuntime.InvokeVoidAsync("window.location.reload");
+                    }
+                    catch
+                    {
+                        // Reload via NavigationManager comme dernier recours
+                        NavigationManager.Refresh(true);
+                    }
+                }
+                else
+                {
+                    NavigationManager.Refresh(true);
+                }
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
         }
     }
 
-    private new void RecoverFromError()
+    private async Task RecoverFromError()
     {
+        if (_isProcessing) return;
+        _isProcessing = true;
+        StateHasChanged();
+
         try
         {
+            // Attendre un peu pour s'assurer que le composant est rendu
+            await Task.Delay(50);
+            
             // Vérifier si on peut récupérer (éviter les boucles infinies)
-            if (_errorCount > 3 || (DateTime.Now - _lastErrorTime) < _errorCooldown)
+            if (_errorCount > 3 || (DateTime.UtcNow - _lastErrorTime) < _errorCooldown)
             {
-                // Trop d'erreurs récentes, rediriger vers la page d'erreur
-                NavigateToErrorPage();
+                Logger.LogWarning("Too many errors or cooldown period active. Redirecting to error page. Count: {ErrorCount}", _errorCount);
+                await NavigateToErrorPage();
                 return;
             }
 
+            Logger.LogInformation("Attempting to recover from error. Count: {ErrorCount}", _errorCount);
+            
             // Réinitialiser l'ErrorBoundary
-            base.Recover();
+            Recover();
         }
-        catch
+        catch (Exception ex)
         {
-            GoHome();
+            Logger.LogError(ex, "Failed to recover from error");
+            await GoHome();
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
         }
     }
 
-    private void GoHome()
+    private async Task GoHome()
     {
-        NavigationManager.NavigateTo("/", true);
+        if (_isProcessing) return;
+        _isProcessing = true;
+        StateHasChanged();
+
+        try
+        {
+            // Attendre un peu pour s'assurer que le composant est rendu
+            await Task.Delay(50);
+            
+            Logger.LogInformation("Navigating to home page due to error recovery");
+            NavigationManager.NavigateTo("", true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogCritical(ex, "Failed to navigate to home page");
+            
+            // Fallback JS seulement si le composant est rendu
+            if (_hasRendered)
+            {
+                try
+                {
+                    await JSRuntime.InvokeVoidAsync("window.location.reload");
+                }
+                catch
+                {
+                    // Reload via NavigationManager comme dernier recours
+                    NavigationManager.Refresh(true);
+                }
+            }
+            else
+            {
+                NavigationManager.Refresh(true);
+            }
+        }
+        finally
+        {
+            _isProcessing = false;
+            StateHasChanged();
+        }
     }
 
-    private async Task<string> GetUserAgent()
+    // Méthode améliorée pour récupérer les informations utilisateur
+    private async Task<UserInfo> GetUserInfoAsync()
     {
         try
         {
-            return await JSRuntime.InvokeAsync<string>("eval", "navigator.userAgent");
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            
+            if (authState?.User?.Identity?.IsAuthenticated == true)
+            {
+                return new UserInfo
+                {
+                    UserId = authState.User.FindFirst("sub")?.Value 
+                           ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+                           ?? "Unknown",
+                    UserEmail = authState.User.FindFirst("email")?.Value 
+                              ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value
+                              ?? "Unknown",
+                    IsAuthenticated = true
+                };
+            }
+            
+            return new UserInfo { UserId = "Anonymous", UserEmail = "Anonymous", IsAuthenticated = false };
         }
-        catch
+        catch (Exception ex)
         {
-            return "Unknown";
+            Logger.LogWarning(ex, "Failed to get user information");
+            return new UserInfo { UserId = "Error", UserEmail = "Error", IsAuthenticated = false };
         }
     }
 
-    private async Task<string> GetCurrentUserId()
+    // Nouvelle méthode pour récupérer les informations du navigateur
+    private async Task<BrowserInfo> GetBrowserInfoAsync()
     {
+        // Ne pas essayer d'appeler JS pendant le prerendering
+        if (!_hasRendered)
+        {
+            return new BrowserInfo 
+            { 
+                UserAgent = "Prerendering", 
+                ViewportSize = "Prerendering", 
+                ConnectionType = "Prerendering" 
+            };
+        }
+
         try
         {
-            // Récupérer l'ID utilisateur depuis le contexte d'authentification
-            return await JSRuntime.InvokeAsync<string>("eval", "window.userId || 'Anonymous'");
+            var userAgent = await JSRuntime.InvokeAsync<string>("eval", "navigator.userAgent || 'Unknown'");
+            var viewportSize = await JSRuntime.InvokeAsync<string>("eval", 
+                "`${window.innerWidth}x${window.innerHeight}`");
+            var connectionType = await JSRuntime.InvokeAsync<string>("eval", 
+                "navigator.connection?.effectiveType || 'Unknown'");
+
+            return new BrowserInfo
+            {
+                UserAgent = userAgent,
+                ViewportSize = viewportSize,
+                ConnectionType = connectionType
+            };
         }
-        catch
+        catch (Exception ex)
         {
-            return "Unknown";
+            Logger.LogWarning(ex, "Failed to get browser information");
+            return new BrowserInfo 
+            { 
+                UserAgent = "Unknown", 
+                ViewportSize = "Unknown", 
+                ConnectionType = "Unknown" 
+            };
         }
+    }
+
+    // Méthode pour identifier les exceptions critiques
+    private static bool IsCriticalException(Exception exception)
+    {
+        return exception is OutOfMemoryException
+            || exception is StackOverflowException
+            || exception is AccessViolationException
+            || exception is System.Security.SecurityException
+            || (exception is InvalidOperationException invalidOpEx && invalidOpEx.Message.Contains("circuit"))
+            || exception.GetType().Name == "JSException";
+    }
+
+    // Classes pour structurer les données
+    private record UserInfo
+    {
+        public string UserId { get; init; } = string.Empty;
+        public string UserEmail { get; init; } = string.Empty;
+        public bool IsAuthenticated { get; init; }
+    }
+
+    private record BrowserInfo
+    {
+        public string UserAgent { get; init; } = string.Empty;
+        public string ViewportSize { get; init; } = string.Empty;
+        public string ConnectionType { get; init; } = string.Empty;
+    }
+
+    // Nettoyage des ressources
+    public void Dispose()
+    {
+        _errorProcessingSemaphore?.Dispose();
     }
 }

@@ -22,13 +22,13 @@
                 <ValidationSummary class="text-danger validation-summary" role="alert" />
                 
                 <div class="form-floating">
-                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="Votre email" />
+                    <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true"/>
                     <label for="Input.Email">Email</label>
                     <ValidationMessage For="() => Input.Email" class="text-danger" />
                 </div>
                 
                 <div class="form-floating">
-                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="Votre mot de passe" />
+                    <InputText type="password" @bind-Value="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true"/>
                     <label for="Input.Password">Mot de passe</label>
                     <ValidationMessage For="() => Input.Password" class="text-danger" />
                 </div>
