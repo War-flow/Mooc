@@ -81,6 +81,19 @@ namespace Mooc.Services
             await SendEmailWithRetryAsync(email, subject, htmlMessage);
         }
 
+        public async Task SendRegistrationConfirmationAsync(ApplicationUser user, string sessionTitle)
+        {
+            var subject = "✅ Inscription confirmée - " + sessionTitle;
+            var htmlMessage = BuildRegistrationConfirmationTemplate(
+                "Inscription confirmée",
+                $"Bonjour {user.FirstName ?? user.UserName},",
+                $"Félicitations ! Votre inscription à la session '{sessionTitle}' a été confirmée avec succès.",
+                sessionTitle
+            );
+
+            await SendEmailWithRetryAsync(user.Email, subject, htmlMessage);
+        }
+
         private async Task SendEmailWithRetryAsync(string email, string subject, string htmlMessage)
         {
             var attempt = 0;
@@ -208,6 +221,35 @@ namespace Mooc.Services
                         <p style='margin-top: 25px; font-size: 14px; color: #666;'>{footer}</p>
                         <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
                         <p style='font-size: 12px; color: #999; text-align: center;'>Cordialement,<br>L'équipe MOOC Platform</p>
+                    </div>
+                </body>
+                </html>";
+        }
+
+        private string BuildRegistrationConfirmationTemplate(string title, string greeting, string message, string sessionTitle)
+        {
+            return $@"
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset='utf-8'>
+                    <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+                    <title>{title}</title>
+                </head>
+                <body style='font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;'>
+                    <div style='background-color: #f8f9fa; padding: 30px; border-radius: 10px;'>
+                        <h2 style='color: #28a745; margin-bottom: 20px;'>🎉 {title}</h2>
+                        <p style='margin-bottom: 15px;'>{greeting}</p>
+                        <p style='margin-bottom: 25px;'>{message}</p>
+                        <div style='background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 20px 0;'>
+                            <h4 style='color: #155724; margin: 0 0 10px 0;'>📚 Session : {sessionTitle}</h4>
+                            <p style='color: #155724; margin: 0;'>Votre place est maintenant réservée !</p>
+                        </div>
+                        <p style='margin-top: 25px; font-size: 14px; color: #666;'>
+                            Connectez-vous à votre compte pour accéder aux détails de la session.
+                        </p>
+                        <hr style='border: none; border-top: 1px solid #eee; margin: 20px 0;'>
+                        <p style='font-size: 12px; color: #999; text-align: center;'>Cordialement,<br/>L'équipe MOOC Platform</p>
                     </div>
                 </body>
                 </html>";

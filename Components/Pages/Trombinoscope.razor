@@ -124,35 +124,44 @@
     private async Task LoadTeamMembers()
     {
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
-        var allUsers = await dbContext.Users.ToListAsync();
+        
+        // Récupérer les utilisateurs avec leurs rôles en une seule requête
+        var usersWithRoles = await dbContext.Users
+            .Join(dbContext.UserRoles, u => u.Id, ur => ur.UserId, (u, ur) => new { User = u, ur.RoleId })
+            .Join(dbContext.Roles, x => x.RoleId, r => r.Id, (x, r) => new { x.User, RoleName = r.Name })
+            .Where(x => x.RoleName == "Admin" || x.RoleName == "Formateur")
+            .ToListAsync();
 
         teamMembers = new List<ApplicationUser>();
         userRoles.Clear();
+        adminCount = 0;
+        formateurCount = 0;
 
-        foreach (var user in allUsers)
+        // Grouper les utilisateurs par ID pour gérer les utilisateurs avec plusieurs rôles
+        var userGroups = usersWithRoles.GroupBy(x => x.User.Id);
+
+        foreach (var userGroup in userGroups)
         {
-            if (user.Id == null) continue;
+            var user = userGroup.First().User;
+            var roles = userGroup.Select(x => x.RoleName).ToList();
 
-            bool isFormateur = await UserManagerService.IsInRoleAsync(user, "Formateur");
-            bool isAdmin = await UserManagerService.IsInRoleAsync(user, "Admin");
+            teamMembers.Add(user);
 
-            // Inclure seulement les formateurs et administrateurs dans le trombinoscope
-            if (isFormateur || isAdmin)
+            // Prioriser Admin sur Formateur si l'utilisateur a les deux rôles
+            if (roles.Contains("Admin"))
             {
-                teamMembers.Add(user);
-
-                if (isAdmin)
-                {
-                    userRoles[user.Id] = "Admin";
-                    adminCount++;
-                }
-                else if (isFormateur)
-                {
-                    userRoles[user.Id] = "Formateur";
-                    formateurCount++;
-                }
+                userRoles[user.Id] = "Admin";
+                adminCount++;
+            }
+            else if (roles.Contains("Formateur"))
+            {
+                userRoles[user.Id] = "Formateur";
+                formateurCount++;
             }
         }
+
+        // Mettre à jour la liste filtrée
+        filteredMembers = teamMembers.ToList();
     }
 
     private string GetUserRole(ApplicationUser user)

@@ -11,20 +11,32 @@ namespace Mooc.Services
 
     public class UserNavigationService : IUserNavigationService
     {
-        private readonly UserManager<ApplicationUser> _userManager;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public UserNavigationService(UserManager<ApplicationUser> userManager)
+        public UserNavigationService(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _userManager = userManager;
+            _contextFactory = contextFactory;
         }
 
         public async Task<(ApplicationUser? user, string? role)> GetUserDataAsync(string userName)
         {
-            var user = await _userManager.FindByNameAsync(userName);
+            using var context = _contextFactory.CreateDbContext();
+            
+            // Utiliser directement Entity Framework au lieu de UserManager
+            var user = await context.Users
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.UserName == userName);
+                
             if (user == null) return (null, null);
 
-            var roles = await _userManager.GetRolesAsync(user);
-            var primaryRole = GetPrimaryRole(roles);
+            // Récupérer les rôles directement via EF
+            var userRoles = await context.UserRoles
+                .AsNoTracking()
+                .Where(ur => ur.UserId == user.Id)
+                .Join(context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name)
+                .ToListAsync();
+
+            var primaryRole = GetPrimaryRole(userRoles);
 
             return (user, primaryRole);
         }

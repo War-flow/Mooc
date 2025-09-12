@@ -6,9 +6,11 @@ namespace Mooc.Data
     public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
     {
         public DbSet<Session> Sessions { get; set; } = null!;
-        public DbSet<Cours> Courses { get; set; }
+        public DbSet<Cours> Courses { get; set; } = null!;
         public DbSet<CourseProgress> CourseProgresses { get; set; } = null!;
-        public DbSet<Certificate> Certificates { get; set; }
+        public DbSet<Certificate> Certificates { get; set; } = null!;
+        public DbSet<PreRegistration> PreRegistrations { get; set; } = null!; // NOUVEAU
+        public DbSet<EnrollmentHistory> EnrollmentHistories { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -142,6 +144,76 @@ namespace Mooc.Data
                       .WithMany()
                       .HasForeignKey(cp => cp.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            // Configuration pour PreRegistration - CONFIGURATION COMPLÈTE
+            builder.Entity<PreRegistration>(entity =>
+            {
+                entity.ToTable("PreRegistrations");
+                
+                entity.Property(e => e.UserId)
+                      .IsRequired()
+                      .HasColumnType("varchar")
+                      .HasMaxLength(450); // Taille standard pour les ID d'Identity
+
+                entity.Property(e => e.SessionId)
+                      .IsRequired()
+                      .HasColumnType("int");
+
+                entity.Property(e => e.PreRegistrationDate)
+                      .IsRequired()
+                      .HasColumnType("timestamp with time zone")
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                entity.Property(e => e.Status)
+                      .IsRequired()
+                      .HasColumnType("varchar")
+                      .HasMaxLength(50)
+                      .HasDefaultValue("Active");
+
+                entity.Property(e => e.NotificationSent)
+                      .HasColumnType("timestamp with time zone");
+
+                entity.Property(e => e.Notes)
+                      .HasColumnType("text");
+
+                entity.Property(e => e.Priority)
+                      .HasColumnType("int")
+                      .HasDefaultValue(0);
+
+                // Relations
+                entity.HasOne(pr => pr.User)
+                      .WithMany()
+                      .HasForeignKey(pr => pr.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(pr => pr.Session)
+                      .WithMany()
+                      .HasForeignKey(pr => pr.SessionId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Index unique sur UserId + SessionId
+                entity.HasIndex(pr => new { pr.UserId, pr.SessionId })
+                      .IsUnique()
+                      .HasDatabaseName("IX_PreRegistrations_UserId_SessionId");
+
+                // Index sur SessionId pour les requêtes
+                entity.HasIndex(pr => pr.SessionId)
+                      .HasDatabaseName("IX_PreRegistrations_SessionId");
+
+                // Index sur Status pour les requêtes filtrées
+                entity.HasIndex(pr => pr.Status)
+                      .HasDatabaseName("IX_PreRegistrations_Status");
+            });
+
+            // Configuration pour EnrollmentHistory
+            builder.Entity<EnrollmentHistory>(entity =>
+            {
+                entity.HasIndex(e => new { e.UserId, e.SessionId, e.Date })
+                      .HasDatabaseName("IX_EnrollmentHistory_User_Session_Date");
+                      
+                entity.HasIndex(e => e.Date)
+                      .HasDatabaseName("IX_EnrollmentHistory_Date");
             });
         }
     }

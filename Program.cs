@@ -52,6 +52,9 @@ namespace Mooc
             // Ajoutez cette ligne dans votre Program.cs avec les autres services
             builder.Services.AddScoped<ISessionCompletionService, SessionCompletionService>();
 
+            // Ajouter cette ligne avec les autres services
+            builder.Services.AddScoped<IPreRegistrationService, PreRegistrationService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>
@@ -195,6 +198,7 @@ namespace Mooc
             // Configuration des notifications
             builder.Services.AddScoped<INotificationService, NotificationService>();
             builder.Services.AddHostedService<SessionExpiryService>();
+            builder.Services.AddHostedService<PreRegistrationNotificationService>(); // Ajout du service PreRegistrationNotificationService
 
             // Ajout des services SignalR
             builder.Services.AddSignalR(options =>

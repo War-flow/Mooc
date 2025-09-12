@@ -1,0 +1,198 @@
+@using Mooc.Services
+@inject IEnrollmentService EnrollmentService
+@inject IJSRuntime JSRuntime
+
+<div class="enrollment-manager">
+    @if (IsEnrolled)
+    {
+        <div class="d-flex gap-2">
+            <a href="/session/@SessionId" class="btn btn-success flex-fill">
+                <i class="bi bi-play-circle me-2"></i>
+                @(IsCompleted ? "Revoir" : "Continuer")
+            </a>
+            
+            @if (CanUnsubscribe)
+            {
+                <button class="btn btn-outline-danger" @onclick="ShowUnsubscribeDialog" disabled="@IsProcessing">
+                    <i class="bi bi-x-circle me-2"></i>
+                    Se désinscrire
+                </button>
+            }
+        </div>
+    }
+    else
+    {
+        @if (CanReEnroll)
+        {
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>
+                Vous vous étiez désinscrit de cette session. Vous pouvez vous réinscrire.
+            </div>
+        }
+        
+        <button class="btn btn-primary w-100" @onclick="EnrollUser" disabled="@IsProcessing">
+            @if (IsProcessing)
+            {
+                <span class="spinner-border spinner-border-sm me-2"></span>
+                <span>Traitement...</span>
+            }
+            else
+            {
+                <i class="bi bi-plus-circle me-2"></i>
+                <span>@(CanReEnroll ? "Se réinscrire" : "S'inscrire")</span>
+            }
+        </button>
+    }
+</div>
+
+@if (ShowUnsubscribeModal)
+{
+    <div class="modal fade show" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                        Confirmer la désinscription
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="HideUnsubscribeDialog"></button>
+                </div>
+                <div class="modal-body">
+                    @if (UnsubscribeRestrictions.Any())
+                    {
+                        <div class="alert alert-warning">
+                            <h6><i class="bi bi-exclamation-triangle me-2"></i>Avertissements :</h6>
+                            <ul class="mb-0">
+                                @foreach (var restriction in UnsubscribeRestrictions.Where(r => !r.IsBlocking))
+                                {
+                                    <li>@restriction.Message</li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                    
+                    <p>Êtes-vous sûr de vouloir vous désinscrire de cette session ?</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="HideUnsubscribeDialog">
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-danger" @onclick="ConfirmUnsubscribe" disabled="@IsProcessing">
+                        @if (IsProcessing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2"></span>
+                        }
+                        Confirmer la désinscription
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int SessionId { get; set; }
+    [Parameter] public string UserId { get; set; } = string.Empty;
+    [Parameter] public bool IsEnrolled { get; set; }
+    [Parameter] public bool IsCompleted { get; set; }
+    [Parameter] public EventCallback OnEnrollmentChanged { get; set; }
+
+    private bool IsProcessing = false;
+    private bool ShowUnsubscribeModal = false;
+    private bool CanUnsubscribe = true;
+    private bool CanReEnroll = false;
+    private List<UnsubscribeRestriction> UnsubscribeRestrictions = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckReEnrollmentEligibility();
+        await LoadUnsubscribeRestrictions();
+    }
+
+    private async Task CheckReEnrollmentEligibility()
+    {
+        if (!IsEnrolled && !string.IsNullOrEmpty(UserId))
+        {
+            CanReEnroll = await EnrollmentService.CanUserReEnrollAsync(UserId, SessionId);
+        }
+    }
+
+    private async Task LoadUnsubscribeRestrictions()
+    {
+        if (IsEnrolled && !string.IsNullOrEmpty(UserId))
+        {
+            UnsubscribeRestrictions = await EnrollmentService.GetUnsubscribeRestrictionsAsync(UserId, SessionId);
+            CanUnsubscribe = !UnsubscribeRestrictions.Any(r => r.IsBlocking);
+        }
+    }
+
+    private async Task EnrollUser()
+    {
+        if (IsProcessing || string.IsNullOrEmpty(UserId)) return;
+
+        IsProcessing = true;
+        try
+        {
+            var result = await EnrollmentService.EnrollUserAsync(UserId, SessionId);
+            
+            if (result.IsSuccess)
+            {
+                await JSRuntime.InvokeVoidAsync("showToast", "Succès", result.Message, "success");
+                await OnEnrollmentChanged.InvokeAsync();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("showToast", "Erreur", result.Message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("showToast", "Erreur", $"Erreur technique : {ex.Message}", "error");
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private async Task ShowUnsubscribeDialog()
+    {
+        await LoadUnsubscribeRestrictions();
+        ShowUnsubscribeModal = true;
+    }
+
+    private void HideUnsubscribeDialog()
+    {
+        ShowUnsubscribeModal = false;
+    }
+
+    private async Task ConfirmUnsubscribe()
+    {
+        if (IsProcessing || string.IsNullOrEmpty(UserId)) return;
+
+        IsProcessing = true;
+        try
+        {
+            var result = await EnrollmentService.UnsubscribeUserAsync(UserId, SessionId);
+            
+            if (result.IsSuccess)
+            {
+                await JSRuntime.InvokeVoidAsync("showToast", "Succès", result.Message, "success");
+                ShowUnsubscribeModal = false;
+                await OnEnrollmentChanged.InvokeAsync();
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("showToast", "Erreur", result.Message, "error");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JSRuntime.InvokeVoidAsync("showToast", "Erreur", $"Erreur technique : {ex.Message}", "error");
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+}

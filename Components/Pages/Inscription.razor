@@ -5,10 +5,12 @@
 @using Microsoft.AspNetCore.Identity
 @using Mooc.Data
 @using Microsoft.EntityFrameworkCore
+@using Mooc.Services
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject UserManager<ApplicationUser> UserManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject NavigationManager NavigationManager
+@inject IPreRegistrationService PreRegistrationService
 @attribute [Authorize(Policy = "VoirCours")]
 
 <PageTitle>Inscription à la session</PageTitle>
@@ -21,7 +23,18 @@
             <div class="row">
                 <div class="col-12 text-center">
                     <h1 class="page-title">
-                        Inscription à la session
+                        @if (IsSessionAvailable())
+                        {
+                            <text>Inscription à la session</text>
+                        }
+                        else if (DateTime.Now < session.StartDate)
+                        {
+                            <text>Préinscription à la session</text>
+                        }
+                        else
+                        {
+                            <text>Session terminée</text>
+                        }
                     </h1>
                 </div>
             </div>
@@ -47,9 +60,16 @@
                                     }
                                     else if (DateTime.Now < session.StartDate)
                                     {
-                                        <span class="badge bg-warning mx-2">
-                                            <i class="bi bi-clock-fill me-1"> Bientôt disponible</i>
+                                        <span class="badge bg-info mx-2">
+                                            <i class="bi bi-bell-fill me-1"> Préinscription disponible</i>
                                         </span>
+                                        @if (preRegistrationCount > 0)
+                                        {
+                                            <span class="badge bg-warning text-dark mx-2">
+                                                <i class="bi bi-people-fill me-1"></i>
+                                                @preRegistrationCount préinscrit@(preRegistrationCount > 1 ? "s" : "")
+                                            </span>
+                                        }
                                     }
                                     else
                                     {
@@ -108,26 +128,42 @@
                         </div>
                         
                         <!-- Messages d'état avec animations -->
-                        @if (!IsSessionAvailable())
+                        @if (DateTime.Now < session.StartDate)
+                        {
+                            @if (isPreRegistered)
+                            {
+                                <div class="alert alert-info alert-modern fade show">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-bell-fill fs-4 me-3 text-info"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Préinscription confirmée !</h6>
+                                            <p class="mb-0">Vous serez automatiquement inscrit lorsque la session ouvrira le <strong>@session.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>. Vous recevrez une notification par email.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                            else if (!isAlreadyEnrolled)
+                            {
+                                <div class="alert alert-warning alert-modern fade show">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-info-circle fs-4 me-3 text-warning"></i>
+                                        <div>
+                                            <h6 class="alert-heading mb-1">Session pas encore ouverte</h6>
+                                            <p class="mb-0">Les inscriptions ouvriront le <strong>@session.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>. Vous pouvez vous préinscrire dès maintenant pour être notifié.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else if (DateTime.Now > session.EndDate)
                         {
                             <div class="alert alert-warning alert-modern fade show">
                                 <div class="d-flex align-items-center">
-                                    @if (DateTime.Now < session.StartDate)
-                                    {
-                                        <i class="bi bi-clock-history fs-4 me-3 text-warning"></i>
-                                        <div>
-                                            <h6 class="alert-heading mb-1">Session pas encore ouverte</h6>
-                                            <p class="mb-0">Les inscriptions ouvriront le <strong>@session.StartDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>.</p>
-                                        </div>
-                                    }
-                                    else if (DateTime.Now > session.EndDate)
-                                    {
-                                        <i class="bi bi-calendar-x fs-4 me-3 text-warning"></i>
-                                        <div>
-                                            <h6 class="alert-heading mb-1">Session terminée</h6>
-                                            <p class="mb-0">Cette session s'est terminée le <strong>@session.EndDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>.</p>
-                                        </div>
-                                    }
+                                    <i class="bi bi-calendar-x fs-4 me-3 text-warning"></i>
+                                    <div>
+                                        <h6 class="alert-heading mb-1">Session terminée</h6>
+                                        <p class="mb-0">Cette session s'est terminée le <strong>@session.EndDate.ToString("dd MMMM yyyy", new System.Globalization.CultureInfo("fr-FR"))</strong>.</p>
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -194,6 +230,49 @@
                                 </a>
                             </div>
                         }
+                        else if (DateTime.Now < session.StartDate)
+                        {
+                            @if (isPreRegistered)
+                            {
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-warning btn-lg" @onclick="CancelPreRegistration" disabled="@isProcessing">
+                                        @if (isProcessing)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Traitement...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-bell-slash me-2"></i>
+                                            <span>Annuler la préinscription</span>
+                                        }
+                                    </button>
+                                    <a href="/" class="btn btn-outline-secondary fs-4" title="Retour à l'accueil">
+                                        <i class="bi bi-arrow-left"></i>
+                                    </a>
+                                </div>
+                            }
+                            else
+                            {
+                                <div class="btn-group w-100" role="group">
+                                    <button class="btn btn-info btn-lg" @onclick="PreRegisterToSession" disabled="@isProcessing">
+                                        @if (isProcessing)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2"></span>
+                                            <span>Préinscription en cours...</span>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-bell-fill me-2"></i>
+                                            <span>Me préinscrire</span>
+                                        }
+                                    </button>
+                                    <a href="/" class="btn btn-outline-secondary fs-4" title="Retour à l'accueil">
+                                        <i class="bi bi-arrow-left"></i>
+                                    </a>
+                                </div>
+                            }
+                        }
                         else
                         {
                             <div class="btn-group w-100" role="group">
@@ -240,12 +319,14 @@ else
 
     private Session? session;
     private bool isAlreadyEnrolled = false;
+    private bool isPreRegistered = false;
     private bool isLoading = true;
     private bool isProcessing = false;
     private bool showError = false;
     private string errorMessage = string.Empty;
     private string? currentUserId;
     private int currentEnrolledCount = 0;
+    private int preRegistrationCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -256,7 +337,9 @@ else
             await using var context = await DbContextFactory.CreateDbContextAsync();
             await LoadSession(context);
             await CheckEnrollmentStatus(context);
+            await CheckPreRegistrationStatus();
             await LoadEnrolledCount(context);
+            await LoadPreRegistrationCount();
         }
         catch (Exception ex)
         {
@@ -299,6 +382,18 @@ else
         isAlreadyEnrolled = user?.EnrolledSessions?.Any(s => s.Id == SessionId) == true;
     }
 
+    private async Task CheckPreRegistrationStatus()
+    {
+        if (string.IsNullOrEmpty(currentUserId)) return;
+
+        isPreRegistered = await PreRegistrationService.IsUserPreRegisteredAsync(currentUserId, SessionId);
+    }
+
+    private async Task LoadPreRegistrationCount()
+    {
+        preRegistrationCount = await PreRegistrationService.GetPreRegistrationCountAsync(SessionId);
+    }
+
     private bool IsSessionAvailable()
     {
         if (session == null) return false;
@@ -336,6 +431,9 @@ else
                         user.EnrolledSessions.Add(sessionToEnroll);
                         await context.SaveChangesAsync();
 
+                        // Convertir la préinscription si elle existe
+                        await PreRegistrationService.ConvertPreRegistrationToEnrollmentAsync(currentUserId, SessionId);
+
                         NavigationManager.NavigateTo("/mes-sessions");
                     }
                 }
@@ -345,6 +443,76 @@ else
         {
             showError = true;
             errorMessage = $"Erreur lors de l'inscription : {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task PreRegisterToSession()
+    {
+        if (string.IsNullOrEmpty(currentUserId) || isProcessing)
+            return;
+
+        isProcessing = true;
+        showError = false;
+
+        try
+        {
+            var success = await PreRegistrationService.PreRegisterUserAsync(currentUserId, SessionId);
+            
+            if (success)
+            {
+                isPreRegistered = true;
+                await LoadPreRegistrationCount();
+                StateHasChanged();
+            }
+            else
+            {
+                showError = true;
+                errorMessage = "Impossible de vous préinscrire à cette session.";
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de la préinscription : {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+
+    private async Task CancelPreRegistration()
+    {
+        if (string.IsNullOrEmpty(currentUserId) || isProcessing)
+            return;
+
+        isProcessing = true;
+        showError = false;
+
+        try
+        {
+            var success = await PreRegistrationService.CancelPreRegistrationAsync(currentUserId, SessionId);
+            
+            if (success)
+            {
+                isPreRegistered = false;
+                await LoadPreRegistrationCount();
+                StateHasChanged();
+            }
+            else
+            {
+                showError = true;
+                errorMessage = "Impossible d'annuler votre préinscription.";
+            }
+        }
+        catch (Exception ex)
+        {
+            showError = true;
+            errorMessage = $"Erreur lors de l'annulation : {ex.Message}";
         }
         finally
         {
