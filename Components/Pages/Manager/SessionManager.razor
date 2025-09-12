@@ -118,18 +118,34 @@
                         <!-- **SECTION ACTIONS RESTAURÉE** -->
                         <div class="session-actions">
                             <div class="btn-group w-100" role="group">
-                                <button class="btn btn-outline-primary" @onclick="() => EditSession(session.Id)" title="Modifier">
-                                    <i class="bi bi-pencil"></i>
+                                <button class="btn btn-outline-primary @(HasUsersEnrolled(session.Id) ? "disabled" : "")" 
+                                        @onclick="() => EditSession(session.Id)" 
+                                        disabled="@HasUsersEnrolled(session.Id)"
+                                        title="@(HasUsersEnrolled(session.Id) ? "Modification bloquée : des utilisateurs sont inscrits" : "Modifier")">
+                                    <i class="bi bi-pencil"></i>    
                                 </button>
                                 <button class="btn @(session.IsActive ? "btn-success" : "btn-outline-secondary")" 
                                         @onclick="() => ToggleSessionStatus(session.Id)" 
                                         title="@(session.IsActive ? "Désactiver" : "Activer")">
                                     <i class="bi @(session.IsActive ? "bi-toggle-on" : "bi-toggle-off")"></i>
                                 </button>
-                                <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id" title="Gérer les cours">
-                                    <i class="bi bi-book"></i>
-                                </a>
-                                <button class="btn btn-outline-danger" @onclick="() => DeleteSessionConfirmation(session.Id)" title="Supprimer">
+                                @if (HasUsersEnrolled(session.Id))
+                                {
+                                    <span class="btn btn-info disabled" 
+                                          title="Gestion des cours bloquée : des utilisateurs sont inscrits">
+                                        <i class="bi bi-book"></i>
+                                    </span>
+                                }
+                                else
+                                {
+                                    <a class="btn btn-info" href="/Manager/Cours?sessionId=@session.Id" title="Gérer les cours">
+                                        <i class="bi bi-book"></i>
+                                    </a>
+                                }
+                                <button class="btn btn-outline-danger @(HasUsersEnrolled(session.Id) ? "disabled" : "")" 
+                                        @onclick="() => DeleteSessionConfirmation(session.Id)" 
+                                        disabled="@HasUsersEnrolled(session.Id)"
+                                        title="@(HasUsersEnrolled(session.Id) ? "Suppression bloquée : des utilisateurs sont inscrits" : "Supprimer")">
                                     <i class="bi bi-trash"></i>
                                 </button>
                             </div>
@@ -448,16 +464,36 @@
                 .ToListAsync(cancellationToken);
 
             publishedCoursesCache.Clear();
-            foreach (var session in sessions!)
+            
+            // **NOUVEAU** : Charger les sessions avec des utilisateurs inscits ou pré-inscrits
+            var sessionsWithEnrolledUsers = await context.Sessions
+                .Where(s => sessionIds.Contains(s.Id) && s.EnrolledUsers.Any())
+                .AsNoTracking()
+                .Select(s => s.Id)
+                .ToListAsync(cancellationToken);
+                
+            var sessionsWithPreRegistrations = await context.PreRegistrations
+                .Where(pr => sessionIds.Contains(pr.SessionId) && pr.Status == "Active")
+                .AsNoTracking()
+                .Select(pr => pr.SessionId)
+                .Distinct()
+                .ToListAsync(cancellationToken);
+            
+            sessionsWithUsersCache.Clear();
+            foreach (var sessionId in sessionIds)
             {
-                var courseCount = courseCounts.FirstOrDefault(cc => cc.SessionId == session.Id);
-                publishedCoursesCache[session.Id] = courseCount?.Count ?? 0;
+                var courseCount = courseCounts.FirstOrDefault(cc => cc.SessionId == sessionId);
+                publishedCoursesCache[sessionId] = courseCount?.Count ?? 0;
 
                 // Initialiser le compteur d'inscriptions si pas trouvé
-                if (!enrolledCounts.ContainsKey(session.Id))
+                if (!enrolledCounts.ContainsKey(sessionId))
                 {
-                    enrolledCounts[session.Id] = 0;
+                    enrolledCounts[sessionId] = 0;
                 }
+                
+                // **NOUVEAU** : Marquer les sessions avec des utilisateurs
+                sessionsWithUsersCache[sessionId] = sessionsWithEnrolledUsers.Contains(sessionId) || 
+                                                   sessionsWithPreRegistrations.Contains(sessionId);
             }
         }
         catch (Exception ex)
@@ -467,6 +503,7 @@
             {
                 enrolledCounts.TryAdd(sessionId, 0);
                 publishedCoursesCache.TryAdd(sessionId, 0);
+                sessionsWithUsersCache.TryAdd(sessionId, false);
             }
 
             Logger?.LogError(ex, "Erreur lors du chargement des compteurs");
@@ -489,6 +526,18 @@
             }
 
             await context.SaveChangesAsync(cancellationToken);
+        }
+    }
+    private async Task ToggleSessionEditor(int sessionId)
+
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+        }
+        catch
+        {
+            
         }
     }
 
@@ -554,6 +603,13 @@
     {
         try
         {
+            // **NOUVEAU** : Vérifier s'il y a des utilisateurs inscrits ou pré-inscrits
+            if (await HasEnrolledOrPreRegisteredUsers(sessionId))
+            {
+                errorMessage = "Impossible de modifier cette session : des utilisateurs sont inscrits ou pré-inscrits. La modification est bloquée pour préserver l'intégrité des données.";
+                return;
+            }
+
             using var context = await DbContextFactory.CreateDbContextAsync();
             var session = await context.Sessions.FindAsync(sessionId);
 
@@ -907,5 +963,42 @@
             return true;
 
         return false;
+    }
+
+    // Méthode pour vérifier si une session a des utilisateurs inscrits ou pré-inscrits
+    private async Task<bool> HasEnrolledOrPreRegisteredUsers(int sessionId)
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            
+            // Vérifier s'il y a des utilisateurs inscrits
+            var hasEnrolledUsers = await context.Sessions
+                .Where(s => s.Id == sessionId)
+                .AnyAsync(s => s.EnrolledUsers.Any());
+            
+            if (hasEnrolledUsers)
+                return true;
+                
+            // Vérifier s'il y a des pré-inscriptions actives
+            var hasPreRegistrations = await context.PreRegistrations
+                .AnyAsync(pr => pr.SessionId == sessionId && pr.Status == "Active");
+                
+            return hasPreRegistrations;
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Erreur lors de la vérification des inscriptions pour la session {SessionId}", sessionId);
+            return false; // En cas d'erreur, on autorise la modification
+        }
+    }
+
+    // Cache pour stocker l'état des sessions avec inscriptions
+    private Dictionary<int, bool> sessionsWithUsersCache = new();
+
+    // Méthode pour obtenir l'état depuis le cache ou calculer
+    private bool HasUsersEnrolled(int sessionId)
+    {
+        return sessionsWithUsersCache.TryGetValue(sessionId, out var hasUsers) && hasUsers;
     }
 }
