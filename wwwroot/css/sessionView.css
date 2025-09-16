@@ -1,27 +1,5 @@
 ﻿
 /* === STYLES POUR SESSION MANAGER === */
-
-/* En-tête de page */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 2rem 0;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.page-title {
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    font-size: 2.5rem;
-}
-
-.page-subtitle {
-    opacity: 0.9;
-    font-size: 1.1rem;
-    margin-bottom: 0;
-}
-
 .session-create-btn {
     background: rgba(255, 255, 255, 0.2);
     border: 2px solid rgba(255, 255, 255, 0.3);
@@ -33,29 +11,6 @@
         background: rgba(255, 255, 255, 0.3);
         border-color: rgba(255, 255, 255, 0.5);
         transform: translateY(-2px);
-    }
-
-/* Grille des sessions */
-.sessions-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-/* Carte de session */
-.session-card {
-    background: white;
-    border-radius: 15px;
-    overflow: hidden;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-    .session-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
     }
 
 /* Image de session */
@@ -72,10 +27,6 @@
         object-fit: cover;
         transition: transform 0.3s ease;
     }
-
-.session-card:hover .session-image img {
-    transform: scale(1.05);
-}
 
 .session-image-placeholder {
     display: flex;
@@ -156,123 +107,12 @@
             transform: translateY(-1px);
         }
 
-/* État vide */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #6c757d;
-}
-
-.empty-state-icon {
-    font-size: 5rem;
-    color: #dee2e6;
-    margin-bottom: 1.5rem;
-}
-
-.empty-state-title {
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: #495057;
-}
-
-.empty-state-text {
-    font-size: 1.1rem;
-    margin-bottom: 2rem;
-    max-width: 400px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
 /* État de chargement */
 .loading-state {
     text-align: center;
     padding: 4rem 2rem;
     color: #6c757d;
 }
-
-/* Modal moderne */
-.modal-backdrop-custom {
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-}
-
-.modal-modern {
-    border: none;
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-}
-
-.modal-header-modern {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem 2rem;
-}
-
-.modal-header-danger {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem 2rem;
-}
-
-.modal-modern .modal-body {
-    padding: 2rem;
-}
-
-.modal-modern .modal-footer {
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    padding: 1.5rem 2rem;
-    background: #f8f9fa;
-}
-
-/* Section d'upload d'image */
-.image-upload-section {
-    background: #f8f9fa;
-    border-radius: 10px;
-    padding: 1.5rem;
-    border: 2px dashed #dee2e6;
-    transition: all 0.3s ease;
-}
-
-    .image-upload-section:hover {
-        border-color: #667eea;
-        background: #f0f4ff;
-    }
-
-.image-preview {
-    width: 100%;
-    height: 150px;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 1rem;
-    background: white;
-    border: 1px solid #dee2e6;
-}
-
-    .image-preview img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-
-.image-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    color: #6c757d;
-}
-
-    .image-placeholder i {
-        font-size: 2rem;
-        margin-bottom: 0.5rem;
-        opacity: 0.5;
-    }
-
 /* Alertes modernes */
 .alert-modern {
     border: none;
@@ -302,22 +142,6 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .page-title {
-        font-size: 2rem;
-    }
-
-    .sessions-grid {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-
-    .session-card {
-        margin: 0 1rem;
-    }
-
-    .modal-modern .modal-body {
-        padding: 1.5rem;
-    }
 
     .session-meta {
         flex-direction: column;
@@ -335,38 +159,10 @@
 }
 
 @media (max-width: 576px) {
-    .page-header {
-        padding: 1.5rem 0;
-    }
-
-    .page-title {
-        font-size: 1.75rem;
-        text-align: center;
-    }
-
-    .page-subtitle {
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-
     .session-create-btn {
         width: 100%;
     }
-
-    .empty-state {
-        padding: 2rem 1rem;
-    }
-
-    .empty-state-icon {
-        font-size: 3.5rem;
-    }
 }
-
-/* Animation d'entrée pour les cartes */
-.session-card {
-    animation: fadeInUp 0.6s ease-out;
-}
-
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -440,14 +236,6 @@
 
 /* Amélioration du responsive */
 @media (max-width: 768px) {
-    .page-header {
-        padding: 2rem 0;
-    }
-
-    .page-title {
-        font-size: 2rem;
-    }
-
     .course-meta .row {
         --bs-gutter-x: 1rem;
     }

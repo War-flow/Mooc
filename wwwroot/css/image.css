@@ -1,37 +1,91 @@
-﻿.image-overlay {
-    position: absolute;
-    top: 10px;
-    right: 10px;
+﻿/* Styles pour la prévisualisation d'image dans les modals */
+.image-upload-section {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 2px dashed #dee2e6;
+    transition: all 0.3s ease;
 }
-
-.image-placeholder {
-    text-align: center;
-    color: #6c757d;
-}
-
-.image-placeholder i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
-}
+    .image-upload-section:hover {
+        border-color: #667eea;
+        background: #f0f4ff;
+    }
 
 .image-preview {
     position: relative;
     border: 2px dashed #dee2e6;
     border-radius: 8px;
     min-height: 200px;
+    max-height: 250px;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
-    background-color: #f8f9fa;
+    background-color: #ffffff;
+    margin-bottom: 1rem;
 }
 
     .image-preview img {
         max-width: 100%;
-        max-height: 200px;
-        object-fit: cover;
+        max-height: 240px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+        object-position: center;
         border-radius: 6px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
+
+.image-overlay {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+}
+
+.image-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: #6c757d;
+}
+
+    .image-placeholder i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .image-placeholder p {
+        margin: 0;
+        font-weight: 500;
+    }
+
+/* Styles pour les images dans les cartes MOOC (page d'accueil) */
+.card-img-top {
+    width: 100% !important;
+    height: 225px !important;
+    object-fit: cover;
+    object-position: center;
+    transition: transform 0.3s ease;
+}
+
+.mooc:hover .card-img-top {
+    transform: scale(1.05);
+}
+
+/* Styles pour les images dans l'éditeur de contenu */
+.ql-editor img {
+    max-width: 100% !important;
+    height: auto !important;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin: 1rem auto;
+    display: block;
+}
 
 /* Animation de chargement pour les images */
 .image-loading {
@@ -81,22 +135,6 @@
     background: linear-gradient(90deg, #f8f9fa 25%, #e9ecef 50%, #f8f9fa 75%);
     background-size: 200% 100%;
     animation: loading 1.5s infinite;
-}
-/* Styles pour les images en mode sombre (si applicable) */
-@media (prefers-color-scheme: dark) {
-    .image-preview {
-        background-color: #2d3748;
-        border-color: #4a5568;
-    }
-
-    .image-placeholder {
-        color: #a0aec0;
-    }
-
-    .session-image-placeholder {
-        background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
-        color: #a0aec0;
-    }
 }
 
 /* Styles responsive pour les images */

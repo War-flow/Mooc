@@ -3,9 +3,8 @@
 @using Mooc.Data
 @inject IJSRuntime JSRuntime
 
-<link href="~/css/quiz-styles.css" rel="stylesheet" />
-
 <div class="quiz-block-viewer">
+
     @if (!string.IsNullOrEmpty(Block.Title))
     {
         <h4 class="quiz-title">@Block.Title</h4>
@@ -73,7 +72,7 @@
 
                         @if (QuizData.Type == "multiple-select")
                         {
-                            <input class="form-check-input" type="checkbox"
+                            <input class="form-check-quiz" type="checkbox"
                                    id="option-@Block.Order-@index"
                                    disabled="@IsCompleted"
                                    checked="@(IsCompleted? CompletedAnswers[index] : UserAnswers[index])"
@@ -81,7 +80,7 @@
                         }
                         else
                         {
-                            <input class="form-check-input" type="radio"
+                            <input class="form-check-quiz" type="radio"
                                    name="quiz-@Block.Order"
                                    id="option-@Block.Order-@index"
                                    disabled="@IsCompleted"

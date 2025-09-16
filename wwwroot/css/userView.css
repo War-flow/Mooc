@@ -1,26 +1,4 @@
-﻿
-/* === STYLES POUR USER MANAGER === */
-
-/* En-tête de page */
-.page-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    padding: 2rem 0;
-    margin-bottom: 2rem;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-}
-
-.page-title {
-    font-weight: 700;
-    margin-bottom: 0.5rem;
-    font-size: 2.5rem;
-}
-
-.page-subtitle {
-    opacity: 0.9;
-    font-size: 1.1rem;
-    margin-bottom: 0;
-}
+﻿/* === STYLES POUR USER MANAGER === */
 
 .user-create-btn {
     background: rgba(255, 255, 255, 0.2);
@@ -34,30 +12,6 @@
         border-color: rgba(255, 255, 255, 0.5);
         transform: translateY(-2px);
     }
-
-/* Grille des utilisateurs */
-.users-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 2rem;
-    margin-top: 2rem;
-}
-
-/* Carte d'utilisateur */
-.user-card {
-    background: #eeeeee;
-    border-radius: 15px;
-    overflow: hidden;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    border: 1px solid rgba(0, 0, 0, 0.05);
-}
-
-    .user-card:hover {
-        transform: translateY(-8px);
-        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
-    }
-
 /* Avatar utilisateur */
 .user-avatar {
     position: relative;
@@ -142,83 +96,11 @@
             cursor: not-allowed;
         }
 
-/* État vide */
-.empty-state {
-    text-align: center;
-    padding: 4rem 2rem;
-    color: #6c757d;
-}
-
-.empty-state-icon {
-    font-size: 5rem;
-    color: #dee2e6;
-    margin-bottom: 1.5rem;
-}
-
-.empty-state-title {
-    font-size: 1.75rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-    color: #495057;
-}
-
-.empty-state-text {
-    font-size: 1.1rem;
-    margin-bottom: 2rem;
-    max-width: 400px;
-    margin-left: auto;
-    margin-right: auto;
-}
-
 /* État de chargement */
 .loading-state {
     text-align: center;
     padding: 4rem 2rem;
     color: #6c757d;
-}
-
-/* Modal moderne */
-.modal-backdrop-custom {
-    background-color: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(8px);
-}
-
-.modal-modern {
-    border: none;
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
-}
-
-.modal-header-modern {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem 2rem;
-}
-
-.modal-header-danger {
-    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem 2rem;
-}
-
-.modal-header-info {
-    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
-    color: white;
-    border-bottom: none;
-    padding: 1.5rem 2rem;
-}
-
-.modal-modern .modal-body {
-    padding: 2rem;
-}
-
-.modal-modern .modal-footer {
-    border-top: 1px solid rgba(0, 0, 0, 0.05);
-    padding: 1.5rem 2rem;
-    background: #f8f9fa;
 }
 
 /* Alertes modernes */
@@ -268,22 +150,6 @@
 
 /* Responsive Design */
 @media (max-width: 768px) {
-    .page-title {
-        font-size: 2rem;
-    }
-
-    .users-grid {
-        grid-template-columns: 1fr;
-        gap: 1.5rem;
-    }
-
-    .user-card {
-        margin: 0 1rem;
-    }
-
-    .modal-modern .modal-body {
-        padding: 1.5rem;
-    }
 
     .user-meta {
         flex-direction: column;
@@ -301,30 +167,9 @@
 }
 
 @media (max-width: 576px) {
-    .page-header {
-        padding: 1.5rem 0;
-    }
-
-    .page-title {
-        font-size: 1.75rem;
-        text-align: center;
-    }
-
-    .page-subtitle {
-        text-align: center;
-        margin-bottom: 1rem;
-    }
 
     .user-create-btn {
         width: 100%;
-    }
-
-    .empty-state {
-        padding: 2rem 1rem;
-    }
-
-    .empty-state-icon {
-        font-size: 3.5rem;
     }
 
     .user-avatar {
@@ -334,11 +179,6 @@
     .avatar-placeholder {
         font-size: 3rem;
     }
-}
-
-/* Animation d'entrée pour les cartes */
-.user-card {
-    animation: fadeInUp 0.6s ease-out;
 }
 
 @keyframes fadeInUp {
@@ -378,11 +218,4 @@
     cursor: pointer;
 }
 
-/* Style pour les modals en cascade */
-.modal.show ~ .modal {
-    z-index: 1070;
-}
 
-    .modal.show ~ .modal .modal-backdrop {
-        z-index: 1065;
-    }

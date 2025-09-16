@@ -1,4 +1,6 @@
-﻿html, body {
+﻿btn
+
+html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
@@ -564,3 +566,287 @@ h1:focus {
     .error-boundary-container .alert-heading {
         font-weight: 600;
     }
+
+/* === STYLE PAR DEFAUT PAGE === */
+
+.page-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 3rem 0;
+    margin-bottom: 2rem;
+}
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.page-subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    margin-bottom: 0;
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+    .page-header {
+        padding: 2rem 0;
+    }
+
+    .page-title {
+        font-size: 2rem;
+    }
+
+    .page-subtitle {
+        font-size: 1rem;
+    }
+}
+
+
+@media (max-width: 576px) {
+    .page-header {
+         padding: 1.5rem 0;
+        }
+
+    .page-title {
+         font-size: 1.75rem;
+         text-align: center;
+        }
+
+    .page-subtitle {
+         text-align: center;
+         margin-bottom: 1rem;
+        }
+    }
+
+/* ==== ETAT VIDE ==== */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.empty-state-icon {
+    color: #dee2e6;
+    margin-bottom: 1.5rem;
+}
+
+.empty-state-icon i {
+    display: block;
+}
+
+.empty-state-title {
+    font-size: 1.75rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.empty-state-text {
+    color: #718096;
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* RESPONSIVE */
+@media (max-width: 576px) {
+
+    .empty-state {
+         padding: 2rem 1rem;
+    }
+
+}
+
+/* === STYLE MODAL === */
+
+/* Modal moderne */
+.modal-backdrop-custom {
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+}
+
+.modal-modern {
+    border: none;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header-modern {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-header-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-header-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+    color: white;
+    border-bottom: none;
+    padding: 1.5rem 2rem;
+}
+
+.modal-modern .modal-body {
+    padding: 2rem;
+}
+
+.modal-modern .modal-footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1.5rem 2rem;
+    background: #f8f9fa;
+}
+
+.modal-dialog.modal-lg {
+    max-width: 900px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+
+    .modal-modern .modal-body {
+        padding: 1.5rem;
+    }
+}
+
+/* Style pour les modals en cascade */
+.modal.show ~ .modal {
+    z-index: 1070;
+}
+
+    .modal.show ~ .modal .modal-backdrop {
+        z-index: 1065;
+    }
+
+/* === STYLE CARTE ET GRILLE === */
+
+/*SESSION */
+
+.sessions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.session-card {
+    background: white;
+    border-radius: 15px;
+    overflow: hidden;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+    .session-card:hover {
+        transform: translateY(-8px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+    }
+
+    .session-card:hover .session-image img {
+        transform: scale(1.05);
+    }
+
+/* UTILISATEUR */
+    .user-card {
+        background: #eeeeee;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+        border: 1px solid rgba(0, 0, 0, 0.05);
+    }
+
+        .user-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+    .users-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 2rem;
+        margin-top: 2rem;
+    }
+
+/* COURS */
+
+.courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+.course-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+    .course-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+    }
+
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+
+   .users-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+   }
+
+   .user-card {
+      margin: 0 1rem;
+   }
+
+   .sessions-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+   }
+
+   .session-card {
+      margin: 0 1rem;
+   }
+
+   .courses-grid {
+      grid-template-columns: 1fr;
+      gap: 1rem;
+      padding: 0.5rem 0;
+   }
+    }
+
+@media (max-width: 576px) {
+
+    .course-card {
+        margin: 0 0.5rem;
+    }
+}
+
+ /* Animation d'entrée pour les cartes */
+.user-card {
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.session-card {
+    animation: fadeInUp 0.6s ease-out;
+}
