@@ -257,13 +257,17 @@
     // Liste des notifications à afficher
     private List<SessionNotification> sessionNotifications = new();
 
+    // Ajouter cette propriété pour suivre les notifications affichées
+    private HashSet<string> dismissedNotifications = new();
+
     protected override async Task OnInitializedAsync()
     {
         try
         {
             await LoadCurrentUser();
             await LoadEnrolledSessions();
-            await LoadSessionCompletionInfos(); // **NOUVEAU**
+            await LoadSessionCompletionInfos();
+            await LoadDismissedNotifications(); // **NOUVEAU**
             await CheckForSessionNotifications();
             
             // Actualiser automatiquement toutes les 2 minutes
@@ -313,6 +317,38 @@
         }
     }
 
+    // **NOUVELLE MÉTHODE** : Charger les notifications dismissées depuis le localStorage
+    private async Task LoadDismissedNotifications()
+    {
+        try
+        {
+            var dismissedJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "dismissedNotifications");
+            if (!string.IsNullOrEmpty(dismissedJson))
+            {
+                var dismissed = System.Text.Json.JsonSerializer.Deserialize<List<string>>(dismissedJson);
+                dismissedNotifications = dismissed?.ToHashSet() ?? new HashSet<string>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des notifications dismissées : {ex.Message}");
+        }
+    }
+
+    // **NOUVELLE MÉTHODE** : Sauvegarder les notifications dismissées dans le localStorage
+    private async Task SaveDismissedNotifications()
+    {
+        try
+        {
+            var dismissedJson = System.Text.Json.JsonSerializer.Serialize(dismissedNotifications.ToList());
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "dismissedNotifications", dismissedJson);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de la sauvegarde des notifications dismissées : {ex.Message}");
+        }
+    }
+
     // **NOUVELLE MÉTHODE** : Obtenir la classe CSS pour la bordure selon le statut
     private string GetSessionBorderClass(Session session, SessionCompletionInfo? completionInfo)
     {
@@ -336,31 +372,39 @@
         {
             var completionInfo = sessionCompletionInfos.GetValueOrDefault(session.Id);
             
-            // **NOUVEAU** : Notification pour session complétée récemment
+            // **MODIFIÉ** : Vérifier si la notification n'a pas déjà été dismissée
             if (completionInfo?.IsCompleted == true && completionInfo.CompletionDate.HasValue)
             {
                 var daysSinceCompletion = (now - completionInfo.CompletionDate.Value).TotalDays;
                 if (daysSinceCompletion <= 3) // Dans les 3 derniers jours
                 {
-                    sessionNotifications.Add(new SessionNotification
-                    {
-                        Id = $"completed-{session.Id}",
-                        Title = "🎉 Félicitations !",
-                        Message = $"Vous avez terminé la session '{session.Title}' avec succès !",
-                        Type = "success",
-                        Icon = "trophy"
-                    });
-
-                    if (completionInfo.HasCertificate)
+                    var completionNotificationId = $"completed-{session.Id}";
+                    if (!dismissedNotifications.Contains(completionNotificationId))
                     {
                         sessionNotifications.Add(new SessionNotification
                         {
-                            Id = $"certificate-{session.Id}",
-                            Title = "🏆 Certificat disponible",
-                            Message = $"Votre certificat pour '{session.Title}' est prêt à être téléchargé.",
-                            Type = "info",
-                            Icon = "award"
+                            Id = completionNotificationId,
+                            Title = "🎉 Félicitations !",
+                            Message = $"Vous avez terminé la session '{session.Title}' avec succès !",
+                            Type = "success",
+                            Icon = "trophy"
                         });
+                    }
+
+                    if (completionInfo.HasCertificate)
+                    {
+                        var certificateNotificationId = $"certificate-{session.Id}";
+                        if (!dismissedNotifications.Contains(certificateNotificationId))
+                        {
+                            sessionNotifications.Add(new SessionNotification
+                            {
+                                Id = certificateNotificationId,
+                                Title = "🏆 Certificat disponible",
+                                Message = $"Votre certificat pour '{session.Title}' est prêt à être téléchargé.",
+                                Type = "info",
+                                Icon = "award"
+                            });
+                        }
                     }
                 }
             }
@@ -372,49 +416,61 @@
                 
                 if (timeRemaining.TotalHours <= 1 && timeRemaining.TotalMinutes > 0)
                 {
-                    sessionNotifications.Add(new SessionNotification
+                    var ending1hNotificationId = $"ending-1h-{session.Id}";
+                    if (!dismissedNotifications.Contains(ending1hNotificationId))
                     {
-                        Id = $"ending-1h-{session.Id}",
-                        Title = "⚠️ Session se termine bientôt !",
-                        Message = $"La session '{session.Title}' se termine dans moins d'une heure.",
-                        Type = "danger",
-                        Icon = "exclamation-triangle-fill"
-                    });
+                        sessionNotifications.Add(new SessionNotification
+                        {
+                            Id = ending1hNotificationId,
+                            Title = "⚠️ Session se termine bientôt !",
+                            Message = $"La session '{session.Title}' se termine dans moins d'une heure.",
+                            Type = "danger",
+                            Icon = "exclamation-triangle-fill"
+                        });
 
-                    // Notification toast
-                    if (notificationToast != null)
-                    {
-                        await notificationToast.ShowNotification(
-                            "Session se termine bientôt !",
-                            $"'{session.Title}' se termine dans {GetTimeRemainingText(timeRemaining)}",
-                            "danger",
-                            10000);
+                        // Notification toast
+                        if (notificationToast != null)
+                        {
+                            await notificationToast.ShowNotification(
+                                "Session se termine bientôt !",
+                                $"'{session.Title}' se termine dans {GetTimeRemainingText(timeRemaining)}",
+                                "danger",
+                                10000);
+                        }
                     }
                 }
                 else if (timeRemaining.TotalHours <= 24)
                 {
-                    sessionNotifications.Add(new SessionNotification
+                    var ending24hNotificationId = $"ending-24h-{session.Id}";
+                    if (!dismissedNotifications.Contains(ending24hNotificationId))
                     {
-                        Id = $"ending-24h-{session.Id}",
-                        Title = "🔔 Session se termine demain",
-                        Message = $"La session '{session.Title}' se termine le {session.EndDate:dd/MM/yyyy à HH:mm}.",
-                        Type = "warning",
-                        Icon = "clock"
-                    });
+                        sessionNotifications.Add(new SessionNotification
+                        {
+                            Id = ending24hNotificationId,
+                            Title = "🔔 Session se termine demain",
+                            Message = $"La session '{session.Title}' se termine le {session.EndDate:dd/MM/yyyy à HH:mm}.",
+                            Type = "warning",
+                            Icon = "clock"
+                        });
+                    }
                 }
             }
 
-            // Session vient de se terminer
+            // **MODIFIÉ** : Session vient de se terminer
             if (IsSessionEnded(session) && (now - session.EndDate).TotalHours <= 24)
             {
-                sessionNotifications.Add(new SessionNotification
+                var endedNotificationId = $"ended-{session.Id}";
+                if (!dismissedNotifications.Contains(endedNotificationId))
                 {
-                    Id = $"ended-{session.Id}",
-                    Title = "📋 Session terminée",
-                    Message = $"La session '{session.Title}' s'est terminée. Vous pouvez toujours consulter les cours.",
-                    Type = "info",
-                    Icon = "info-circle"
-                });
+                    sessionNotifications.Add(new SessionNotification
+                    {
+                        Id = endedNotificationId,
+                        Title = "📋 Session terminée",
+                        Message = $"La session '{session.Title}' s'est terminée. Vous pouvez toujours consulter les cours.",
+                        Type = "info",
+                        Icon = "info-circle"
+                    });
+                }
             }
         }
     }
@@ -542,12 +598,15 @@
         }
     }
 
-    private void DismissNotification(string notificationId)
+    // **MODIFIÉE** : Méthode DismissNotification mise à jour
+    private async Task DismissNotification(string notificationId)
     {
         var notification = sessionNotifications.FirstOrDefault(n => n.Id == notificationId);
         if (notification != null)
         {
             sessionNotifications.Remove(notification);
+            dismissedNotifications.Add(notificationId);
+            await SaveDismissedNotifications();
             StateHasChanged();
         }
     }
