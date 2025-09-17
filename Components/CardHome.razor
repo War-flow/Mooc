@@ -351,9 +351,18 @@ else
         
         // Mise à jour automatique toutes les 30 secondes
         refreshTimer = new Timer(async _ => await RefreshEnrollmentData(), 
-                               null, 
-                               TimeSpan.FromSeconds(30), 
-                               TimeSpan.FromSeconds(30));
+                           null, 
+                           TimeSpan.FromSeconds(30), 
+                           TimeSpan.FromSeconds(30));
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await LoadSessionCompletionInfos();
+            StateHasChanged();
+        }
     }
 
     // **NOUVELLE MÉTHODE** : Charger les informations de completion
@@ -431,6 +440,7 @@ else
         if (!string.IsNullOrEmpty(currentUserId))
         {
             await LoadUserEnrollments();
+            await LoadSessionCompletionInfos(); // **AJOUT MANQUANT**
         }
         await LoadEnrollmentCountsWithErrorHandling();
         
@@ -455,6 +465,18 @@ else
     public async Task ForceRefresh()
     {
         await RefreshEnrollmentData();
+    }
+
+    /// <summary>
+    /// **NOUVELLE MÉTHODE** : Force la mise à jour des informations de completion
+    /// </summary>
+    public async Task RefreshCompletionInfo()
+    {
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await LoadSessionCompletionInfos();
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     /// <summary>
