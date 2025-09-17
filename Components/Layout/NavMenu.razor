@@ -7,7 +7,7 @@
 @inject IUserNavigationService UserNavigationService
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-<div class="top-row ps-3 navbar navbar-dark">
+<div class="top-row ps-1 navbar navbar-dark">
     <div class="container-fluid">
         <a class="navbar-brand" href="/">
             <img src="images/logo.png" alt="logo" class="navbar-logo">
@@ -43,26 +43,26 @@
                     {
                         <div class="nav-item px-3">
                             <NavLink class="nav-link" href="@GetUserProfileUrl()">
-                                <span aria-hidden="true"></span> @GetUserDisplayName()
+                                <span class="bi bi-person-circle-nav-menu" aria-hidden="true"></span> @GetUserDisplayName()
                             </NavLink>
                         </div>
                     }
-
+                    
                     <AuthorizeView Policy="GérerUtilisateurs" Context="userManagementContext">
                         <Authorized>
                             <div class="nav-item px-3">
                                 <NavLink class="nav-link" href="/manager/user">
-                                    <span aria-hidden="true"></span> Gestion des utilisateurs
+                                    <span aria-hidden="true" class="bi bi-person-gear-nav-menu"></span> Liste des utilisateurs
                                 </NavLink>
                             </div>
                         </Authorized>
                     </AuthorizeView>
-
+                    
                     <AuthorizeView Policy="GestionFormation" Context="trainingManagementContext">
                         <Authorized>
                             <div class="nav-item px-3">
                                 <NavLink class="nav-link" href="/manager/session">
-                                    <span aria-hidden="true"></span> Gestion des sessions
+                                    <span aria-hidden="true" class="bi bi-easel2-nav-menu"></span> Liste des sessions
                                 </NavLink>
                             </div>
                         </Authorized>
@@ -72,17 +72,17 @@
                         <Authorized>
                             <div class="nav-item px-3">
                                 <NavLink class="nav-link" href="/mes-sessions">
-                                    <span aria-hidden="true"></span> Mes Formations
+                                    <span aria-hidden="true" class="bi bi-mortarboard-nav-menu"></span> Mes Formations
                                 </NavLink>
                             </div>
                             <div class="nav-item px-3">
                                 <NavLink class="nav-link" href="/certification">
-                                    <span aria-hidden="true"></span> Mes Certifications
+                                    <span aria-hidden="true" class="bi bi-award-fill-nav-menu"></span> Mes Certifications
                                 </NavLink>
                             </div>
                             <div class="nav-item px-3">
                                 <NavLink class="nav-link" href="/trombinoscope">
-                                    <span aria-hidden="true"></span> Trombinoscope
+                                    <span aria-hidden="true" class="bi bi-grid-1x2-nav-menu"></span> Trombinoscope
                                 </NavLink>
                             </div>
                         </Authorized>
@@ -93,7 +93,7 @@
                             <AntiforgeryToken />
                             <input type="hidden" name="ReturnUrl" value="@currentUrl" />
                             <button type="submit" class="nav-link btn-logout">
-                                <span aria-hidden="true"></span> Déconnexion
+                                <span aria-hidden="true" class="bi bi-box-arrow-in-left-nav-menu"></span> Déconnexion
                             </button>
                         </form>
                     </div>
@@ -101,7 +101,7 @@
                 <NotAuthorized>
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="/compte/connexion">
-                            <span aria-hidden="true"></span> Connexion
+                            <span aria-hidden="true" class="bi bi-box-arrow-in-right-nav-menu"></span> Connexion
                         </NavLink>
                     </div>
                 </NotAuthorized>
