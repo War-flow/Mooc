@@ -1,0 +1,700 @@
+﻿/* === EN-TÊTE DE PAGE MODERNE ET ANIMÉ === */
+.page-header {
+    background: var(--primary-gradient);
+    color: white;
+    padding: 3rem 0 2rem;
+    margin-bottom: 0;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--shadow-lg);
+    animation: slideInFromTop 0.8s ease-out;
+}
+
+    .page-header::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 50%, rgba(255, 255, 255, 0.15) 100%);
+        animation: shimmer 3s ease-in-out infinite;
+    }
+
+    .page-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.8));
+        animation: pulse 2s ease-in-out infinite;
+    }
+
+.page-title {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.5px;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    animation: fadeInUp 0.8s ease-out 0.2s both;
+    position: relative;
+    z-index: 2;
+    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+    .page-title::after {
+        content: '';
+        position: absolute;
+        bottom: -8px;
+        left: 0;
+        width: 0;
+        height: 3px;
+        background: linear-gradient(90deg, #ffffff, rgba(255, 255, 255, 0.5));
+        border-radius: 2px;
+        animation: expandWidth 1.2s ease-out 0.8s both;
+    }
+
+.page-subtitle {
+    font-size: 1.125rem;
+    margin: 0.75rem 0 0;
+    opacity: 0.9;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+    animation: fadeInUp 0.8s ease-out 0.4s both;
+    position: relative;
+    z-index: 2;
+}
+
+/* === ANIMATIONS POUR L'EN-TÊTE === */
+@keyframes slideInFromTop {
+    from {
+        opacity: 0;
+        transform: translateY(-50px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes shimmer {
+    0%, 100% {
+        transform: translateX(-100%);
+        opacity: 0;
+    }
+
+    50% {
+        transform: translateX(100%);
+        opacity: 1;
+    }
+}
+
+@keyframes expandWidth {
+    from {
+        width: 0;
+    }
+
+    to {
+        width: 60px;
+    }
+}
+
+/* === VARIANTES D'EN-TÊTES COLORÉES === */
+.page-header.header-success {
+    background: var(--success-gradient);
+}
+
+.page-header.header-danger {
+    background: var(--danger-gradient);
+}
+
+.page-header.header-warning {
+    background: var(--warning-gradient);
+    color: #212529;
+}
+
+    .page-header.header-warning .page-title {
+        background: linear-gradient(135deg, #212529 0%, #495057 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: none;
+    }
+
+    .page-header.header-warning .page-subtitle {
+        color: #212529;
+    }
+
+.page-header.header-info {
+    background: var(--info-gradient);
+}
+
+/* === EN-TÊTE COMPACT POUR MOBILES === */
+@media (max-width: 768px) {
+    .page-header {
+        padding: 2rem 0 1.5rem;
+    }
+
+    .page-title {
+        font-size: 1.75rem;
+        line-height: 1.3;
+    }
+
+    .page-subtitle {
+        font-size: 1rem;
+    }
+}
+
+/* === EN-TÊTE AVEC ICÔNE === */
+.page-header .header-icon {
+    display: inline-block;
+    font-size: 3rem;
+    margin-right: 1rem;
+    vertical-align: middle;
+    animation: bounceIn 1s ease-out 0.6s both;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+}
+
+@keyframes bounceIn {
+    0% {
+        opacity: 0;
+        transform: scale(0.3);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scale(1.05);
+    }
+
+    70% {
+        transform: scale(0.9);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* === EN-TÊTE AVEC PARTICULES ANIMÉES === */
+.page-header.header-animated {
+    position: relative;
+}
+
+    .page-header.header-animated::before {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        background-image: radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 50%), radial-gradient(circle at 40% 40%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+        animation: floatingParticles 6s ease-in-out infinite;
+    }
+
+@keyframes floatingParticles {
+    0%, 100% {
+        transform: translateY(0px) rotate(0deg);
+        opacity: 1;
+    }
+
+    33% {
+        transform: translateY(-10px) rotate(2deg);
+        opacity: 0.8;
+    }
+
+    66% {
+        transform: translateY(5px) rotate(-1deg);
+        opacity: 0.9;
+    }
+}
+/* === ANIMATIONS AVANCÉES POUR L'EN-TÊTE === */
+
+/* Animation de vagues en arrière-plan - VERSION AMÉLIORÉE */
+.page-header.header-waves {
+    position: relative;
+    overflow: hidden;
+}
+
+.page-header.header-waves::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: -100%; /* Démarrer hors écran à gauche */
+    width: 300%; /* Largeur triple pour assurer la continuité */
+    height: 60px;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1200,160,1200,160,1200,128L1200,120L1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z' fill='rgba(255,255,255,0.15)'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+    background-size: 400px 60px; /* Taille répétitive pour la continuité */
+    animation: waveFlowContinuous 25s linear infinite;
+    z-index: 1;
+}
+
+/* Variante avec vagues plus intenses pour certaines pages */
+.page-header.header-waves.intense::after {
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1200,160,1200,160,1200,128L1200,120L1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z' fill='rgba(255,255,255,0.25)'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+    background-size: 400px 80px;
+    height: 80px;
+    animation: waveFlowContinuous 20s linear infinite;
+}
+
+/* NOUVELLE animation continue sans coupures */
+@keyframes waveFlowContinuous {
+    0% {
+        transform: translateX(0);
+    }
+    100% {
+        transform: translateX(400px); /* Correspond à la taille du background-size */
+    }
+}
+
+/* Alternative avec effet de vagues multiples */
+.page-header.header-waves.multi::after {
+    background: 
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1200,160,1200,160,1200,128L1200,120L1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z' fill='rgba(255,255,255,0.1)'%3E%3C/path%3E%3C/svg%3E") repeat-x,
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,64L48,80C96,96,192,128,288,128C384,128,480,96,576,80C672,64,768,64,864,80C960,96,1056,128,1152,128C1200,128,1200,128,1200,96L1200,120L1152,120C1056,120,960,120,864,120C768,120,672,120,576,120C480,120,384,120,288,120C192,120,96,120,48,120L0,120Z' fill='rgba(255,255,255,0.15)'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+    background-size: 500px 60px, 400px 60px;
+    animation: 
+        waveFlowContinuous 30s linear infinite,
+        waveFlowContinuousReverse 25s linear infinite;
+}
+
+@keyframes waveFlowContinuousReverse {
+    0% {
+        background-position: 0px 0px, 0px 0px;
+    }
+    100% {
+        background-position: -500px 0px, 400px 0px;
+    }
+}
+
+/* Vagues avec effet océanique plus réaliste */
+.page-header.header-waves.ocean::after {
+    background: 
+        /* Vague principale */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V120H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z' fill='rgba(255,255,255,0.12)'%3E%3C/path%3E%3C/svg%3E") repeat-x,
+        /* Vague secondaire */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V120H0Z' fill='rgba(255,255,255,0.08)'%3E%3C/path%3E%3C/svg%3E") repeat-x,
+        /* Vague de fond */
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 120' preserveAspectRatio='none'%3E%3Cpath d='M1200,0H0V120H281.94C572.9,116.24,602.45,3.86,602.45,3.86h0S632,116.24,923,120h277Z' fill='rgba(255,255,255,0.05)'%3E%3C/path%3E%3C/svg%3E") repeat-x;
+    background-size: 600px 60px, 800px 60px, 1000px 60px;
+    animation: 
+        oceanWave1 20s ease-in-out infinite,
+        oceanWave2 15s ease-in-out infinite reverse,
+        oceanWave3 25s linear infinite;
+}
+
+@keyframes oceanWave1 {
+    0%, 100% {
+        background-position: 0px 0px, 0px 0px, 0px 0px;
+    }
+    50% {
+        background-position: 600px 0px, -400px 0px, 500px 0px;
+    }
+}
+
+@keyframes oceanWave2 {
+    0%, 100% {
+        transform: translateX(0) scaleY(1);
+    }
+    33% {
+        transform: translateX(-20px) scaleY(1.1);
+    }
+    66% {
+        transform: translateX(15px) scaleY(0.9);
+    }
+}
+
+@keyframes oceanWave3 {
+    0% {
+        background-position: 0px 0px, 0px 0px, 0px 0px;
+    }
+    100% {
+        background-position: 600px 0px, 800px 0px, 1000px 0px;
+    }
+}
+
+/* Amélioration pour les mobiles */
+@media (max-width: 768px) {
+    .page-header.header-waves::after {
+        height: 40px;
+        background-size: 300px 40px;
+        animation-duration: 30s;
+    }
+    
+    .page-header.header-waves.intense::after {
+        height: 50px;
+        background-size: 300px 50px;
+        animation-duration: 25s;
+    }
+    
+    .page-header.header-waves.multi::after {
+        background-size: 400px 40px, 300px 40px;
+    }
+    
+    .page-header.header-waves.ocean::after {
+        background-size: 500px 40px, 600px 40px, 800px 40px;
+    }
+}
+
+/* Performance optimization */
+.page-header.header-waves::after {
+    will-change: transform;
+    backface-visibility: hidden;
+    perspective: 1000px;
+}
+
+/* Préférences de mouvement réduit */
+@media (prefers-reduced-motion: reduce) {
+    .page-header.header-waves::after {
+        animation-duration: 60s; /* Animation plus lente */
+    }
+    
+    .page-header.header-waves.multi::after,
+    .page-header.header-waves.ocean::after {
+        animation: waveFlowContinuous 60s linear infinite;
+    }
+}
+
+/* Combinaison harmonieuse avec les autres animations */
+.page-header.header-waves.header-animated::before {
+    z-index: 0; /* S'assurer que les particules sont en arrière-plan */
+}
+
+.page-header.header-waves .page-title,
+.page-header.header-waves .page-subtitle,
+.page-header.header-waves .header-icon {
+    position: relative;
+    z-index: 3; /* S'assurer que le texte est au premier plan */
+}
+
+/* Animation de texte dactylographié */
+.page-title.typewriter {
+    overflow: hidden;
+    border-right: 3px solid rgba(255, 255, 255, 0.8);
+    white-space: nowrap;
+    animation: typewriter 3s steps(30, end), blinkCursor 0.8s infinite;
+    width: 0;
+    animation-fill-mode: forwards;
+}
+
+@keyframes typewriter {
+    from {
+        width: 0;
+    }
+
+    to {
+        width: 100%;
+    }
+}
+
+@keyframes blinkCursor {
+    from, to {
+        border-color: transparent;
+    }
+
+    50% {
+        border-color: rgba(255, 255, 255, 0.8);
+    }
+}
+
+/* Animation de morphing d'icône */
+.header-icon.morphing {
+    animation: iconMorph 6s ease-in-out infinite;
+    transform-origin: center;
+}
+
+@keyframes iconMorph {
+    0%, 100% {
+        transform: scale(1) rotate(0deg);
+        filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.3));
+    }
+
+    25% {
+        transform: scale(1.1) rotate(5deg);
+        filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.4)) hue-rotate(30deg);
+    }
+
+    50% {
+        transform: scale(0.9) rotate(-3deg);
+        filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2)) hue-rotate(60deg);
+    }
+
+    75% {
+        transform: scale(1.05) rotate(2deg);
+        filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.5)) hue-rotate(90deg);
+    }
+}
+
+/* Animation de slider de couleurs */
+.page-header.header-color-slide {
+    background: linear-gradient(270deg, var(--primary-gradient), var(--success-gradient), var(--info-gradient), var(--warning-gradient), var(--primary-gradient));
+    background-size: 500% 100%;
+    animation: colorSlide 12s ease-in-out infinite;
+}
+
+@keyframes colorSlide {
+    0%, 100% {
+        background-position: 0% 50%;
+    }
+
+    25% {
+        background-position: 25% 50%;
+    }
+
+    50% {
+        background-position: 50% 50%;
+    }
+
+    75% {
+        background-position: 75% 50%;
+    }
+}
+
+/* Animation de rebond pour les statistiques */
+.stat-badge.bouncing {
+    animation: statBounce 2s ease-in-out infinite;
+}
+
+@keyframes statBounce {
+    0%, 20%, 50%, 80%, 100% {
+        transform: translateY(0) scale(1);
+    }
+
+    40% {
+        transform: translateY(-8px) scale(1.05);
+    }
+
+    60% {
+        transform: translateY(-4px) scale(1.02);
+    }
+}
+
+/* Animation de tremblement pour les alertes */
+.page-header.header-shake {
+    animation: headerShake 0.5s ease-in-out;
+}
+
+@keyframes headerShake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+
+    10%, 30%, 50%, 70%, 90% {
+        transform: translateX(-2px);
+    }
+
+    20%, 40%, 60%, 80% {
+        transform: translateX(2px);
+    }
+}
+
+/* Animation de zoom pulsé */
+.page-header.header-pulse-zoom {
+    animation: pulseZoom 3s ease-in-out infinite;
+}
+
+@keyframes pulseZoom {
+    0%, 100% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.02);
+    }
+}
+
+/* Animation de révélation progressive */
+.page-header.header-reveal {
+    opacity: 0;
+    transform: translateY(-100%);
+    animation: revealHeader 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+@keyframes revealHeader {
+    0% {
+        opacity: 0;
+        transform: translateY(-100%) scale(0.8);
+    }
+
+    70% {
+        opacity: 1;
+        transform: translateY(10px) scale(1.05);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Animation de défilement de texte */
+.page-subtitle.scrolling-text {
+    overflow: hidden;
+    white-space: nowrap;
+    animation: scrollText 10s linear infinite;
+}
+
+@keyframes scrollText {
+    0% {
+        transform: translateX(100%);
+    }
+
+    100% {
+        transform: translateX(-100%);
+    }
+}
+
+/* Animation de matrices/pluie de code */
+.page-header.header-matrix::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: repeating-linear-gradient( 90deg, transparent, transparent 98px, rgba(255, 255, 255, 0.03) 100px ), repeating-linear-gradient( 0deg, transparent, transparent 98px, rgba(255, 255, 255, 0.03) 100px );
+    animation: matrixFall 20s linear infinite;
+    z-index: 1;
+}
+
+@keyframes matrixFall {
+    0% {
+        transform: translateY(-100%);
+    }
+
+    100% {
+        transform: translateY(100%);
+    }
+}
+
+/* Animation de respiration */
+.page-header.header-breathing {
+    animation: breathing 4s ease-in-out infinite;
+}
+
+@keyframes breathing {
+    0%, 100% {
+        transform: scale(1);
+        filter: brightness(1);
+    }
+
+    50% {
+        transform: scale(1.01);
+        filter: brightness(1.1);
+    }
+}
+
+/* === EN-TÊTE AVEC STATISTIQUES AVANCÉES === */
+.page-header .header-stats {
+    margin-top: 1.5rem;
+    animation: fadeInUp 0.8s ease-out 0.6s both;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: center;
+}
+
+.page-header .stat-badge {
+    display: inline-flex;
+    align-items: center;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-lg);
+    backdrop-filter: blur(10px);
+    transition: all var(--transition-normal);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.page-header .stat-badge:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Animation différée pour les badges multiples */
+.page-header .stat-badge:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.page-header .stat-badge:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+.page-header .stat-badge:nth-child(4) {
+    animation-delay: 0.6s;
+}
+
+/* Responsive pour les statistiques */
+@media (max-width: 768px) {
+    .page-header .header-stats {
+        justify-content: center;
+        gap: 0.5rem;
+    }
+    
+    .page-header .stat-badge {
+        font-size: 0.85rem;
+        padding: 0.4rem 0.8rem;
+    }
+}
+
+/* État vide amélioré */
+.empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+    animation: fadeInUp 0.8s ease-out;
+}
+
+.empty-state-icon {
+    margin-bottom: 2rem;
+    color: #dee2e6;
+    animation: bounce 2s ease-in-out infinite;
+}
+
+.empty-state-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #495057;
+}
+
+.empty-state-text {
+    font-size: 1.1rem;
+    margin-bottom: 2rem;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.6;
+}
+
+/* État de chargement amélioré */
+.loading-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: #6c757d;
+    animation: fadeInUp 0.6s ease-out;
+}
+
+.loading-state .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.3rem;
+}

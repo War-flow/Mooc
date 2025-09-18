@@ -17,31 +17,26 @@
 
 <PageTitle>Mes Certifications</PageTitle>
 
-<div class="container-fluid py-4">
-    <!-- En-tête de la page -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="d-flex align-items-center justify-content-between">
-                <div>
-                    <h1 class="h2 text-dark fw-bold mb-2">
-                        <i class="bi bi-award-fill text-warning me-3"></i>
-                        Mes Certifications
-                    </h1>
-                    <p class="text-muted mb-0">Consultez et téléchargez vos certificats de formation</p>
-                </div>
-                <div class="d-none d-md-block">
-                    <div class="bg-light p-3 rounded-3 text-center">
-                        <i class="bi bi-trophy-fill text-warning fs-2"></i>
-                        <div class="mt-2">
-                            <small class="text-muted d-block">Total</small>
-                            <strong class="text-primary">@availableCertificates.Count</strong>
-                        </div>
-                    </div>
+<!-- En-tête de page avec design moderne -->
+<div class="page-header header-waves ocean header-animated">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <i class="bi bi-award-fill header-icon morphing"></i>
+                <h1 class="page-title typewriter">Mes Certifications</h1>
+                <p class="page-subtitle">Consultez et téléchargez vos certificats de formation</p>
+                <div class="header-stats">
+                    <span class="stat-badge bouncing">
+                        <i class="bi bi-trophy-fill me-2"></i>
+                        @availableCertificates.Count certificat@(availableCertificates.Count > 1 ? "s" : "")
+                    </span>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
+<div class="container mt-4">
     <!-- Filtres -->
     <div class="row mb-4">
         <div class="col-md-6 mt-2 mt-md-0">
@@ -180,13 +175,13 @@
     {
         <div class="row mt-5">
             <div class="col-12">
-                <div class="text-center py-5">
-                    <div class="mb-4">
-                        <i class="bi bi-award text-muted" style="font-size: 4rem;"></i>
+                <div class="empty-state">
+                    <div class="empty-state-icon">
+                        <i class="bi bi-award fs-1"></i>
                     </div>
-                    <h4 class="text-muted mb-3">Aucune certification trouvée</h4>
-                    <p class="text-muted mb-4">Vous n'avez pas encore de certificats disponibles. Terminez vos formations pour obtenir vos certificats.</p>
-                    <a href="/" class="btn btn-primary">
+                    <h3 class="empty-state-title">Aucune certification trouvée</h3>
+                    <p class="empty-state-text">Vous n'avez pas encore de certificats disponibles. Terminez vos formations pour obtenir vos certificats.</p>
+                    <a href="/" class="btn btn-primary btn-lg">
                         <i class="bi bi-book me-2"></i>
                         Voir les formations
                     </a>

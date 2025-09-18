@@ -19,13 +19,23 @@
 @if (session != null)
 {
     <!-- En-tête de page avec design moderne -->
-    <div class="page-header">
+    <div class="page-header header-waves ocean header-animated">
         <div class="container">
+            <nav class="header-breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a href="/">Accueil</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a href="/Manager/Session">Sessions</a>
+                    </li>
+                    <li class="breadcrumb-item active">Modules</li>
+                </ol>
+            </nav>
             <div class="row align-items-center">
                 <div class="col">
-                    <h1 class="page-title">
-                        Modules de formation
-                    </h1>
+                    <i class="bi bi-book header-icon morphing"></i>
+                    <h1 class="page-title typewriter">Modules de formation</h1>
                     <p class="page-subtitle">@session.Title - Gérez vos modules</p>
                 </div>
                 <div class="col-auto">
@@ -33,7 +43,7 @@
                         <i class="bi bi-plus-circle me-2"></i>
                         Nouveau Module
                     </button>
-                    <a class="btn btn-primary btn-lg session-create-btn" href="/Manager/Session">
+                    <a class="btn btn-outline-light btn-lg session-create-btn ms-2" href="/Manager/Session">
                         <i class="bi bi-arrow-left me-2"></i>
                         Retour aux sessions
                     </a>

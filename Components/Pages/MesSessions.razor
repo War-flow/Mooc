@@ -18,12 +18,41 @@
 
 <PageTitle>Mes Sessions</PageTitle>
 
-<div class="page-header">
+<!-- En-tête de page avec design moderne amélioré -->
+<div class="page-header header-waves ocean header-animated">
     <div class="container">
         <div class="row align-items-center">
             <div class="col">
-                <h1 class="page-title">Mes Sessions</h1>
+                <i class="bi bi-calendar3 header-icon morphing"></i>
+                <h1 class="page-title typewriter">Mes Formations</h1>
                 <p class="page-subtitle">Retrouvez vos sessions de formation en cours</p>
+                @if (enrolledSessions != null && enrolledSessions.Any())
+                {
+                    <div class="header-stats">
+                        <span class="stat-badge bouncing">
+                            <i class="bi bi-calendar-check me-2"></i>
+                            @enrolledSessions.Count session @(enrolledSessions.Count > 1 ? "s" : "")
+                        </span>
+                        @{
+                            var completedSessions = enrolledSessions.Count(s => sessionCompletionInfos.GetValueOrDefault(s.Id)?.IsCompleted == true);
+                            var activeSessions = enrolledSessions.Count(s => IsSessionActive(s));
+                        }
+                        @if (completedSessions > 0)
+                        {
+                            <span class="stat-badge bouncing" style="animation-delay: 0.2s;">
+                                <i class="bi bi-check-circle me-2"> </i>
+                                @completedSessions terminée @(completedSessions > 1 ? "s" : "")
+                            </span>
+                        }
+                        @if (activeSessions > 0)
+                        {
+                            <span class="stat-badge bouncing" style="animation-delay: 0.4s;">
+                                <i class="bi bi-play-circle me-2"> </i>
+                                @activeSessions en cours
+                            </span>
+                        }
+                    </div>
+                }
             </div>
         </div>
     </div>

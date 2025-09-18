@@ -87,8 +87,12 @@
                             </div>
                         </Authorized>
                     </AuthorizeView>
-
-                    <div class="nav-item px-3 mt-auto">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/trombinoscope">
+                            <span aria-hidden="true" class="bi bi-grid-1x2-nav-menu"></span> FAQ
+                        </NavLink>
+                    </div>
+                    <div class="nav-item px-3">
                         <form action="Account/Logout" method="post">
                             <AntiforgeryToken />
                             <input type="hidden" name="ReturnUrl" value="@currentUrl" />
@@ -99,6 +103,11 @@
                     </div>
                 </Authorized>
                 <NotAuthorized>
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="/FAQ">
+                            <span aria-hidden="true" class="bi bi-grid-1x2-nav-menu"></span> FAQ
+                        </NavLink>
+                    </div>
                     <div class="nav-item px-3">
                         <NavLink class="nav-link" href="/compte/connexion">
                             <span aria-hidden="true" class="bi bi-box-arrow-in-right-nav-menu"></span> Connexion

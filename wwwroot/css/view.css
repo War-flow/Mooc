@@ -977,3 +977,10 @@ left: 10px;
     color: #667eea;
     font-weight: 600;
 }
+.text-black {
+    background-color : cornsilk;
+    width:65%;
+    border-radius: 20px;
+    padding: 10px;
+    opacity:80%;
+}

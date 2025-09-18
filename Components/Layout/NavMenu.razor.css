@@ -28,15 +28,34 @@
 }
 
 .top-row {
-    min-height: 3.5rem;
+    min-height: 3rem;
     background: linear-gradient(135deg, rgba(102, 126, 234, 0.9) 0%, rgba(118, 75, 162, 0.9) 100%);
     backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    position: sticky;
+    position: fixed;
     top: 0;
+    left: 0;
+    right: 0;
+    width: 250px;
     z-index: 1000;
 }
+
+/* === MENU LATÉRAL FIXE === */
+.nav {
+    position: fixed;
+    top: 3rem;
+    left: 0;
+    width: 250px;
+    height: calc(100vh - 3rem);
+    background: linear-gradient(180deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+    backdrop-filter: blur(20px);
+    overflow-y: hidden; /* CHANGÉ : auto vers hidden */
+    overflow-x: hidden;
+    z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
 
 .navbar-brand {
     font-size: 1.2rem;
@@ -131,6 +150,33 @@
     transform: scale(1.1);
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
+/* === BOUTON DÉCONNEXION === */
+.btn-logout {
+    color: rgba(255, 255, 255, 0.85);
+    background: none;
+    border: none;
+    border-radius: 12px;
+    height: 3.2rem;
+    display: flex;
+    align-items: center;
+    line-height: 3.2rem;
+    width: 100%;
+    margin: 0.15rem 0.5rem;
+    padding: 0 1rem;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.btn-logout:hover {
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.05) 100%);
+    color: white;
+    transform: translateX(8px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
 
 /* === ANIMATIONS D'ENTRÉE === */
 .nav-scrollable {
@@ -184,34 +230,38 @@
         display: none;
     }
 
+    /* Style pour le contenu principal */
+    .main {
+        margin-left: 250px;
+        padding-top: 3rem;
+    }
+
     .nav-scrollable {
         display: block;
-        height: calc(100vh - 3.5rem);
-        overflow-y: auto;
+        height: calc(100vh - 3rem);
+        overflow-y: hidden; /* CHANGÉ : auto vers hidden */
         overflow-x: hidden;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
-    }
-
-    .nav-scrollable::-webkit-scrollbar {
-        width: 6px;
-    }
-
-    .nav-scrollable::-webkit-scrollbar-track {
-        background: transparent;
-    }
-
-    .nav-scrollable::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.3);
-        border-radius: 3px;
-    }
-
-    .nav-scrollable::-webkit-scrollbar-thumb:hover {
-        background: rgba(255, 255, 255, 0.5);
+        scrollbar-width: none; /* CHANGÉ : thin vers none */
+        scrollbar-color: transparent; /* CHANGÉ */
     }
 }
 
 @media (max-width: 640px) {
+    .nav {
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .navbar-toggler:checked ~ .nav {
+        transform: translateX(0);
+    }
+    
+    /* Sur mobile, le contenu principal prend toute la largeur */
+    .main {
+        padding-top: 3rem;
+        margin-left: 0;
+    }
+    
     .nav-scrollable {
         position: absolute;
         top: 100%;
@@ -219,8 +269,8 @@
         right: 0;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         border-radius: 0 0 15px 15px;
-        max-height: calc(100vh - 3.5rem);
-        overflow-y: auto;
+        max-height: calc(100vh - 3rem);
+        overflow-y: hidden; /* CHANGÉ : auto vers hidden */
     }
 }
 
@@ -275,4 +325,53 @@
 
 .bi-grid-1x2-nav-menu {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='white' class='bi bi-grid-1x2' viewBox='0 0 16 16'%3E%3Cpath d='M6 1H1v14h5zm9 0h-5v5h5zm0 9v5h-5v-5zM0 1a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H1a1 1 0 0 1-1-1zm9 0a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1zm1 8a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h5a1 1 0 0 0 1-1v-5a1 1 0 0 0-1-1z'/%3E%3C/svg%3E");
+}
+
+/* === AJUSTEMENT DU CONTENU PRINCIPAL === */
+@media (min-width: 641px) {
+    .navbar-toggler {
+        display: none;
+    }
+
+    /* Style pour le contenu principal */
+    .main {
+        margin-left: 250px;
+        padding-top: 3rem;
+    }
+
+    .nav-scrollable {
+        display: block;
+        height: calc(100vh - 3rem);
+        overflow-y: hidden; /* CHANGÉ : auto vers hidden */
+        overflow-x: hidden;
+        scrollbar-width: none; /* CHANGÉ : thin vers none */
+        scrollbar-color: transparent; /* CHANGÉ */
+    }
+
+@media (max-width: 640px) {
+    .nav {
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .navbar-toggler:checked ~ .nav {
+        transform: translateX(0);
+    }
+    
+    /* Sur mobile, le contenu principal prend toute la largeur */
+    .main {
+        padding-top: 3rem;
+        margin-left: 0;
+    }
+    
+    .nav-scrollable {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        border-radius: 0 0 15px 15px;
+        max-height: calc(100vh - 3rem);
+        overflow-y: hidden; /* CHANGÉ : auto vers hidden */
+    }
 }

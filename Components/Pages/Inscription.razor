@@ -17,12 +17,13 @@
 
 @if (session != null)
 {
-    <!-- En-tête moderne avec gradient -->
-    <div class="page-header">
+    <!-- En-tête de page avec design moderne -->
+    <div class="page-header header-waves ocean header-animated">
         <div class="container">
-            <div class="row">
-                <div class="col-12 text-center">
-                    <h1 class="page-title">
+            <div class="row align-items-center">
+                <div class="col text-center">
+                    <i class="bi bi-person-plus-fill header-icon morphing"></i>
+                    <h1 class="page-title typewriter">
                         @if (IsSessionAvailable())
                         {
                             <text>Inscription à la session</text>
@@ -36,6 +37,7 @@
                             <text>Session terminée</text>
                         }
                     </h1>
+                    <p class="page-subtitle">@session.Title</p>
                 </div>
             </div>
         </div>
