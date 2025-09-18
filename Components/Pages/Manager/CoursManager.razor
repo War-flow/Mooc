@@ -1,4 +1,4 @@
-﻿@page "/Manager/Cours"
+﻿@page "/manager/cours"
 
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components
@@ -21,17 +21,6 @@
     <!-- En-tête de page avec design moderne -->
     <div class="page-header header-waves ocean header-animated">
         <div class="container">
-            <nav class="header-breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item">
-                        <a href="/">Accueil</a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="/Manager/Session">Sessions</a>
-                    </li>
-                    <li class="breadcrumb-item active">Modules</li>
-                </ol>
-            </nav>
             <div class="row align-items-center">
                 <div class="col">
                     <i class="bi bi-book header-icon morphing"></i>
@@ -218,17 +207,17 @@ else
 
     private void CreerCours(int sessionId)
     {
-        NavigationManager.NavigateTo($"/Manager/Cours/Edit?sessionId={sessionId}");
+        NavigationManager.NavigateTo($"/manager/cours/edit?sessionId={sessionId}");
     }
 
     private void EditerCours(int coursId)
     {
-        NavigationManager.NavigateTo($"/Manager/Cours/Edit/{coursId}");
+        NavigationManager.NavigateTo($"/manager/cours/edit/{coursId}");
     }
 
     private void VoirCours(int coursId)
     {
-        NavigationManager.NavigateTo($"/Cours/View/{coursId}");
+        NavigationManager.NavigateTo($"/cours/view/{coursId}");
     }
 
     private async Task ToggleCourseStatus(int coursId)

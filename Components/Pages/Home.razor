@@ -9,20 +9,131 @@
 
 <PageTitle>MOOC POINT COM</PageTitle>
 
+<!-- Hero Section avec animation -->
+<div class="hero-section">
+    <div class="container">
+        <div class="hero-content animate-fade-in">
+            <AuthorizeView>
+                <Authorized>
+                    @if (currentUser != null)
+                    {
+                        <div class="welcome-card animate-slide-in-bottom">
+                            <div class="welcome-avatar">
+                                <i class="bi bi-person-circle"></i>
+                            </div>
+                            <div class="welcome-text">
+                                <h1 class="welcome-title hello">Bonjour, @currentUser.FirstName !</h1>
+                                <p class="welcome-subtitle">Prêt à continuer votre apprentissage ?</p>
+                            </div>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="welcome-card animate-slide-in-bottom">
+                            <div class="welcome-avatar">
+                                <i class="fas fa-user-circle"></i>
+                            </div>
+                            <div class="welcome-text">
+                                <h1 class="welcome-title">Bonjour, @context.User.Identity?.Name !</h1>
+                                <p class="welcome-subtitle">Explorez nos formations disponibles</p>
+                            </div>
+                        </div>
+                    }
+                </Authorized>
+                <NotAuthorized>
+                    <div class="hero-guest animate-zoom-in">
+                        <h1 class="hero-title" >Bienvenue sur MOOC POINT COM</h1>
+                        <p class="hero-description">Découvrez nos formations et développez vos compétences</p>
+                        <div class="hero-actions">
+                            <a href="/Account/Register" class="btn btn-primary btn-lg">
+                                <i class="fas fa-user-plus me-2"></i>S'inscrire
+                            </a>
+                            <a href="/compte/connexion" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-sign-in-alt me-2"></i>Se connecter
+                            </a>
+                        </div>
+                    </div>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</div>
+
+<!-- Section des statistiques -->
 <AuthorizeView>
     <Authorized>
-        @if (currentUser != null)
-        {
-            <h1 class="hello">Bonjour, @currentUser.FirstName</h1>
-        }
-        else
-        {
-            <h1 class="hello">Bonjour, @context.User.Identity?.Name</h1>
-        }
+        <div class="stats-section">
+            <div class="container">
+                <div class="row">
+                    <div class="col-md-4 col-3 mb-3">
+                        <div class="stat-card animate-slide-in-right">
+                            <div class="stat-icon bg-primary">
+                                <i class="bi bi-book"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4 class="stat-number">@(availableSessions?.Count ?? 0)</h4>
+                                <p class="stat-label">Sessions disponibles</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4 col-3 mb-3">
+                        <div class="stat-card animate-slide-in-right" style="animation-delay: 0.2s">
+                            <div class="stat-icon bg-info">
+                                <i class="bi bi-clock-history"></i>
+                            </div>
+                            <div class="stat-content">
+                                <h4 class="stat-number">24/7</h4>
+                                <p class="stat-label">Accès disponible</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </Authorized>
 </AuthorizeView>
 
-<CardHome Sessions="@availableSessions" />
+<!-- Section principale des sessions -->
+<div class="sessions-section">
+    <div class="container">
+        <div class="section-header animate-fade-in">
+            <h2 class="section-title">
+                <i class="fas fa-star me-2"></i>
+                Formations Disponibles
+            </h2>
+            <p class="section-subtitle">
+                Découvrez nos sessions de formation et commencez votre parcours d'apprentissage
+            </p>
+        </div>
+
+        @if (availableSessions == null)
+        {
+            <div class="loading-container">
+                <div class="loading-spinner"></div>
+                <p class="loading-text">Chargement des formations...</p>
+            </div>
+        }
+        else if (!availableSessions.Any())
+        {
+            <div class="empty-state animate-zoom-in">
+                <div class="empty-icon">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <h3 class="empty-title">Aucune session disponible</h3>
+                <p class="empty-description">
+                    Il n'y a actuellement aucune formation disponible.
+                    Revenez bientôt pour découvrir de nouvelles opportunités d'apprentissage !
+                </p>
+            </div>
+        }
+        else
+        {
+            <div class="sessions-content animate-slide-in-bottom">
+                <CardHome Sessions="@availableSessions" />
+            </div>
+        }
+    </div>
+</div>
 
 @code {
     private ApplicationUser? currentUser;
@@ -32,14 +143,14 @@
     {
         // Utilisation de IDbContextFactory pour obtenir une nouvelle instance de DbContext
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
-        
+
         // Récupération des sessions disponibles (pas encore terminées et actives)
         availableSessions = await dbContext.Sessions
             .Include(s => s.Courses)
             .Where(s => s.IsActive && DateTime.Now <= s.EndDate)
             .OrderBy(s => s.StartDate)
             .ToListAsync();
-            
+
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 

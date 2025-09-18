@@ -1,12 +1,31 @@
 ﻿/* Styles pour les modules (CoursManager) */
 
-session-card
-user-card
-course-card
-sessions-grid
-users-grid
-courses-grid
+.btn-outline-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: 2px solid #667eea;
+    transition: all var(--transition-normal);
+}
 
+    .btn-outline-primary:hover {
+        background: var(--primary-gradient);
+        color: black;
+        border-color: transparent;
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .btn-outline-primary:focus {
+        background: var(--primary-gradient);
+        color: black;
+        border-color: transparent;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.25);
+    }
+
+    .btn-outline-primary:active {
+        background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+        transform: translateY(0);
+    }
 
 .course-header {
     display: flex;
