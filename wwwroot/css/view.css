@@ -970,4 +970,10 @@ left: 10px;
     height: 1rem;
 }
 
-
+.hello {
+    outline: none;
+    margin-bottom: 15px;
+    font-size: 45px;
+    color: #667eea;
+    font-weight: 600;
+}
