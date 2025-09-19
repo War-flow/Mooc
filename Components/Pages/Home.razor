@@ -42,7 +42,7 @@
                 </Authorized>
                 <NotAuthorized>
                     <div class="hero-guest animate-zoom-in">
-                        <h1 class="hero-title" >Bienvenue sur MOOC POINT COM</h1>
+                        <h1 class="hero-title">Bienvenue sur MOOC POINT COM</h1>
                         <p class="hero-description">Découvrez nos formations et développez vos compétences</p>
                         <div class="hero-actions">
                             <a href="/Account/Register" class="btn btn-primary btn-lg">
@@ -117,7 +117,7 @@
         {
             <div class="empty-state animate-zoom-in">
                 <div class="empty-icon">
-                    <i class="fas fa-book-open"></i>
+                    <i class="bi bi-database-slash"></i>
                 </div>
                 <h3 class="empty-title">Aucune session disponible</h3>
                 <p class="empty-description">
@@ -144,10 +144,13 @@
         // Utilisation de IDbContextFactory pour obtenir une nouvelle instance de DbContext
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
 
+        // ⭐ CORRECTION : Utilisation de DateTime.UtcNow au lieu de DateTime.Now
+        var currentTime = DateTime.UtcNow;
+
         // Récupération des sessions disponibles (pas encore terminées et actives)
         availableSessions = await dbContext.Sessions
             .Include(s => s.Courses)
-            .Where(s => s.IsActive && DateTime.Now <= s.EndDate)
+            .Where(s => s.IsActive && currentTime <= s.EndDate)
             .OrderBy(s => s.StartDate)
             .ToListAsync();
 

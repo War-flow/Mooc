@@ -200,15 +200,34 @@ namespace Mooc
             builder.Services.AddHostedService<SessionExpiryService>();
             builder.Services.AddHostedService<PreRegistrationNotificationService>(); // Ajout du service PreRegistrationNotificationService
 
-            // Ajout des services SignalR
+            // Remplacez la configuration SignalR existante par :
             builder.Services.AddSignalR(options =>
             {
                 options.EnableDetailedErrors = builder.Environment.IsDevelopment();
-                options.ClientTimeoutInterval = TimeSpan.FromSeconds(30);
-                options.HandshakeTimeout = TimeSpan.FromSeconds(15);
-                options.MaximumReceiveMessageSize = 32 * 1024; // 32KB max
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(60); // Augmenté
+                options.HandshakeTimeout = TimeSpan.FromSeconds(30); // Augmenté
+                options.KeepAliveInterval = TimeSpan.FromSeconds(15); // Ajouté
+                options.MaximumReceiveMessageSize = 1024 * 1024; // 1MB
+                options.StreamBufferCapacity = 10;
+                options.MaximumParallelInvocationsPerClient = 2;
+            })
+            .AddHubOptions<SessionHub>(options =>
+            {
+                options.ClientTimeoutInterval = TimeSpan.FromSeconds(60);
+                options.HandshakeTimeout = TimeSpan.FromSeconds(30);
+                options.KeepAliveInterval = TimeSpan.FromSeconds(15);
             });
 
+            // Ajoutez cette configuration spécifique pour Blazor Server
+            builder.Services.AddServerSideBlazor(options =>
+            {
+                options.DetailedErrors = builder.Environment.IsDevelopment();
+                options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+                options.DisconnectedCircuitMaxRetained = 100;
+                options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+                options.MaxBufferedUnacknowledgedRenderBatches = 10;
+            });
+            
             // Ajout du service d'erreurs
             builder.Services.AddScoped<IErrorHandlingService, ErrorHandlingService>();
 
@@ -340,36 +359,73 @@ namespace Mooc
             app.UseAntiforgery();
             app.UseRateLimiter(); // Ajout de la protection contre les surcharges
 
-            // ✅ AJOUTER : Middleware de sécurité
+            // ✅ MODIFIER : Middleware de sécurité avec CSP pour Blazor
             app.Use(async (context, next) =>
             {
-                // Headers de sécurité
+                // Headers de sécurité de base
                 context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
                 context.Response.Headers.Append("X-Frame-Options", "DENY");
                 context.Response.Headers.Append("X-XSS-Protection", "1; mode=block");
                 context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
                 context.Response.Headers.Append("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
                 
+                // CSP spécialement configurée pour Blazor Server
+                if (app.Environment.IsDevelopment())
+                {
+                    // CSP moins stricte en développement pour faciliter le debug
+                    context.Response.Headers.Append("Content-Security-Policy",
+                        "default-src 'self'; " +
+                        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.youtube.com https://player.vimeo.com; " +
+                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                        "img-src 'self' data: https:; " +
+                        "media-src 'self' https:; " +
+                        "frame-src https://www.youtube.com https://player.vimeo.com https://www.dailymotion.com; " +
+                        "connect-src 'self' wss: ws: https: http: blob:; " + // ← IMPORTANT : blob: ajouté
+                        "font-src 'self' https://cdn.jsdelivr.net; " +
+                        "object-src 'none'; " +
+                        "base-uri 'self'; " +
+                        "form-action 'self'");
+                }
+                else
+                {
+                    // CSP plus stricte en production mais compatible SignalR
+                    context.Response.Headers.Append("Content-Security-Policy",
+                        "default-src 'self'; " +
+                        "script-src 'self' https://www.youtube.com https://player.vimeo.com; " +
+                        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+                        "img-src 'self' data: https:; " +
+                        "media-src 'self' https:; " +
+                        "frame-src https://www.youtube.com https://player.vimeo.com https://www.dailymotion.com; " +
+                        "connect-src 'self' wss: ws: https: blob:; " + // ← IMPORTANT : blob: ajouté
+                        "font-src 'self' https://cdn.jsdelivr.net; " +
+                        "object-src 'none'; " +
+                        "base-uri 'self'; " +
+                        "form-action 'self'");
+                }
+                
                 await next();
             });
 
+            // Ajoutez AVANT les autres mappings
             app.MapRazorComponents<App>()
-                .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode();
 
-            // Ajout des endpoints pour Identity
-            app.MapAdditionalIdentityEndpoints();
+// Ajout des endpoints pour Identity APRÈS
+app.MapAdditionalIdentityEndpoints();
 
-            // Ajout d'un health check
-            app.MapHealthChecks("/health");
+// Ajout d'un health check
+app.MapHealthChecks("/health");
 
-            // Ajout des hubs SignalR
-            app.MapHub<SessionHub>("/sessionHub").RequireAuthorization();
+// Ajout des hubs SignalR personnalisés APRÈS
+app.MapHub<SessionHub>("/sessionHub").RequireAuthorization();
 
             using (var scope = app.Services.CreateScope())
             {
                 var initializer = scope.ServiceProvider.GetRequiredService<IdentityDataInitializer>();
                 await initializer.InitializeAsync();
             }
+
+            app.MapControllers(); // Ajouter cette ligne avant app.Run()
 
             await app.RunAsync();
         }

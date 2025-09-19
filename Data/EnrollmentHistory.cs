@@ -28,7 +28,12 @@ namespace Mooc.Data
         public bool FromPreRegistration { get; set; } = false;
         
         public string? Notes { get; set; }
-        
+
+        public DateTime EnrollmentDate { get; set; }
+        public DateTime UnenrollmentDate { get; set; }
+        public string UnenrollmentReason { get; set; }
+        public bool IsCompleted { get; set; }
+
         // Propriétés calculées pour les statistiques
         [NotMapped]
         public int EnrollmentCount { get; set; }

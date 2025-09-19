@@ -2,142 +2,363 @@
 @page "/Error/{StatusCode:int?}"
 @using System.Diagnostics
 @using System.Net
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Authorization
+@using Mooc.Services
+@inherits ErrorBoundary
 
 @inject ILogger<Error> Logger
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
+@inject IErrorHandlingService ErrorHandlingService
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>@GetPageTitle()</PageTitle>
 
-<div class="error-container">
-    <div class="error-content">
-        <!-- Icône d'erreur -->
-        <div class="error-icon">
-            <i class="@GetErrorIcon()"></i>
-        </div>
-
-        <!-- Titre principal -->
-        <h1 class="error-title">@GetErrorTitle()</h1>
-        
-        <!-- Message d'erreur personnalisé -->
-        <div class="error-message">
-            <h2>@GetErrorMessage()</h2>
-            
-            @if (!string.IsNullOrEmpty(CustomMessage))
+@if (CurrentException is null && !HasLocalError && !IsDirectErrorPageAccess)
+{
+    @ChildContent
+}
+else
+{
+    <div class="error-container">
+        <div class="error-content">
+            <!-- Affichage pour erreur globale (ErrorBoundary) -->
+            @if (CurrentException is not null && !HasLocalError)
             {
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle me-2"></i>
-                    @CustomMessage
+                <div class="alert alert-danger mb-4" role="alert">
+                    <h4 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Une erreur inattendue s'est produite
+                    </h4>
+                    <p>L'application a rencontré une erreur technique. Nos équipes ont été automatiquement notifiées et travaillent à résoudre le problème.</p>
+                    <p class="mb-0">
+                        <small class="text-muted">
+                            Référence d'erreur : @(_currentErrorId ?? "N/A")
+                        </small>
+                    </p>
+                </div>
+            }
+
+            <!-- Affichage pour erreur locale -->
+            @if (HasLocalError)
+            {
+                <div class="alert alert-warning mb-4" role="alert">
+                    <h4 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Une erreur s'est produite
+                    </h4>
+                    <p>Une erreur technique s'est produite. Nos équipes ont été automatiquement notifiées.</p>
+                    <p class="mb-0">
+                        <small class="text-muted">
+                            Référence d'erreur : @(_currentErrorId ?? "N/A")
+                        </small>
+                    </p>
+                </div>
+            }
+
+            <!-- Affichage standard pour page d'erreur directe -->
+            @if (IsDirectErrorPageAccess)
+            {
+                <!-- Icône d'erreur -->
+                <div class="error-icon">
+                    <i class="@GetErrorIcon()"></i>
+                </div>
+
+                <!-- Titre principal -->
+                <h1 class="error-title">@GetErrorTitle()</h1>
+
+                <!-- Message d'erreur personnalisé -->
+                <div class="error-message">
+                    <h2>@GetErrorMessage()</h2>
+
+                    @if (!string.IsNullOrEmpty(CustomMessage))
+                    {
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            @CustomMessage
+                        </div>
+                    }
+
+                    <!-- Message d'information pour l'utilisateur -->
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Nos équipes techniques ont été automatiquement notifiées de ce problème et travaillent à le résoudre.
+                        @if (!string.IsNullOrEmpty(_currentErrorId))
+                        {
+                            <br><small class="text-muted">Référence d'erreur : @_currentErrorId</small>
+                        }
+                    </div>
+                </div>
+
+                <!-- Suggestions d'aide (gardées pour aider l'utilisateur) -->
+                <div class="error-help mt-4">
+                    <h5>Que puis-je faire ?</h5>
+                    <ul class="list-unstyled">
+                        @foreach (var suggestion in GetSuggestions())
+                        {
+                            <li><i class="bi bi-check-circle text-success me-2"></i>@suggestion</li>
+                        }
+                    </ul>
+                </div>
+
+                <!-- Informations de contact pour le support -->
+                <div class="error-contact mt-4 p-3 bg-light rounded">
+                    <h6>Besoin d'aide ?</h6>
+                    <p class="mb-1">
+                        <i class="bi bi-envelope me-2"></i>
+                        Si le problème persiste, contactez notre support : <a href="mailto:contact@cfa-pcom.fr">contact@cfa-pcom.fr</a>
+                        @if (!string.IsNullOrEmpty(_currentErrorId))
+                        {
+                            <br><small class="text-muted">Veuillez mentionner la référence d'erreur : @_currentErrorId</small>
+                        }
+                    </p>
                 </div>
             }
         </div>
-
-        <!-- Détails techniques (uniquement en développement) -->
-        @if (IsDevelopment && ShowRequestId)
-        {
-            <div class="error-details">
-                <details class="mt-3">
-                    <summary class="btn btn-outline-secondary btn-sm">
-                        <i class="bi bi-info-circle me-1"></i>
-                        Détails techniques
-                    </summary>
-                    <div class="mt-2 p-3 bg-light rounded">
-                        <p><strong>Request ID:</strong> <code>@RequestId</code></p>
-                        <p><strong>Timestamp:</strong> @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")</p>
-                        <p><strong>Status Code:</strong> @(StatusCode ?? 500)</p>
-                        @if (!string.IsNullOrEmpty(ExceptionDetails))
-                        {
-                            <p><strong>Exception:</strong></p>
-                            <pre class="bg-danger text-white p-2 rounded">@ExceptionDetails</pre>
-                        }
-                    </div>
-                </details>
-            </div>
-        }
-
-        <!-- Actions utilisateur -->
-        <div class="error-actions mt-4">
-            <button class="btn btn-primary me-2" @onclick="GoHome">
-                <i class="bi bi-house me-1"></i>
-                Retour à l'accueil
-            </button>
-            
-            <button class="btn btn-outline-secondary me-2" @onclick="GoBack">
-                <i class="bi bi-arrow-left me-1"></i>
-                Page précédente
-            </button>
-            
-            <button class="btn btn-outline-info" @onclick="RefreshPage">
-                <i class="bi bi-arrow-clockwise me-1"></i>
-                Actualiser
-            </button>
-        </div>
-
-        <!-- Suggestions d'aide -->
-        <div class="error-help mt-4">
-            <h5>Que puis-je faire ?</h5>
-            <ul class="list-unstyled">
-                @foreach (var suggestion in GetSuggestions())
-                {
-                    <li><i class="bi bi-check-circle text-success me-2"></i>@suggestion</li>
-                }
-            </ul>
-        </div>
-
-        <!-- Informations de contact (optionnel) -->
-        @if (ShowContactInfo)
-        {
-            <div class="error-contact mt-4 p-3 bg-light rounded">
-                <h6>Besoin d'aide ?</h6>
-                <p class="mb-1">
-                    <i class="bi bi-envelope me-2"></i>
-                    Contactez notre support : <a href="mailto:contact@cfa-pcom.fr">contact@cfa-pcom.fr</a>
-                </p>
-            </div>
-        }
     </div>
-</div>
+}
 
 @code {
+    // Paramètres existants pour page d'erreur directe
     [Parameter] public int? StatusCode { get; set; }
     [Parameter] public string? CustomMessage { get; set; }
     [Parameter] public string? ExceptionDetails { get; set; }
-    [Parameter] public bool ShowContactInfo { get; set; } = true;
+
+    // Paramètres pour ErrorBoundary
+    [Parameter] public EventCallback OnRetry { get; set; }
+    [Parameter] public bool IsLocalErrorMode { get; set; } = false;
 
     [CascadingParameter] private HttpContext? HttpContext { get; set; }
 
+    // Propriétés pour page d'erreur directe
     private string? RequestId { get; set; }
     private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
     private bool IsDevelopment => Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Development";
 
-    protected override void OnInitialized()
+    // Propriétés pour ErrorBoundary
+    public bool HasLocalError { get; private set; }
+    public string? LocalErrorMessage { get; private set; }
+    private int _errorCount = 0;
+    private readonly TimeSpan _errorCooldown = TimeSpan.FromMinutes(1);
+    private DateTime _lastErrorTime = DateTime.MinValue;
+    private readonly SemaphoreSlim _errorProcessingSemaphore = new(1, 1);
+    private bool _isProcessing = false;
+    private bool _hasRendered = false;
+    private string? _currentErrorId = null;
+
+    // Détection de la page d'erreur directe
+    private bool IsDirectErrorPageAccess
     {
-        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
-        
-        // Extraire le code de statut depuis le contexte HTTP si disponible
-        if (StatusCode == null && HttpContext?.Response != null)
+        get
         {
-            StatusCode = HttpContext.Response.StatusCode;
+            var uri = NavigationManager.Uri;
+            var hasErrorInUrl = uri.Contains("/Error", StringComparison.OrdinalIgnoreCase);
+            var hasStatusCode = StatusCode.HasValue;
+            var hasCustomMessage = !string.IsNullOrEmpty(CustomMessage);
+            var hasExceptionDetails = !string.IsNullOrEmpty(ExceptionDetails);
+
+            return hasErrorInUrl || hasStatusCode || hasCustomMessage || hasExceptionDetails;
         }
-
-        // Logger l'erreur
-        LogError();
     }
 
-    private void LogError()
+    protected override async Task OnInitializedAsync()
     {
-        var errorInfo = new
-        {
-            RequestId,
-            StatusCode = StatusCode ?? 500,
-            Timestamp = DateTime.Now,
-            UserAgent = HttpContext?.Request.Headers.UserAgent.ToString(),
-            Path = HttpContext?.Request.Path.ToString(),
-            CustomMessage
-        };
+        Logger.LogInformation("Error component initializing. URI: {URI}, StatusCode: {StatusCode}, IsDirectAccess: {IsDirectAccess}",
+            NavigationManager.Uri, StatusCode, IsDirectErrorPageAccess);
 
-        Logger.LogError("Page d'erreur affichée: {@ErrorInfo}", errorInfo);
+        if (IsDirectErrorPageAccess)
+        {
+            RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+
+            // Extraire le code de statut depuis le contexte HTTP si disponible
+            if (StatusCode == null && HttpContext?.Response != null)
+            {
+                StatusCode = HttpContext.Response.StatusCode;
+            }
+
+            // Logger et notifier automatiquement l'admin
+            await LogAndNotifyErrorAsync();
+        }
+        else
+        {
+            Logger.LogDebug("Error component initialized as ErrorBoundary for normal page routing");
+        }
     }
+
+    private async Task LogAndNotifyErrorAsync()
+    {
+        try
+        {
+            var errorInfo = new
+            {
+                RequestId,
+                StatusCode = StatusCode ?? 500,
+                Timestamp = DateTime.Now,
+                UserAgent = HttpContext?.Request.Headers.UserAgent.ToString(),
+                Path = HttpContext?.Request.Path.ToString(),
+                CustomMessage,
+                ExceptionDetails
+            };
+
+            Logger.LogError("Page d'erreur affichée: {@ErrorInfo}", errorInfo);
+
+            // Créer une exception fictive pour les erreurs HTTP
+            var exception = new HttpRequestException($"HTTP {StatusCode}: {GetErrorTitle()}");
+            
+            // Logger l'erreur et obtenir l'ID
+            _currentErrorId = await ErrorHandlingService.LogErrorAsync(exception, "DirectErrorPage", new Dictionary<string, object>
+            {
+                ["RequestId"] = RequestId ?? "Unknown",
+                ["StatusCode"] = StatusCode ?? 500,
+                ["UserAgent"] = HttpContext?.Request.Headers.UserAgent.ToString() ?? "Unknown",
+                ["Path"] = HttpContext?.Request.Path.ToString() ?? "Unknown",
+                ["CustomMessage"] = CustomMessage ?? "",
+                ["ExceptionDetails"] = ExceptionDetails ?? ""
+            });
+
+            // Notifier les administrateurs automatiquement
+            await ErrorHandlingService.NotifyAdministratorsAsync(exception, _currentErrorId);
+
+            Logger.LogInformation("Error logged and administrators notified. ErrorId: {ErrorId}", _currentErrorId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to log error and notify administrators");
+            _currentErrorId = Guid.NewGuid().ToString("N")[..8]; // ID de fallback
+        }
+    }
+
+    // ========================= MÉTHODES POUR ERREURS LOCALES =========================
+
+    public async void SetError(string message)
+    {
+        HasLocalError = true;
+        LocalErrorMessage = message;
+        Logger.LogWarning("Erreur locale définie: {Message}", message);
+        
+        // Notifier automatiquement l'admin
+        await NotifyAdminOfLocalErrorAsync(message);
+        
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public async void SetError(Exception exception)
+    {
+        SetError($"Erreur: {exception.Message}");
+        Logger.LogError(exception, "Exception locale dans ErrorBoundary");
+        
+        // Notifier automatiquement l'admin
+        await NotifyAdminOfLocalErrorAsync(exception);
+    }
+
+    private async Task NotifyAdminOfLocalErrorAsync(object error)
+    {
+        try
+        {
+            Exception exception = error switch
+            {
+                Exception ex => ex,
+                string msg => new ApplicationException(msg),
+                _ => new ApplicationException(error?.ToString() ?? "Unknown local error")
+            };
+
+            _currentErrorId = await ErrorHandlingService.LogErrorAsync(exception, "LocalError", new Dictionary<string, object>
+            {
+                ["ErrorType"] = "LocalError",
+                ["Timestamp"] = DateTime.UtcNow,
+                ["Url"] = NavigationManager.Uri
+            });
+
+            await ErrorHandlingService.NotifyAdministratorsAsync(exception, _currentErrorId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to notify admin of local error");
+        }
+    }
+
+    public void ResetLocal()
+    {
+        HasLocalError = false;
+        LocalErrorMessage = null;
+        _currentErrorId = null;
+        Logger.LogInformation("Erreur locale réinitialisée");
+        InvokeAsync(StateHasChanged);
+    }
+
+    // ========================= MÉTHODES POUR ERRORBOUNDARY =========================
+
+    protected override async Task OnErrorAsync(Exception exception)
+    {
+        await _errorProcessingSemaphore.WaitAsync();
+
+        try
+        {
+            _errorCount++;
+            _lastErrorTime = DateTime.UtcNow;
+
+            var errorId = Guid.NewGuid();
+            var timestamp = DateTime.UtcNow;
+
+            var userInfo = await GetUserInfoAsync();
+            var browserInfo = await GetBrowserInfoAsync();
+
+            var errorContext = new
+            {
+                ErrorId = errorId,
+                Timestamp = timestamp,
+                UserAgent = browserInfo.UserAgent,
+                Url = NavigationManager.Uri,
+                UserId = userInfo.UserId,
+                UserEmail = userInfo.UserEmail,
+                IsAuthenticated = userInfo.IsAuthenticated,
+                ErrorCount = _errorCount,
+                ExceptionType = exception.GetType().Name,
+                Message = exception.Message,
+                StackTrace = exception.StackTrace,
+                InnerException = exception.InnerException?.Message,
+                ViewportSize = browserInfo.ViewportSize,
+                ConnectionType = browserInfo.ConnectionType
+            };
+
+            Logger.LogError(exception,
+                "🚨 ErrorBoundary captured exception {ErrorId}. User: {UserId} ({UserEmail}), Count: {ErrorCount}, Type: {ExceptionType}, URL: {Url}",
+                errorId, userInfo.UserId, userInfo.UserEmail, _errorCount, exception.GetType().Name, NavigationManager.Uri);
+
+            // Logger l'erreur et obtenir l'ID
+            _currentErrorId = await ErrorHandlingService.LogErrorAsync(exception, "ErrorBoundary", new Dictionary<string, object>
+            {
+                ["ErrorId"] = errorId,
+                ["ErrorCount"] = _errorCount,
+                ["UserContext"] = userInfo,
+                ["BrowserContext"] = browserInfo
+            });
+
+            // Toujours notifier les administrateurs pour les exceptions capturées par ErrorBoundary
+            await ErrorHandlingService.NotifyAdministratorsAsync(exception, _currentErrorId);
+
+            Logger.LogInformation("ErrorBoundary exception logged and administrators notified. ErrorId: {ErrorId}", _currentErrorId);
+        }
+        catch (Exception loggingException)
+        {
+            Console.WriteLine($"❌ Critical error in ErrorBoundary logging: {loggingException}");
+            try
+            {
+                Logger.LogCritical(loggingException, "Failed to log original exception in ErrorBoundary. Original: {OriginalException}", exception.Message);
+            }
+            catch
+            {
+                Console.WriteLine($"❌ Complete logging failure. Original: {exception.Message}, Logging: {loggingException.Message}");
+            }
+        }
+        finally
+        {
+            _errorProcessingSemaphore.Release();
+        }
+    }
+
+    // ========================= MÉTHODES UTILITAIRES =========================
 
     private string GetPageTitle()
     {
@@ -219,18 +440,88 @@
         };
     }
 
-    private async Task GoHome()
+    private async Task<UserInfo> GetUserInfoAsync()
     {
-        NavigationManager.NavigateTo("/");
+        try
+        {
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+
+            if (authState?.User?.Identity?.IsAuthenticated == true)
+            {
+                return new UserInfo
+                {
+                    UserId = authState.User.FindFirst("sub")?.Value
+                           ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value
+                           ?? "Unknown",
+                    UserEmail = authState.User.FindFirst("email")?.Value
+                              ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress")?.Value
+                              ?? "Unknown",
+                    IsAuthenticated = true
+                };
+            }
+
+            return new UserInfo { UserId = "Anonymous", UserEmail = "Anonymous", IsAuthenticated = false };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to get user information");
+            return new UserInfo { UserId = "Error", UserEmail = "Error", IsAuthenticated = false };
+        }
     }
 
-    private async Task GoBack()
+    private async Task<BrowserInfo> GetBrowserInfoAsync()
     {
-        await JSRuntime.InvokeVoidAsync("history.back");
+        if (!_hasRendered)
+        {
+            return new BrowserInfo
+            {
+                UserAgent = "Prerendering",
+                ViewportSize = "Prerendering",
+                ConnectionType = "Prerendering"
+            };
+        }
+
+        try
+        {
+            var userAgent = await JSRuntime.InvokeAsync<string>("eval", "navigator.userAgent || 'Unknown'");
+            var viewportSize = await JSRuntime.InvokeAsync<string>("eval", "`${window.innerWidth}x${window.innerHeight}`");
+            var connectionType = await JSRuntime.InvokeAsync<string>("eval", "navigator.connection?.effectiveType || 'Unknown'");
+
+            return new BrowserInfo
+            {
+                UserAgent = userAgent,
+                ViewportSize = viewportSize,
+                ConnectionType = connectionType
+            };
+        }
+        catch (Exception ex)
+        {
+            Logger.LogWarning(ex, "Failed to get browser information");
+            return new BrowserInfo
+            {
+                UserAgent = "Unknown",
+                ViewportSize = "Unknown",
+                ConnectionType = "Unknown"
+            };
+        }
     }
 
-    private async Task RefreshPage()
+    private record UserInfo
     {
-        await JSRuntime.InvokeVoidAsync("location.reload");
+        public string UserId { get; init; } = string.Empty;
+        public string UserEmail { get; init; } = string.Empty;
+        public bool IsAuthenticated { get; init; }
+    }
+
+    private record BrowserInfo
+    {
+        public string UserAgent { get; init; } = string.Empty;
+        public string ViewportSize { get; init; } = string.Empty;
+        public string ConnectionType { get; init; } = string.Empty;
+    }
+
+    public void Dispose()
+    {
+        _errorProcessingSemaphore?.Dispose();
     }
 }

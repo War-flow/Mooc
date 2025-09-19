@@ -1,5 +1,8 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Mooc.Data.Converters;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion; // ⭐ AJOUTÉ
+
 
 namespace Mooc.Data
 {
@@ -15,6 +18,20 @@ namespace Mooc.Data
         protected override void OnModelCreating(ModelBuilder builder)
         {
             base.OnModelCreating(builder);
+
+            // ⭐ NOUVEAU : Configuration globale pour convertir automatiquement les DateTime en UTC
+            foreach (var entityType in builder.Model.GetEntityTypes())
+            {
+                foreach (var property in entityType.GetProperties())
+                {
+                    if (property.ClrType == typeof(DateTime) || property.ClrType == typeof(DateTime?))
+                    {
+                        property.SetValueConverter(new ValueConverter<DateTime, DateTime>(
+                            v => v.Kind == DateTimeKind.Utc ? v : DateTime.SpecifyKind(v, DateTimeKind.Utc),
+                            v => DateTime.SpecifyKind(v, DateTimeKind.Utc)));
+                    }
+                }
+            }
 
             // Configuration de Session
             builder.Entity<Session>(entity =>
@@ -34,11 +51,12 @@ namespace Mooc.Data
                       .HasColumnType("varchar")
                       .HasMaxLength(300);
                       
+                // ⭐ CORRECTION : Utiliser timestamp avec time zone pour les dates
                 entity.Property(e => e.StartDate)
-                      .HasColumnType("date");
+                      .HasColumnType("timestamp with time zone");
                       
                 entity.Property(e => e.EndDate)
-                      .HasColumnType("date");
+                      .HasColumnType("timestamp with time zone");
                       
                 entity.Property(e => e.Work)
                       .HasColumnType("int");
@@ -47,7 +65,7 @@ namespace Mooc.Data
                       .HasColumnType("boolean")
                       .HasDefaultValue(true);
                 
-                // **AJOUT MANQUANT** : Configuration de la relation one-to-one avec le créateur
+                // Configuration de la relation one-to-one avec le créateur
                 entity.HasOne(s => s.User)
                       .WithMany()
                       .HasForeignKey(s => s.UserId)
@@ -58,11 +76,11 @@ namespace Mooc.Data
                       .WithOne(c => c.Session)
                       .HasForeignKey(c => c.SessionId);
                 
-                // **CONFIGURATION EXISTANTE** : Relation many-to-many avec ApplicationUser pour les inscriptions
+                // Configuration de la relation many-to-many avec ApplicationUser pour les inscriptions
                 entity.HasMany(s => s.EnrolledUsers)
                       .WithMany(u => u.EnrolledSessions)
                       .UsingEntity<Dictionary<string, object>>(
-                          "SessionEnrollments", // Nom de la table de liaison
+                          "SessionEnrollments",
                           j => j
                               .HasOne<ApplicationUser>()
                               .WithMany()
@@ -214,7 +232,29 @@ namespace Mooc.Data
                       
                 entity.HasIndex(e => e.Date)
                       .HasDatabaseName("IX_EnrollmentHistory_Date");
+
+                // ⭐ NOUVEAU : Configuration explicite pour les propriétés DateTime
+                entity.Property(e => e.Date)
+                      .HasColumnType("timestamp with time zone")
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                      
+                entity.Property(e => e.EnrollmentDate)
+                      .HasColumnType("timestamp with time zone");
+                      
+                entity.Property(e => e.UnenrollmentDate)
+                      .HasColumnType("timestamp with time zone");
             });
+        }
+
+        // ⭐ NOUVEAU : Configuration supplémentaire pour les conventions PostgreSQL
+        protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
+        {
+            // Convertir automatiquement tous les DateTime en UTC
+            configurationBuilder.Properties<DateTime>()
+                .HaveConversion<UtcDateTimeConverter>();
+                
+            configurationBuilder.Properties<DateTime?>()
+                .HaveConversion<NullableUtcDateTimeConverter>();
         }
     }
 }

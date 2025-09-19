@@ -91,7 +91,7 @@
                                 <!-- Badge cours -->
                                 <span class="bage @(GetPublishedCoursesCount(session.Id) > 0 ? "bg-info" : "bg-warning")">
                                     <i class="bi bi-book me-1"></i>
-                                    @GetPublishedCoursesCount(session.Id) cours@(GetPublishedCoursesCount(session.Id) > 1 ? "s" : "")
+                                    @GetPublishedCoursesCount(session.Id) cour@(GetPublishedCoursesCount(session.Id) > 1 ? "s" : "")
                                 </span>
                             </div>
                         </div>
@@ -343,6 +343,44 @@
     </div>
 }
 
+@if (showDeactivationModal)
+{
+    <div class="modal fade show modal-backdrop-custom" style="display: block;" aria-modal="true" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content modal-modern">
+                <div class="modal-header modal-header-warning">
+                    <h5 class="modal-title">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        Confirmer la mise hors ligne
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" @onclick="() => showDeactivationModal = false"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="warning-icon mb-3">
+                        <i class="bi bi-people-fill text-warning"></i>
+                    </div>
+                    <p class="lead">Cette session a <strong>@enrolledUsersCount utilisateur@(enrolledUsersCount > 1 ? "s" : "") inscrit@(enrolledUsersCount > 1 ? "s" : "")</strong>.</p>
+                    <p class="text-muted">En mettant cette session hors ligne, tous les utilisateurs seront automatiquement désinscrits.</p>
+                    <div class="alert alert-warning">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Cette action est irréversible et un historique sera conservé.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" @onclick="() => showDeactivationModal = false">
+                        <i class="bi bi-x-circle me-1"></i>
+                        Annuler
+                    </button>
+                    <button type="button" class="btn btn-warning" @onclick="ConfirmSessionDeactivation">
+                        <i class="bi bi-wifi-off me-1"></i>
+                        Mettre hors ligne et désinscrire
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     // Variables existantes
     private List<Mooc.Data.Session>? sessions;
@@ -370,6 +408,11 @@
 
     // **NOUVEAU** : Token d'annulation pour gérer les timeouts
     private CancellationTokenSource? cancellationTokenSource;
+
+    // Ajoutez ces variables dans la section @code
+    private bool showDeactivationModal = false;
+    private int sessionToDeactivate = 0;
+    private int enrolledUsersCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -547,35 +590,43 @@
             var now = DateTime.Now;
 
             using var context = await DbContextFactory.CreateDbContextAsync();
-            var session = await context.Sessions.Include(s => s.Courses).FirstOrDefaultAsync(s => s.Id == sessionId);
+            var session = await context.Sessions
+                .Include(s => s.Courses)
+                .Include(s => s.EnrolledUsers)
+                .FirstOrDefaultAsync(s => s.Id == sessionId);
 
             if (session != null)
             {
-                // Vérification : bloquer l'activation si aucun cours n'existe
+                // Si on tente de désactiver une session avec des utilisateurs inscrits
+                if (session.IsActive && session.EnrolledUsers != null && session.EnrolledUsers.Any())
+                {
+                    sessionToDeactivate = sessionId;
+                    enrolledUsersCount = session.EnrolledUsers.Count;
+                    showDeactivationModal = true;
+                    return;
+                }
+
+                // Logique existante pour l'activation...
                 if (!session.IsActive && (session.Courses == null || !session.Courses.Any()))
                 {
-                    errorMessage = "Impossible de publier cette session : aucun cours n'a été créé. Veuillez d'abord ajouter des cours à cette session.";
+                    errorMessage = "Impossible de publier cette session : aucun cours n'a été créé.";
                     return;
                 }
 
-                // Vérification : bloquer l'activation s'il n'y a pas de cours publiés
                 if (!session.IsActive && session.Courses != null && !session.Courses.Any(c => c.IsPublished))
                 {
-                    errorMessage = "Impossible de publier  cette session : aucun cours n'est publié. Veuillez publier au moins un cours avant d'activer la session.";
+                    errorMessage = "Impossible de publier cette session : aucun cours n'est publié.";
                     return;
                 }
 
-                // Vérification : Session terminé
                 if (session.EndDate < now)
                 {
-                    errorMessage = "Impossible de publier  cette session : la période de formation est expirée";
+                    errorMessage = "Impossible de publier cette session : la période de formation est expirée";
                     return;
                 }
 
                 session.IsActive = !session.IsActive;
                 await context.SaveChangesAsync();
-
-                // **OPTIMISÉ** : Recharger seulement si nécessaire
                 await LoadSessionsOptimized();
                 ClearError();
             }
@@ -583,6 +634,55 @@
         catch (Exception ex)
         {
             errorMessage = $"Erreur lors du changement de statut : {ex.Message}";
+        }
+    }
+
+    // Nouvelle méthode pour confirmer la désactivation
+    private async Task ConfirmSessionDeactivation()
+    {
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var session = await context.Sessions
+                .Include(s => s.EnrolledUsers)
+                .FirstOrDefaultAsync(s => s.Id == sessionToDeactivate);
+
+            if (session != null)
+            {
+                // Créer l'historique pour chaque utilisateur
+                foreach (var user in session.EnrolledUsers.ToList())
+                {
+                    var enrollmentHistory = new EnrollmentHistory
+                    {
+                        SessionId = sessionToDeactivate,
+                        UserId = user.Id,
+                        EnrollmentDate = DateTime.Now,
+                        UnenrollmentDate = DateTime.Now,
+                        UnenrollmentReason = "Session mise hors ligne par l'administrateur",
+                        IsCompleted = false
+                    };
+                    
+                    context.EnrollmentHistories.Add(enrollmentHistory);
+                }
+
+                // Désinscrire tous les utilisateurs
+                session.EnrolledUsers.Clear();
+                session.IsActive = false;
+                
+                await context.SaveChangesAsync();
+                await LoadSessionsOptimized();
+                ClearError();
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la désactivation : {ex.Message}";
+        }
+        finally
+        {
+            showDeactivationModal = false;
+            sessionToDeactivate = 0;
+            enrolledUsersCount = 0;
         }
     }
 
@@ -1000,4 +1100,6 @@
     {
         return sessionsWithUsersCache.TryGetValue(sessionId, out var hasUsers) && hasUsers;
     }
+
+
 }

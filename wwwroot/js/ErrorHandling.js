@@ -83,5 +83,47 @@ class ErrorHandler {
     }
 }
 
+// Gestionnaire d'erreurs côté client
+window.addEventListener('error', function(event) {
+    logClientError('javascript', event.message, event.filename, event.lineno, event.colno);
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+    logClientError('promise', event.reason.message || event.reason, window.location.href);
+});
+
+function logClientError(type, message, url = '', line = 0, col = 0) {
+    try {
+        const errorData = {
+            type: type,
+            message: message,
+            error: { line: line, column: col },
+            timestamp: new Date().toISOString(),
+            userAgent: navigator.userAgent,
+            url: url || window.location.href,
+            userId: 'anonymous', // Vous pouvez récupérer l'ID utilisateur si disponible
+            errorCount: 1
+        };
+
+        console.error('Client Error:', errorData);
+
+        // Envoyer l'erreur au serveur
+        fetch('/api/errors/client', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(errorData)
+        }).catch(err => {
+            console.error('Failed to log error to server:', err);
+        });
+    } catch (err) {
+        console.error('Error in error handler:', err);
+    }
+}
+
+// Exposer la fonction globalement
+window.logClientError = logClientError;
+
 // Initialiser le gestionnaire d'erreurs
 window.errorHandler = new ErrorHandler();
