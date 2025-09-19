@@ -1,6 +1,537 @@
 ﻿@page "/FAQ"
-<h3>FAQ</h3>
 
-@code {
+<PageTitle>FAQ POINT</PageTitle>
 
+<!-- En-tête de page avec design moderne -->
+<div class="page-header header-waves ocean header-animated">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <i class="bi bi-patch-question header-icon morphing" aria-hidden="true"></i>
+                <h1 class="page-title">Foire aux questions</h1>
+                <p class="page-subtitle">Trouvez rapidement les réponses à vos questions</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <!-- Navigation latérale -->
+        <div class="col-lg-3 col-md-4">
+            <div class="faq-sidebar sticky-top">
+                <nav class="faq-navigation" aria-label="Navigation FAQ">
+                    <div class="nav nav-pills flex-column">
+                        <button class="nav-link active" onclick="scrollToSection('questions-generales')" type="button">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Questions générales
+                            <span class="badge bg-secondary ms-auto">5</span>
+                        </button>
+                        <button class="nav-link" onclick="scrollToSection('compte-connexion')" type="button">
+                            <i class="bi bi-person-circle me-2"></i>
+                            Compte et connexion
+                            <span class="badge bg-secondary ms-auto">4</span>
+                        </button>
+                        <button class="nav-link" onclick="scrollToSection('formations')" type="button">
+                            <i class="bi bi-mortarboard me-2"></i>
+                            Formations
+                            <span class="badge bg-secondary ms-auto">6</span>
+                        </button>
+                        <button class="nav-link" onclick="scrollToSection('technique')" type="button">
+                            <i class="bi bi-gear me-2"></i>
+                            Support technique
+                            <span class="badge bg-secondary ms-auto">3</span>
+                        </button>
+                        <button class="nav-link" onclick="scrollToSection('certifications')" type="button">
+                            <i class="bi bi-award me-2"></i>
+                            Certifications
+                            <span class="badge bg-secondary ms-auto">3</span>
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Contenu principal -->
+        <div class="col-lg-9 col-md-8">
+            <div class="faq-content">
+
+                <!-- Section: Questions générales -->
+                <section id="questions-generales" class="faq-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="bi bi-info-circle me-2"></i>
+                            Questions générales
+                        </h2>
+                        <p class="section-description">Informations générales sur la plateforme POINT COM</p>
+                    </div>
+
+                    <div class="accordion accordion-flush" id="accordion-general">
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#general-1" aria-expanded="true">
+                                    Qu'est-ce que la plateforme POINT COM ?
+                                    <span class="badge bg-warning text-dark ms-2">
+                                        <i class="bi bi-star-fill me-1"></i>Populaire
+                                    </span>
+                                </button>
+                            </h3>
+                            <div id="general-1" class="accordion-collapse collapse show" data-bs-parent="#accordion-general">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>POINT COM est une plateforme d'apprentissage en ligne (MOOC) dédiée à la formation professionnelle. Elle propose des cours interactifs, des quiz, et des certifications dans divers domaines.</p>
+                                        <p>La plateforme offre :</p>
+                                        <ul>
+                                            <li>Des cours vidéo de haute qualité</li>
+                                            <li>Des exercices pratiques interactifs</li>
+                                            <li>Un suivi personnalisé de votre progression</li>
+                                            <li>Des certifications reconnues</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#general-2">
+                                    Comment puis-je m'inscrire ?
+                                </button>
+                            </h3>
+                            <div id="general-2" class="accordion-collapse collapse" data-bs-parent="#accordion-general">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>L'inscription est simple et rapide :</p>
+                                        <ol>
+                                            <li>Cliquez sur le bouton "S'inscrire" en haut de la page</li>
+                                            <li>Remplissez le formulaire avec vos informations</li>
+                                            <li>Validez votre email via le lien reçu</li>
+                                            <li>Votre compte est prêt !</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#general-3">
+                                    La plateforme est-elle gratuite ?
+                                </button>
+                            </h3>
+                            <div id="general-3" class="accordion-collapse collapse" data-bs-parent="#accordion-general">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Oui, l'accès aux formations est entièrement gratuit pour tous les apprenants inscrits dans notre centre de formation.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Compte et connexion -->
+                <section id="compte-connexion" class="faq-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="bi bi-person-circle me-2"></i>
+                            Compte et connexion
+                        </h2>
+                        <p class="section-description">Gérez votre compte et résolvez les problèmes de connexion</p>
+                    </div>
+
+                    <div class="accordion accordion-flush" id="accordion-compte">
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compte-1">
+                                    Comment réinitialiser mon mot de passe ?
+                                    <span class="badge bg-warning text-dark ms-2">
+                                        <i class="bi bi-star-fill me-1"></i>Populaire
+                                    </span>
+                                </button>
+                            </h3>
+                            <div id="compte-1" class="accordion-collapse collapse" data-bs-parent="#accordion-compte">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Pour réinitialiser votre mot de passe :</p>
+                                        <ol>
+                                            <li>Cliquez sur <strong>"Mot de passe oublié"</strong> sur la page de connexion</li>
+                                            <li>Saisissez votre adresse email</li>
+                                            <li>Consultez votre boîte mail pour le lien de réinitialisation</li>
+                                            <li>Suivez les instructions dans l'email</li>
+                                        </ol>
+                                        <p><strong>Note :</strong> Vérifiez aussi vos spams si vous ne recevez pas l'email.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compte-2">
+                                    Je n'arrive pas à me connecter
+                                </button>
+                            </h3>
+                            <div id="compte-2" class="accordion-collapse collapse" data-bs-parent="#accordion-compte">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Vérifiez ces points :</p>
+                                        <ul>
+                                            <li>Votre email et mot de passe sont corrects</li>
+                                            <li>Votre compte a été activé (vérifiez vos emails)</li>
+                                            <li>Votre navigateur accepte les cookies</li>
+                                            <li>Vous n'avez pas de bloqueur de publicités actif</li>
+                                        </ul>
+                                        <p>Si le problème persiste, contactez notre support.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#compte-3">
+                                    Comment modifier mes informations personnelles ?
+                                </button>
+                            </h3>
+                            <div id="compte-3" class="accordion-collapse collapse" data-bs-parent="#accordion-compte">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Pour modifier vos informations :</p>
+                                        <ol>
+                                            <li>Connectez-vous à votre compte</li>
+                                            <li>Cliquez sur votre nom en haut à droite</li>
+                                            <li>Sélectionnez "Gérer le compte"</li>
+                                            <li>Modifiez les informations souhaitées</li>
+                                            <li>Cliquez sur "Enregistrer"</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Formations -->
+                <section id="formations" class="faq-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="bi bi-mortarboard me-2"></i>
+                            Formations
+                        </h2>
+                        <p class="section-description">Tout savoir sur l'accès et le suivi de vos formations</p>
+                    </div>
+
+                    <div class="accordion accordion-flush" id="accordion-formations">
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#formation-1">
+                                    Comment accéder à mes formations ?
+                                    <span class="badge bg-warning text-dark ms-2">
+                                        <i class="bi bi-star-fill me-1"></i>Populaire
+                                    </span>
+                                </button>
+                            </h3>
+                            <div id="formation-1" class="accordion-collapse collapse" data-bs-parent="#accordion-formations">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Pour accéder à vos formations :</p>
+                                        <ol>
+                                            <li>Connectez-vous à votre compte</li>
+                                            <li>Cliquez sur <strong>"Mes Formations"</strong> dans le menu</li>
+                                            <li>Sélectionnez la formation souhaitée</li>
+                                            <li>Cliquez sur "Commencer" ou "Continuer"</li>
+                                        </ol>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#formation-2">
+                                    Comment suivre ma progression ?
+                                </button>
+                            </h3>
+                            <div id="formation-2" class="accordion-collapse collapse" data-bs-parent="#accordion-formations">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Votre progression est automatiquement sauvegardée. Vous pouvez la consulter :</p>
+                                        <ul>
+                                            <li>Sur la page d'accueil de chaque formation</li>
+                                            <li>Dans la section "Mes Formations"</li>
+                                            <li>Via la barre de progression en haut de chaque cours</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#formation-3">
+                                    Puis-je reprendre une formation interrompue ?
+                                </button>
+                            </h3>
+                            <div id="formation-3" class="accordion-collapse collapse" data-bs-parent="#accordion-formations">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Oui, absolument ! Votre progression est automatiquement sauvegardée. Vous pouvez reprendre votre formation exactement où vous l'avez laissée.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Support technique -->
+                <section id="technique" class="faq-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="bi bi-gear me-2"></i>
+                            Support technique
+                        </h2>
+                        <p class="section-description">Résolution des problèmes techniques</p>
+                    </div>
+
+                    <div class="accordion accordion-flush" id="accordion-technique">
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tech-1">
+                                    Problème de lecture vidéo
+                                </button>
+                            </h3>
+                            <div id="tech-1" class="accordion-collapse collapse" data-bs-parent="#accordion-technique">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Si vous rencontrez des problèmes de lecture vidéo :</p>
+                                        <ul>
+                                            <li>Vérifiez votre connexion internet</li>
+                                            <li>Essayez de recharger la page (F5)</li>
+                                            <li>Utilisez un navigateur récent (Chrome, Firefox, Edge)</li>
+                                            <li>Désactivez temporairement votre bloqueur de publicités</li>
+                                            <li>Videz le cache de votre navigateur</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tech-2">
+                                    Le site est lent ou ne se charge pas
+                                </button>
+                            </h3>
+                            <div id="tech-2" class="accordion-collapse collapse" data-bs-parent="#accordion-technique">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Pour résoudre les problèmes de chargement :</p>
+                                        <ul>
+                                            <li>Vérifiez votre connexion internet</li>
+                                            <li>Essayez un autre navigateur</li>
+                                            <li>Videz le cache et les cookies</li>
+                                            <li>Désactivez les extensions du navigateur</li>
+                                            <li>Réessayez plus tard</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#tech-3">
+                                    Configuration système recommandée
+                                </button>
+                            </h3>
+                            <div id="tech-3" class="accordion-collapse collapse" data-bs-parent="#accordion-technique">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p><strong>Navigateurs recommandés :</strong></p>
+                                        <ul>
+                                            <li>Google Chrome (version récente)</li>
+                                            <li>Mozilla Firefox (version récente)</li>
+                                            <li>Microsoft Edge (version récente)</li>
+                                            <li>Safari (version récente)</li>
+                                        </ul>
+                                        <p><strong>Connexion internet :</strong> Minimum 2 Mbps pour la lecture vidéo</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Certifications -->
+                <section id="certifications" class="faq-section">
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <i class="bi bi-award me-2"></i>
+                            Certifications
+                        </h2>
+                        <p class="section-description">Informations sur les certificats et badges</p>
+                    </div>
+
+                    <div class="accordion accordion-flush" id="accordion-certifications">
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cert-1">
+                                    Comment obtenir mon certificat ?
+                                    <span class="badge bg-warning text-dark ms-2">
+                                        <i class="bi bi-star-fill me-1"></i>Populaire
+                                    </span>
+                                </button>
+                            </h3>
+                            <div id="cert-1" class="accordion-collapse collapse" data-bs-parent="#accordion-certifications">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Votre certificat sera automatiquement généré une fois que vous aurez :</p>
+                                        <ul>
+                                            <li>Terminé tous les modules de la formation</li>
+                                            <li>Réussi tous les quiz avec une note minimale</li>
+                                            <li>Validé le projet final (si applicable)</li>
+                                        </ul>
+                                        <p>Le certificat sera disponible dans la section "Certificats et Badges".</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cert-2">
+                                    Mes certificats sont-ils reconnus ?
+                                </button>
+                            </h3>
+                            <div id="cert-2" class="accordion-collapse collapse" data-bs-parent="#accordion-certifications">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Oui, nos certificats sont officiellement reconnus et délivrés par notre centre de formation agréé. Ils attestent de vos compétences acquises.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion-item faq-item">
+                            <h3 class="accordion-header">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cert-3">
+                                    Comment télécharger mon certificat ?
+                                </button>
+                            </h3>
+                            <div id="cert-3" class="accordion-collapse collapse" data-bs-parent="#accordion-certifications">
+                                <div class="accordion-body">
+                                    <div class="answer-content">
+                                        <p>Pour télécharger votre certificat :</p>
+                                        <ol>
+                                            <li>Allez dans "Certificats et Badges"</li>
+                                            <li>Trouvez le certificat souhaité</li>
+                                            <li>Cliquez sur "Télécharger PDF"</li>
+                                        </ol>
+                                        <p>Le certificat sera téléchargé au format PDF haute qualité.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+
+            <!-- Section contact -->
+            <div class="contact-section mt-5">
+                <div class="card border-0 bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="card-title">
+                            <i class="bi bi-question-circle text-primary me-2"></i>
+                            Vous ne trouvez pas votre réponse ?
+                        </h3>
+                        <p class="card-text">
+                            Notre équipe est là pour vous aider. N'hésitez pas à nous contacter.
+                        </p>
+                        <div class="d-flex justify-content-center gap-3 flex-wrap">
+                            <a href="mailto:contact@cfa-pcom.fr" class="btn btn-primary">
+                                <i class="bi bi-envelope me-2"></i>
+                                Nous contacter
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ===== JAVASCRIPT POUR LA NAVIGATION FAQ ===== -->
+<script>
+function scrollToSection(sectionId) {
+    const element = document.getElementById(sectionId);
+    if (element) {
+        // Calculer l'offset pour la navbar sticky
+        const offset = 100;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition = elementPosition + window.pageYOffset - offset;
+        
+        window.scrollTo({
+            top: offsetPosition,
+            behavior: 'smooth'
+        });
+        
+        // Mettre à jour l'état actif des liens
+        updateActiveLink(sectionId);
+    }
 }
+
+function updateActiveLink(activeId) {
+    // Retirer la classe active de tous les liens
+    document.querySelectorAll('.faq-navigation .nav-link').forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Ajouter la classe active au lien cliqué
+    if (event && event.target) {
+        event.target.classList.add('active');
+    }
+}
+
+// Scroll spy pour mettre à jour automatiquement le lien actif pendant le défilement
+window.addEventListener('scroll', function() {
+    const sections = ['questions-generales', 'compte-connexion', 'formations', 'technique', 'certifications'];
+    const scrollPos = window.pageYOffset + 150;
+    
+    sections.forEach(sectionId => {
+        const section = document.getElementById(sectionId);
+        if (section) {
+            const top = section.offsetTop;
+            const bottom = top + section.offsetHeight;
+            
+            if (scrollPos >= top && scrollPos <= bottom) {
+                // Retirer la classe active de tous les boutons
+                document.querySelectorAll('.faq-navigation .nav-link').forEach(link => {
+                    link.classList.remove('active');
+                });
+                
+                // Ajouter la classe active au bouton correspondant
+                const activeButton = document.querySelector(`button[onclick*="${sectionId}"]`);
+                if (activeButton) {
+                    activeButton.classList.add('active');
+                }
+            }
+        }
+    });
+});
+
+// Initialisation au chargement de la page
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('FAQ JavaScript chargé avec succès');
+    
+    // Vérifier si nous sommes sur une ancre spécifique dans l'URL
+    const hash = window.location.hash;
+    if (hash) {
+        const targetId = hash.substring(1); // Enlever le #
+        setTimeout(() => {
+            scrollToSection(targetId);
+        }, 500); // Petit délai pour que la page soit complètement chargée
+    }
+});
+</script>
