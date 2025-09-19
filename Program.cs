@@ -410,6 +410,7 @@ namespace Mooc
             app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
+
 // Ajout des endpoints pour Identity APRÈS
 app.MapAdditionalIdentityEndpoints();
 
