@@ -171,14 +171,32 @@ else
                             <div class="info-item mb-3">
                                 <strong>Score :</strong>
                                 <div class="score-display">
-                                    <span class="fs-4 fw-bold text-success">
-                                        @GetCorrectAnswersCount()/@GetTotalQuizCount()
-                                    </span>
-                                    @if (GetTotalQuizCount() > 0)
+                                    @if (courseScoreResult != null)
                                     {
-                                        <span class="text-muted">
-                                            (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
+                                        <div class="d-flex flex-column">
+                                            <span class="fs-4 fw-bold text-success">
+                                                @courseScoreResult.TotalEarnedPoints / @courseScoreResult.TotalPossiblePoints pts
+                                            </span>
+                                            <span class="text-muted small">
+                                                @courseScoreResult.CorrectAnswers/@courseScoreResult.QuizCount quiz réussis
+                                                (@courseScoreResult.ScorePercentage.ToString("F1")%)
+                                            </span>
+                                            <span class="badge @GetOverallLevelClass() mt-1">
+                                                @GetOverallLevelText()
+                                            </span>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <span class="fs-4 fw-bold text-success">
+                                            @GetCorrectAnswersCount()/@GetTotalQuizCount()
                                         </span>
+                                        @if (GetTotalQuizCount() > 0)
+                                        {
+                                            <span class="text-muted">
+                                                (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
+                                            </span>
+                                        }
                                     }
                                 </div>
                             </div>
@@ -284,9 +302,9 @@ else
                     }
 
                     <div class="card-body">
-                        @if (blocks != null && blocks.Any() && CurrentBlockIndex >= 0 && CurrentBlockIndex < blocks.Count)
+                        @if (IsCurrentBlockValid())
                         {
-                            var currentBlock = blocks[CurrentBlockIndex];
+                            var currentBlock = blocks![CurrentBlockIndex];
                             <div class="course-block-viewer">
                                 <DynamicComponent Type="@GetViewerBlockComponent(currentBlock.Type)"
                                                   Parameters="@GetViewerBlockParameters(currentBlock)" />
@@ -389,24 +407,35 @@ else
     private List<CourBuilder.CoursBlock>? blocks;
     private bool isLoading = true;
     private bool showNavigationHelper = true;
+    
+    // ✅ Propriété sécurisée pour CurrentBlockIndex
     private int CurrentBlockIndex => BlockIndex ?? 0;
+    
     private Services.CourseProgress? courseProgress;
-
-    // Dictionnaire pour tracker l'état des quiz par bloc
     private Dictionary<int, bool> quizCompletionState = new();
+    private CourseScoreResult? courseScoreResult;
 
     protected override async Task OnInitializedAsync()
     {
         await LoadCoursData();
         await LoadCourseProgress();
+        
+        // Charger le score détaillé si le cours est terminé
+        if (courseProgress?.IsCompleted == true)
+        {
+            await LoadCourseScore();
+        }
     }
 
     protected override async Task OnParametersSetAsync()
     {
+        // ✅ Attendre que les données soient chargées avant de valider les paramètres
+        if (isLoading) return;
+
         // Rediriger vers le dernier bloc consulté si aucun bloc spécifié
         if (!BlockIndex.HasValue && blocks != null && blocks.Any())
         {
-            var targetBlock = courseProgress?.LastAccessedBlock ?? 0;
+            var targetBlock = Math.Max(0, Math.Min(courseProgress?.LastAccessedBlock ?? 0, blocks.Count - 1));
             NavigationManager.NavigateTo(GetBlockUrl(targetBlock), replace: true);
             return;
         }
@@ -415,16 +444,26 @@ else
         if (BlockIndex.HasValue && blocks != null &&
             (BlockIndex.Value < 0 || BlockIndex.Value >= blocks.Count))
         {
-            NavigationManager.NavigateTo(GetBlockUrl(0), replace: true);
+            var safeIndex = Math.Max(0, Math.Min(BlockIndex.Value, blocks.Count - 1));
+            NavigationManager.NavigateTo(GetBlockUrl(safeIndex), replace: true);
             return;
         }
 
         // Sauvegarder l'accès au bloc actuel
-        if (BlockIndex.HasValue && courseProgress != null)
+        if (BlockIndex.HasValue && courseProgress != null && IsCurrentBlockValid())
         {
             courseProgress.LastAccessedBlock = BlockIndex.Value;
             await CourseStateService.SaveProgressAsync(courseProgress);
         }
+    }
+
+    // ✅ Nouvelle méthode pour vérifier la validité du bloc actuel
+    private bool IsCurrentBlockValid()
+    {
+        return blocks != null && 
+               blocks.Any() && 
+               CurrentBlockIndex >= 0 && 
+               CurrentBlockIndex < blocks.Count;
     }
 
     private async Task LoadCoursData()
@@ -446,6 +485,9 @@ else
                         {
                             PropertyNameCaseInsensitive = true
                         });
+                    
+                    // ✅ Assurer que blocks n'est jamais null
+                    blocks ??= new List<CourBuilder.CoursBlock>();
                 }
                 catch (Exception ex)
                 {
@@ -453,10 +495,15 @@ else
                     blocks = new List<CourBuilder.CoursBlock>();
                 }
             }
+            else
+            {
+                blocks = new List<CourBuilder.CoursBlock>();
+            }
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement du cours: {ex.Message}");
+            blocks = new List<CourBuilder.CoursBlock>();
         }
         finally
         {
@@ -473,6 +520,18 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement du progrès: {ex.Message}");
+        }
+    }
+
+    private async Task LoadCourseScore()
+    {
+        try
+        {
+            courseScoreResult = await CourseStateService.CalculateCourseScoreAsync(CoursId);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement du score: {ex.Message}");
         }
     }
 
@@ -518,7 +577,7 @@ else
 
     private async Task MarkBlockAsCompleted()
     {
-        if (courseProgress != null)
+        if (courseProgress != null && IsCurrentBlockValid())
         {
             courseProgress.CompletedBlocks.Add(CurrentBlockIndex);
 
@@ -540,7 +599,7 @@ else
         try
         {
             // Marquer le dernier bloc comme complété s'il ne l'est pas
-            if (!courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
+            if (IsCurrentBlockValid() && !courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
             {
                 courseProgress.CompletedBlocks.Add(CurrentBlockIndex);
             }
@@ -564,10 +623,10 @@ else
         }
     }
 
-    // Méthodes utilitaires améliorées
+    // ✅ Méthodes utilitaires sécurisées
     private bool IsLastBlock()
     {
-        return blocks != null && CurrentBlockIndex == blocks.Count - 1;
+        return blocks != null && blocks.Any() && CurrentBlockIndex == blocks.Count - 1;
     }
 
     private bool IsCurrentBlockCompleted()
@@ -577,9 +636,9 @@ else
 
     private bool CanCompleteCourse()
     {
-        if (blocks == null || courseProgress == null) return false;
+        if (!IsCurrentBlockValid() || courseProgress == null) return false;
 
-        var currentBlock = blocks[CurrentBlockIndex];
+        var currentBlock = blocks![CurrentBlockIndex];
         
         // Si ce n'est pas un quiz, permettre la completion
         if (currentBlock.Type != "quiz") return true;
@@ -590,9 +649,9 @@ else
 
     private bool CanNavigateToNext()
     {
-        if (blocks == null) return false;
+        if (!IsCurrentBlockValid()) return false;
 
-        var currentBlock = blocks[CurrentBlockIndex];
+        var currentBlock = blocks![CurrentBlockIndex];
         
         // Si ce n'est pas un quiz, permettre la navigation
         if (currentBlock.Type != "quiz") return true;
@@ -603,8 +662,8 @@ else
 
     private bool IsCurrentBlockQuiz()
     {
-        if (blocks == null || CurrentBlockIndex >= blocks.Count) return false;
-        return blocks[CurrentBlockIndex].Type == "quiz";
+        if (!IsCurrentBlockValid()) return false;
+        return blocks![CurrentBlockIndex].Type == "quiz";
     }
 
     private async Task OnQuizCompleted(bool isCorrect)
@@ -642,10 +701,10 @@ else
 
     private string GetCurrentBlockTitle()
     {
-        if (blocks == null || !blocks.Any() || CurrentBlockIndex < 0 || CurrentBlockIndex >= blocks.Count)
+        if (!IsCurrentBlockValid())
             return "Contenu du cours";
 
-        var currentBlock = blocks[CurrentBlockIndex];
+        var currentBlock = blocks![CurrentBlockIndex];
         return !string.IsNullOrEmpty(currentBlock.Title)
             ? currentBlock.Title
             : $"Bloc {CurrentBlockIndex + 1}";
@@ -673,9 +732,10 @@ else
             ["IsReadOnly"] = true
         };
 
-        // Ajouter le callback pour les quiz
+        // Ajouter le CoursId et le callback seulement pour les quiz
         if (block.Type == "quiz")
         {
+            parameters["CoursId"] = CoursId;
             parameters["OnQuizCompleted"] = EventCallback.Factory.Create<bool>(this, OnQuizCompleted);
         }
 
@@ -713,9 +773,37 @@ else
         return blocks.Count(b => b.Type == "quiz");
     }
 
+    private string GetOverallLevelClass()
+    {
+        return courseScoreResult?.OverallLevel switch
+        {
+            CoursePerformanceLevel.Excellent => "bg-success",
+            CoursePerformanceLevel.Good => "bg-info",
+            CoursePerformanceLevel.Average => "bg-warning text-dark",
+            CoursePerformanceLevel.NeedsImprovement => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetOverallLevelText()
+    {
+        return courseScoreResult?.OverallLevel switch
+        {
+            CoursePerformanceLevel.Excellent => "🏆 Excellent",
+            CoursePerformanceLevel.Good => "⭐ Bien",
+            CoursePerformanceLevel.Average => "👍 Satisfaisant",
+            CoursePerformanceLevel.NeedsImprovement => "📚 À améliorer",
+            _ => "Non évalué"
+        };
+    }
+
     // Vérifie si l'utilisateur peut naviguer vers un bloc spécifique
     private bool CanNavigateToBlock(int targetBlockIndex)
     {
+        // ✅ Vérification de sécurité
+        if (blocks == null || targetBlockIndex < 0 || targetBlockIndex >= blocks.Count)
+            return false;
+
         // Si le cours a déjà été complété une fois, autoriser la navigation libre
         if (HasCompletedCourseOnce())
         {
@@ -753,8 +841,7 @@ else
             return true;
         }
 
-        // Vous pourriez aussi vérifier dans l'historique si vous avez une table pour ça
-        // Par exemple, vérifier si tous les blocs ont été complétés au moins une fois
+        // Vérifier si tous les blocs ont été complétés au moins une fois
         if (blocks != null && courseProgress?.CompletedBlocks != null)
         {
             return courseProgress.CompletedBlocks.Count >= blocks.Count;

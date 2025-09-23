@@ -13,6 +13,7 @@
 @inject IJSRuntime JSRuntime
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject ISessionCompletionService SessionCompletionService
+@inject CourseStateService CourseStateService
 @attribute [Authorize(Policy = "VoirCours")]
 @implements IDisposable
 
@@ -51,6 +52,14 @@
                                 @activeSessions en cours
                             </span>
                         }
+                        @* **NOUVEAU**: Affichage du score total *@
+                        @if (totalEarnedPoints > 0)
+                        {
+                            <span class="stat-badge bouncing" style="animation-delay: 0.6s;">
+                                <i class="bi bi-trophy me-2"></i>
+                                @totalEarnedPoints pts
+                            </span>
+                        }
                     </div>
                 }
             </div>
@@ -71,7 +80,7 @@
             </div>
         }
     }
-    
+
     @if (isLoading)
     {
         <div class="loading-state">
@@ -87,6 +96,7 @@
             @foreach (var session in enrolledSessions)
             {
                 var completionInfo = sessionCompletionInfos.GetValueOrDefault(session.Id);
+                var sessionScore = sessionScores.GetValueOrDefault(session.Id);
                 <div class="session-card @(GetSessionBorderClass(session, completionInfo))">
                     <div class="session-image">
                         @if (!string.IsNullOrEmpty(session.Image))
@@ -125,12 +135,45 @@
                                 </span>
                             }
                         </div>
+                        @* **NOUVEAU**: Affichage du score dans l'image *@
+                        @if (sessionScore != null && sessionScore.TotalEarnedPoints > 0)
+                        {
+                            <div class="session-score-overlay">
+                                <span class="badge bg-warning">
+                                    <i class="bi bi-star-fill me-1"></i>
+                                    @sessionScore.TotalEarnedPoints pts
+                                </span>
+                            </div>
+                        }
                     </div>
                     <div class="session-content">
                         <h5 class="session-title">@session.Title</h5>
                         <p class="session-description">@session.Description</p>
-                        
-                        <!-- **NOUVEAU** : Affichage du progrès de completion -->
+
+                        <!-- **NOUVEAU** : Affichage du score détaillé -->
+                        @if (sessionScore != null && (sessionScore.TotalEarnedPoints > 0 || sessionScore.TotalPossiblePoints > 0))
+                        {
+                            <div class="score-info mb-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <small class="text-muted">Score obtenu</small>
+                                    <small class="fw-bold">@sessionScore.TotalEarnedPoints/@sessionScore.TotalPossiblePoints points</small>
+                                </div>
+                                <div class="progress mb-2" style="height: 6px;">
+                                    <div class="progress-bar bg-warning"
+                                         role="progressbar"
+                                         style="width: @(sessionScore.ScorePercentage)%"
+                                         aria-valuenow="@sessionScore.ScorePercentage"
+                                         aria-valuemin="0"
+                                         aria-valuemax="100">
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-muted">@sessionScore.ScorePercentage.ToString("F1")%</small>
+                                </div>
+                            </div>
+                        }
+
+                        <!-- **MODIFIÉ** : Affichage du progrès de completion -->
                         @if (completionInfo != null)
                         {
                             <div class="completion-info mb-3">
@@ -139,11 +182,11 @@
                                     <small class="text-muted">@completionInfo.CompletedCoursesCount/@completionInfo.TotalCoursesCount cours</small>
                                 </div>
                                 <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar @(completionInfo.IsCompleted ? "bg-success" : "bg-primary")" 
-                                         role="progressbar" 
+                                    <div class="progress-bar @(completionInfo.IsCompleted ? "bg-success" : "bg-primary")"
+                                         role="progressbar"
                                          style="width: @(completionInfo.CompletionPercentage)%"
-                                         aria-valuenow="@completionInfo.CompletionPercentage" 
-                                         aria-valuemin="0" 
+                                         aria-valuenow="@completionInfo.CompletionPercentage"
+                                         aria-valuemin="0"
                                          aria-valuemax="100">
                                     </div>
                                 </div>
@@ -202,7 +245,7 @@
                                     <i class="bi bi-eye me-2"></i> Voir la session
                                 </a>
                             }
-                            
+
                             @if (AllowUnsubscribeFromEndedSessions || !IsSessionEnded(session))
                             {
                                 <button class="btn btn-outline-danger flex-fill" @onclick="() => ShowUnsubscribeModal(session.Id)" disabled="@isProcessing">
@@ -214,6 +257,46 @@
                 </div>
             }
         </div>
+
+        @* **NOUVEAU**: Résumé global des scores *@
+        @if (enrolledSessions.Any() && (totalEarnedPoints > 0 || totalPossiblePoints > 0))
+        {
+            <div class="row mt-4">
+                <div class="col-md-8 mx-auto">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">
+                                <i class="bi bi-trophy me-2"></i>
+                                Résumé de vos performances
+                            </h6>
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <div class="fs-3 fw-bold text-primary">@totalEarnedPoints</div>
+                                    <small class="text-muted">Points gagnés</small>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="fs-3 fw-bold text-info">@totalPossiblePoints</div>
+                                    <small class="text-muted">Points possibles</small>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <div class="fs-3 fw-bold text-success">@overallScorePercentage.ToString("F1")%</div>
+                                    <small class="text-muted">Score global</small>
+                                </div>
+                            </div>
+                            <div class="progress mt-3" style="height: 10px;">
+                                <div class="progress-bar bg-gradient"
+                                     role="progressbar"
+                                     style="width: @(overallScorePercentage)%; background: linear-gradient(45deg, #28a745, #ffc107);"
+                                     aria-valuenow="@overallScorePercentage"
+                                     aria-valuemin="0"
+                                     aria-valuemax="100">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
     }
     else
     {
@@ -280,6 +363,12 @@
     // **NOUVEAU** : Dictionnaire pour stocker les informations de completion
     private Dictionary<int, SessionCompletionInfo> sessionCompletionInfos = new();
 
+    // **NOUVEAU** : Dictionnaires pour les scores
+    private Dictionary<int, SessionScoreInfo> sessionScores = new();
+    private int totalEarnedPoints = 0;
+    private int totalPossiblePoints = 0;
+    private double overallScorePercentage = 0;
+
     // Paramètre pour contrôler si on permet la désinscription des sessions terminées
     private bool AllowUnsubscribeFromEndedSessions = true;
 
@@ -296,9 +385,10 @@
             await LoadCurrentUser();
             await LoadEnrolledSessions();
             await LoadSessionCompletionInfos();
+            await LoadSessionScores(); // **NOUVEAU**
             await LoadDismissedNotifications(); // **NOUVEAU**
             await CheckForSessionNotifications();
-            
+
             // Actualiser automatiquement toutes les 2 minutes
             refreshTimer = new Timer(async _ => await RefreshSessions(), null, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2));
         }
@@ -322,8 +412,100 @@
         var previousCount = enrolledSessions?.Count ?? 0;
         await LoadEnrolledSessions();
         await LoadSessionCompletionInfos(); // **NOUVEAU**
+        await LoadSessionScores(); // **NOUVEAU**
         await CheckForSessionNotifications();
         await InvokeAsync(StateHasChanged);
+    }
+
+    // **NOUVELLE MÉTHODE** : Charger les scores des sessions
+    private async Task LoadSessionScores()
+    {
+        if (string.IsNullOrEmpty(currentUserId) || enrolledSessions == null)
+        {
+            sessionScores.Clear();
+            totalEarnedPoints = 0;
+            totalPossiblePoints = 0;
+            overallScorePercentage = 0;
+            return;
+        }
+
+        try
+        {
+            sessionScores.Clear();
+            totalEarnedPoints = 0;
+            totalPossiblePoints = 0;
+
+            using var context = await DbContextFactory.CreateDbContextAsync();
+
+            foreach (var session in enrolledSessions)
+            {
+                var courses = await context.Courses
+                    .Where(c => c.SessionId == session.Id)
+                    .ToListAsync();
+
+                var sessionInfo = new SessionScoreInfo
+                {
+                    SessionId = session.Id,
+                    TotalEarnedPoints = 0,
+                    TotalPossiblePoints = 0,
+                    ScorePercentage = 0
+                };
+
+                foreach (var course in courses)
+                {
+                    try
+                    {
+                        var courseScore = await CourseStateService.CalculateCourseScoreAsync(course.Id, currentUserId);
+                        sessionInfo.TotalEarnedPoints += courseScore.TotalEarnedPoints;
+                        sessionInfo.TotalPossiblePoints += courseScore.TotalPossiblePoints;
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erreur lors du calcul du score pour le cours {course.Id}: {ex.Message}");
+                    }
+                }
+
+                // Calculer le pourcentage de la session
+                sessionInfo.ScorePercentage = sessionInfo.TotalPossiblePoints > 0
+                    ? (double)sessionInfo.TotalEarnedPoints / sessionInfo.TotalPossiblePoints * 100
+                    : 0;
+
+                sessionScores[session.Id] = sessionInfo;
+                totalEarnedPoints += sessionInfo.TotalEarnedPoints;
+                totalPossiblePoints += sessionInfo.TotalPossiblePoints;
+            }
+
+            // Calculer le pourcentage global
+            overallScorePercentage = totalPossiblePoints > 0
+                ? (double)totalEarnedPoints / totalPossiblePoints * 100
+                : 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des scores de session : {ex.Message}");
+            sessionScores.Clear();
+            totalEarnedPoints = 0;
+            totalPossiblePoints = 0;
+            overallScorePercentage = 0;
+        }
+    }
+
+    // **NOUVELLES MÉTHODES** : Helper pour l'affichage des scores
+    private string GetScoreBadgeClass(double scorePercentage)
+    {
+        if (scorePercentage >= 80) return "bg-success";
+        if (scorePercentage >= 60) return "bg-warning";
+        if (scorePercentage >= 40) return "bg-info";
+        return "bg-danger";
+    }
+
+    // **NOUVELLE CLASSE** : Information de score pour une session
+    public class SessionScoreInfo
+    {
+        public int SessionId { get; set; }
+        public int TotalEarnedPoints { get; set; }
+        public int TotalPossiblePoints { get; set; }
+        public double ScorePercentage { get; set; }
     }
 
     // **NOUVELLE MÉTHODE** : Charger les informations de completion
@@ -400,7 +582,7 @@
         foreach (var session in enrolledSessions)
         {
             var completionInfo = sessionCompletionInfos.GetValueOrDefault(session.Id);
-            
+
             // **MODIFIÉ** : Vérifier si la notification n'a pas déjà été dismissée
             if (completionInfo?.IsCompleted == true && completionInfo.CompletionDate.HasValue)
             {
@@ -442,7 +624,7 @@
             if (IsSessionActive(session))
             {
                 var timeRemaining = session.EndDate - now;
-                
+
                 if (timeRemaining.TotalHours <= 1 && timeRemaining.TotalMinutes > 0)
                 {
                     var ending1hNotificationId = $"ending-1h-{session.Id}";
@@ -523,7 +705,7 @@
 
     private async Task LoadEnrolledSessions()
     {
-        if (string.IsNullOrEmpty(currentUserId)) 
+        if (string.IsNullOrEmpty(currentUserId))
         {
             enrolledSessions = new List<Session>();
             return;
@@ -565,7 +747,7 @@
     private void ShowUnsubscribeModal(int sessionId)
     {
         if (isProcessing) return;
-        
+
         sessionToUnsubscribe = sessionId;
         showUnsubscribeModal = true;
     }
@@ -578,11 +760,11 @@
 
     private async Task UnsubscribeFromSession()
     {
-        if (string.IsNullOrEmpty(currentUserId) || sessionToUnsubscribe == 0 || isProcessing) 
+        if (string.IsNullOrEmpty(currentUserId) || sessionToUnsubscribe == 0 || isProcessing)
             return;
 
         isProcessing = true;
-        
+
         try
         {
             await using var context = await DbContextFactory.CreateDbContextAsync();
@@ -597,10 +779,11 @@
                 {
                     user.EnrolledSessions.Remove(sessionToRemove);
                     await context.SaveChangesAsync();
-                    
+
                     // Recharger les sessions après la désinscription
                     await LoadEnrolledSessions();
                     await LoadSessionCompletionInfos(); // **NOUVEAU**
+                    await LoadSessionScores(); // **NOUVEAU**
                     StateHasChanged();
 
                     // Notification de succès
@@ -653,7 +836,7 @@
             return $"{(int)timeSpan.TotalHours} heure(s) et {timeSpan.Minutes} minute(s)";
         return $"{(int)timeSpan.TotalDays} jour(s), {timeSpan.Hours} heure(s)";
     }
-    
+
     // Ajoutez cette classe à la fin du fichier ou dans un fichier partagé approprié
     public class SessionNotification
     {
@@ -664,4 +847,3 @@
         public string Icon { get; set; } = "info-circle";
     }
 }
-

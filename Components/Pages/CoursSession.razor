@@ -61,6 +61,14 @@ else
                     @(IsSessionEnded() ? "Session terminée" : IsSessionActive() ? "Session en cours" : "À venir")
                 </span>
                 <span class="badge bg-info">@coursList.Count cours</span>
+                @* **NOUVEAU**: Affichage du score total de la session *@
+                @if (sessionTotalScore > 0)
+                {
+                    <span class="badge bg-warning">
+                        <i class="bi bi-trophy me-1"></i>
+                        @sessionTotalScore pts
+                    </span>
+                }
             </div>
         </div>
     </div>
@@ -93,13 +101,43 @@ else
                                 @GetCourseCompletionStatus(cours.Id)
                             </span>
                         </div>
+                        @* **NOUVEAU**: Affichage du score du cours *@
+                        @if (courseScores.ContainsKey(cours.Id) && courseScores[cours.Id].TotalEarnedPoints > 0)
+                        {
+                            <div class="course-score">
+                                <span class="badge bg-success">
+                                    <i class="bi bi-star-fill me-1"></i>
+                                    @courseScores[cours.Id].TotalEarnedPoints/@courseScores[cours.Id].TotalPossiblePoints pts
+                                </span>
+                                <small class="text-muted d-block mt-1">
+                                    @courseScores[cours.Id].ScorePercentage.ToString("F1")%
+                                </small>
+                            </div>
+                        }
                     </div>
                     <div class="course-content">
                         <div class="course-title">@cours.Title</div>
                         <div class="course-description">@GetTruncatedDescription(cours.Description)</div>
+                        
+                        @* **NOUVEAU**: Détails du score si disponible *@
+                        @if (courseScores.ContainsKey(cours.Id) && courseScores[cours.Id].QuizCount > 0)
+                        {
+                            <div class="course-score-details mt-2">
+                                <small class="text-muted">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    @courseScores[cours.Id].CorrectAnswers/@courseScores[cours.Id].QuizCount quiz réussis
+                                </small>
+                                <div class="performance-level mt-1">
+                                    <span class="badge @GetPerformanceBadgeClass(courseScores[cours.Id].OverallLevel)">
+                                        @GetPerformanceLevelText(courseScores[cours.Id].OverallLevel)
+                                    </span>
+                                </div>
+                            </div>
+                        }
+
                         <div class="course-meta">
                             <div class="course-updated">
-                                <i class="bi bi-calendar me-1"></i> Mise à jour : @cours.UpdatedAt.ToString("dd/MM/yyyy")
+                                <i class="bi bi-calendar me-1"></i> Mise à jour : @cours.UpdatedAt.ToString("dd/MM/yyyy")
                             </div>
                         </div>
                     </div>
@@ -145,6 +183,20 @@ else
                         <small class="text-muted">
                             @completedCoursCount sur @coursList.Count cours terminés
                         </small>
+                        
+                        @* **NOUVEAU**: Affichage du score global de la session *@
+                        @if (sessionTotalScore > 0 || sessionMaxScore > 0)
+                        {
+                            <div class="mt-3">
+                                <h6 class="card-title">Score global de la session</h6>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="fs-4 fw-bold text-primary">@sessionTotalScore</span>
+                                        <span class="text-muted">/ @sessionMaxScore points</span>
+                                    </div>
+                                </div>
+                            </div>
+                        }
                     </div>
                 </div>
             </div>
@@ -166,6 +218,12 @@ else
 
     // Nouveau dictionnaire pour tracker les progrès des cours
     private Dictionary<int, Services.CourseProgress> courseProgresses = new();
+    
+    // **CORRECTION**: Initialisation explicite des dictionnaires pour les scores
+    private Dictionary<int, CourseScoreResult> courseScores = new Dictionary<int, CourseScoreResult>();
+    private int sessionTotalScore = 0;
+    private int sessionMaxScore = 0;
+    private double sessionScorePercentage = 0;
 
     // Injection du service
     @inject CourseStateService CourseStateService
@@ -178,8 +236,13 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        // **AJOUT**: Initialisation explicite des dictionnaires au cas où
+        courseProgresses ??= new Dictionary<int, Services.CourseProgress>();
+        courseScores ??= new Dictionary<int, CourseScoreResult>();
+        
         await LoadSessionData();
         await LoadCourseProgresses(); // Charger les progrès des cours
+        await LoadCourseScores(); // **NOUVEAU**: Charger les scores des cours
         
         // Démarrer un timer pour vérifier les changements de statut de session toutes les minutes
         refreshTimer = new Timer(async _ => await CheckSessionStatus(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
@@ -193,6 +256,7 @@ else
         // Recharger les données si SessionId change
         await LoadSessionData();
         await LoadCourseProgresses();
+        await LoadCourseScores(); // **NOUVEAU**
     }
 
     public void Dispose()
@@ -202,11 +266,48 @@ else
         errorMessageTimer?.Dispose(); // Nouveau
     }
 
+    // **NOUVELLE MÉTHODE**: Charger les scores des cours
+    private async Task LoadCourseScores()
+    {
+        try
+        {
+            // **CORRECTION**: Vérification et initialisation si nécessaire
+            courseScores ??= new Dictionary<int, CourseScoreResult>();
+            courseScores.Clear();
+            
+            sessionTotalScore = 0;
+            sessionMaxScore = 0;
+            
+            foreach (var cours in coursList)
+            {
+                var scoreResult = await CourseStateService.CalculateCourseScoreAsync(cours.Id);
+                courseScores[cours.Id] = scoreResult;
+                
+                sessionTotalScore += scoreResult.TotalEarnedPoints;
+                sessionMaxScore += scoreResult.TotalPossiblePoints;
+            }
+            
+            // Calculer le pourcentage global
+            sessionScorePercentage = sessionMaxScore > 0 ? (double)sessionTotalScore / sessionMaxScore * 100 : 0;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des scores: {ex.Message}");
+            // **AJOUT**: Réinitialiser les scores en cas d'erreur
+            courseScores ??= new Dictionary<int, CourseScoreResult>();
+            sessionTotalScore = 0;
+            sessionMaxScore = 0;
+            sessionScorePercentage = 0;
+        }
+    }
+
     // Nouvelle méthode pour charger les progrès des cours
     private async Task LoadCourseProgresses()
     {
         try
         {
+            // **AJOUT**: Vérification et initialisation si nécessaire
+            courseProgresses ??= new Dictionary<int, Services.CourseProgress>();
             courseProgresses.Clear();
             
             foreach (var cours in coursList)
@@ -218,6 +319,8 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement des progrès: {ex.Message}");
+            // **AJOUT**: Réinitialiser les progrès en cas d'erreur
+            courseProgresses ??= new Dictionary<int, Services.CourseProgress>();
         }
     }
 
@@ -228,6 +331,7 @@ else
         {
             var previousCompletedCount = completedCoursCount;
             await LoadCourseProgresses();
+            await LoadCourseScores(); // **NOUVEAU**: Rafraîchir les scores aussi
             
             // Si le nombre de cours complétés a changé, rafraîchir l'interface
             if (completedCoursCount != previousCompletedCount)
@@ -235,6 +339,29 @@ else
                 await InvokeAsync(StateHasChanged);
             }
         }
+    }
+
+    // **NOUVELLES MÉTHODES**: Helper pour l'affichage des performances
+    private string GetPerformanceBadgeClass(CoursePerformanceLevel level)
+    {
+        return level switch
+        {
+            CoursePerformanceLevel.Excellent => "bg-success",
+            CoursePerformanceLevel.Good => "bg-info",
+            CoursePerformanceLevel.Average => "bg-warning",
+            _ => "bg-secondary"
+        };
+    }
+    
+    private string GetPerformanceLevelText(CoursePerformanceLevel level)
+    {
+        return level switch
+        {
+            CoursePerformanceLevel.Excellent => "Excellent",
+            CoursePerformanceLevel.Good => "Bien",
+            CoursePerformanceLevel.Average => "Moyen",
+            _ => "Non évalué"
+        };
     }
 
     // Méthode pour obtenir le statut d'un cours spécifique
@@ -291,6 +418,7 @@ else
                     session = updatedSession;
                     coursList = session.Courses?.ToList() ?? new List<Cours>();
                     await LoadCourseProgresses(); // Recharger les progrès aussi
+                    await LoadCourseScores(); // **NOUVEAU**: Recharger les scores aussi
                     await InvokeAsync(StateHasChanged);
                 }
             }

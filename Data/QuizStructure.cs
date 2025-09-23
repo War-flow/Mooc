@@ -69,6 +69,46 @@ namespace Mooc.Data
             };
         }
 
+        // **NOUVELLES MÉTHODES** : Pour l'affichage des points
+        /// <summary>
+        /// Obtient les points de base selon la difficulté
+        /// </summary>
+        public int GetBasePoints()
+        {
+            return QuizScoring.DifficultyPoints[Difficulty];
+        }
+
+        /// <summary>
+        /// Obtient la classe CSS pour l'affichage des points
+        /// </summary>
+        public string GetPointsClass()
+        {
+            return Difficulty switch
+            {
+                QuizDifficulty.Débutant => "bg-success",
+                QuizDifficulty.Intermédiaire => "bg-info",
+                QuizDifficulty.Avancé => "bg-warning text-dark",
+                QuizDifficulty.Expert => "bg-danger",
+                _ => "bg-secondary"
+            };
+        }
+
+        /// <summary>
+        /// Obtient la description des points possibles
+        /// </summary>
+        public string GetPointsDescription()
+        {
+            var basePoints = GetBasePoints();
+            return Difficulty switch
+            {
+                QuizDifficulty.Débutant => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
+                QuizDifficulty.Intermédiaire => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
+                QuizDifficulty.Avancé => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
+                QuizDifficulty.Expert => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
+                _ => $"{basePoints} points possibles"
+            };
+        }
+
         public static ValidationResult? ValidateOptions(string? value, ValidationContext context)
         {
             if (context.ObjectInstance is QuizStructure quiz)
