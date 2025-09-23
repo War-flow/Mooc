@@ -225,26 +225,44 @@ else
                                         var block = blocks[i];
                                         var isCompleted = courseProgress?.CompletedBlocks.Contains(blockIndex) ?? false;
                                         var isCurrent = blockIndex == CurrentBlockIndex;
+                                        var isNavigationAllowed = CanNavigateToBlock(blockIndex);
 
-                                        <div class="list-group-item @(isCurrent ? "active" : "") p-2"
-                                             @onclick="() => GoToBlock(blockIndex)"
-                                             role="button">
+                                        <div class="list-group-item @(isCurrent ? "active" : "") @(!isNavigationAllowed ? "disabled" : "") p-2"
+                                             @onclick="() => HandleBlockNavigation(blockIndex)"
+                                             role="button"
+                                             style="@(!isNavigationAllowed ? "cursor: not-allowed; opacity: 0.6;" : "cursor: pointer;")">
                                             <div class="d-flex justify-content-between align-items-center">
                                                 <span class="@(isCurrent ? "fw-bold" : "")">
                                                     @(blockIndex + 1). @(!string.IsNullOrEmpty(block.Title) ? block.Title : GetBlockTypeDisplay(block.Type))
                                                 </span>
-                                                @if (isCompleted)
-                                                {
-                                                    <i class="bi bi-check-circle-fill text-success"></i>
-                                                }
-                                                else if (isCurrent)
-                                                {
-                                                    <i class="bi bi-arrow-right text-primary"></i>
-                                                }
+                                                <div class="d-flex align-items-center">
+                                                    @if (!isNavigationAllowed && !isCurrent)
+                                                    {
+                                                        <i class="bi bi-lock-fill text-muted me-2" title="Bloc verrouillé - terminez le cours une fois pour débloquer"></i>
+                                                    }
+                                                    @if (isCompleted)
+                                                    {
+                                                        <i class="bi bi-check-circle-fill text-success"></i>
+                                                    }
+                                                    else if (isCurrent)
+                                                    {
+                                                        <i class="bi bi-arrow-right text-primary"></i>
+                                                    }
+                                                </div>
                                             </div>
                                         </div>
                                     }
                                 </div>
+                                @if (!HasCompletedCourseOnce())
+                                {
+                                    <div class="alert alert-info mt-3 mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <small>
+                                            <strong>Navigation séquentielle :</strong> Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours. 
+                                            Une fois terminé, vous pourrez naviguer librement entre tous les blocs.
+                                        </small>
+                                    </div>
+                                }
                             </div>
                         }
                     </div>
@@ -693,5 +711,69 @@ else
     {
         if (blocks == null) return 0;
         return blocks.Count(b => b.Type == "quiz");
+    }
+
+    // Vérifie si l'utilisateur peut naviguer vers un bloc spécifique
+    private bool CanNavigateToBlock(int targetBlockIndex)
+    {
+        // Si le cours a déjà été complété une fois, autoriser la navigation libre
+        if (HasCompletedCourseOnce())
+        {
+            return true;
+        }
+
+        // Sinon, navigation séquentielle uniquement
+        // Permettre d'aller au bloc actuel
+        if (targetBlockIndex == CurrentBlockIndex)
+        {
+            return true;
+        }
+
+        // Permettre d'aller au bloc suivant si le bloc actuel permet la navigation
+        if (targetBlockIndex == CurrentBlockIndex + 1 && CanNavigateToNext())
+        {
+            return true;
+        }
+
+        // Permettre d'aller aux blocs précédents déjà visités
+        if (targetBlockIndex < CurrentBlockIndex)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    // Vérifie si le cours a été complété au moins une fois
+    private bool HasCompletedCourseOnce()
+    {
+        // Vérifier si le cours est actuellement marqué comme complété
+        if (courseProgress?.IsCompleted == true)
+        {
+            return true;
+        }
+
+        // Vous pourriez aussi vérifier dans l'historique si vous avez une table pour ça
+        // Par exemple, vérifier si tous les blocs ont été complétés au moins une fois
+        if (blocks != null && courseProgress?.CompletedBlocks != null)
+        {
+            return courseProgress.CompletedBlocks.Count >= blocks.Count;
+        }
+
+        return false;
+    }
+
+    // Gère la navigation vers un bloc avec vérification des permissions
+    private async Task HandleBlockNavigation(int blockIndex)
+    {
+        if (!CanNavigateToBlock(blockIndex))
+        {
+            await JSRuntime.InvokeVoidAsync("alert", 
+                "Navigation bloquée : Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours. " +
+                "Une fois le cours terminé, vous pourrez naviguer librement entre tous les blocs.");
+            return;
+        }
+
+        await GoToBlock(blockIndex);
     }
 }
