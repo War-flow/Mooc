@@ -50,9 +50,9 @@ else if (session == null)
 else
 {
     @* Ajout d'un header moderne *@
-    <div class="page-header">
+    <div class="page-header header-waves ocean header-animated">
         <div class="container">
-            <h1 class="page-title">@session?.Title</h1>
+            <h1 class="page-title typewriter">@session?.Title</h1>
             <p class="page-subtitle">
                 @session?.Description
             </p>
@@ -89,9 +89,6 @@ else
                 <div class="course-card">
                     <div class="course-header">
                         <div class="course-status">
-                            <span class="badge @(cours.IsPublished ? "bg-success" : "bg-secondary")">
-                                @(cours.IsPublished ? "Disponible" : "À venir")
-                            </span>
                             <span class="badge @GetCourseStatusBadgeClass(cours.Id)">
                                 @GetCourseCompletionStatus(cours.Id)
                             </span>

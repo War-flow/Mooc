@@ -225,7 +225,6 @@ BEGIN
         [Description] nvarchar(300) NULL,
         [Content] nvarchar(max) NULL,
         [Order] int NOT NULL,
-        [Duration] int NOT NULL,
         [IsPublished] boolean NOT NULL,
         [IsRequired] boolean NOT NULL,
         [DateCreated] datetime NOT NULL DEFAULT GETDATE(),

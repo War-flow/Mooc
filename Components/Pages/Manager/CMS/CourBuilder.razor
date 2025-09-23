@@ -83,6 +83,10 @@
     [Parameter]
     public EventCallback<CoursBlock?> SelectedBlockChanged { get; set; }
 
+    // Ajouter un nouveau paramètre pour notifier les changements
+    [Parameter]
+    public EventCallback OnContentChanged { get; set; }
+
     // Méthode pour créer les paramètres du bloc avec CoursId
     private Dictionary<string, object> GetBlockParameters(CoursBlock block)
     {
@@ -110,7 +114,7 @@
     }
 
     // Méthode pour ajouter un bloc
-    public void AddBlock(string type)
+    public async Task AddBlock(string type)
     {
         int order = Blocks.Count > 0 ? Blocks.Max(b => b.Order) + 1 : 1;
         var newBlock = new CoursBlock { 
@@ -124,18 +128,21 @@
         
         // Sélectionner automatiquement le nouveau bloc
         SelectedBlock = newBlock;
-        SelectedBlockChanged.InvokeAsync(newBlock);
+        await SelectedBlockChanged.InvokeAsync(newBlock);
         
-        InvokeAsync(() => StateHasChanged());
+        // Notifier le changement
+        await OnContentChanged.InvokeAsync();
+        
+        await InvokeAsync(() => StateHasChanged());
     }
 
     // Méthode pour supprimer un bloc
-    public void RemoveBlock(CoursBlock block)
+    public async Task RemoveBlock(CoursBlock block)
     {
         if (block == SelectedBlock)
         {
             SelectedBlock = null;
-            SelectedBlockChanged.InvokeAsync(null);
+            await SelectedBlockChanged.InvokeAsync(null);
         }
         
         Blocks.Remove(block);
@@ -143,6 +150,10 @@
         {
             Blocks[i].Order = i + 1;
         }
+        
+        // Notifier le changement
+        await OnContentChanged.InvokeAsync();
+        
         StateHasChanged();
     }
 

@@ -10,7 +10,7 @@
 <EditForm Model="QuizContent" OnValidSubmit="HandleValidSubmit">
     <DataAnnotationsValidator />
     
-    <div class="quiz-block @GetTypeClass()" @attributes="AdditionalAttributes">
+    <div class="quiz-block @GetTypeClass() @GetDifficultyClass()" @attributes="AdditionalAttributes">
         <h4 class="quiz-title">
             @if (IsEditing)
             {
@@ -21,6 +21,10 @@
             else if (!string.IsNullOrEmpty(QuizContent.Title))
             {
                 @QuizContent.Title
+                <span class="difficulty-badge ms-2">
+                    <i class="@QuizContent.QuizData.GetDifficultyIcon() me-1"></i>
+                    @QuizContent.QuizData.Difficulty
+                </span>
             }
             else
             {
@@ -49,14 +53,40 @@
                     <ValidationMessage For="@(() => QuizContent.QuizData.Question)" />
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Type de quiz</label>
-                    <InputSelect class="form-select" @bind-Value="QuizContent.QuizData.Type" @bind-Value:after="OnQuizTypeChanged">
-                        <option value="multiple-choice">Choix multiple (une seule réponse)</option>
-                        <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
-                        <option value="true-false">Vrai/Faux</option>
-                    </InputSelect>
-                    <ValidationMessage For="@(() => QuizContent.QuizData.Type)" />
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">Type de quiz</label>
+                            <InputSelect class="form-select" @bind-Value="QuizContent.QuizData.Type" @bind-Value:after="OnQuizTypeChanged">
+                                <option value="multiple-choice">Choix multiple (une seule réponse)</option>
+                                <option value="multiple-select">Choix multiple (plusieurs réponses)</option>
+                                <option value="true-false">Vrai/Faux</option>
+                            </InputSelect>
+                            <ValidationMessage For="@(() => QuizContent.QuizData.Type)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Niveau de difficulté <span class="text-danger">*</span>
+                            </label>
+                            <InputSelect class="form-select" @bind-Value="QuizContent.QuizData.Difficulty">
+                                @foreach (QuizDifficulty difficulty in Enum.GetValues<QuizDifficulty>())
+                                {
+                                    <option value="@difficulty">
+                                        @GetDifficultyDisplayText(difficulty)
+                                    </option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="@(() => QuizContent.QuizData.Difficulty)" />
+                            <div class="form-text">
+                                <small class="text-muted d-flex align-items-center">
+                                    <i class="@GetDifficultyIcon(QuizContent.QuizData.Difficulty) me-1"></i>
+                                    @GetDifficultyDescription(QuizContent.QuizData.Difficulty)
+                                </small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -79,9 +109,8 @@
                             @if (QuizContent.QuizData.Type == "multiple-select")
                             {
                                 <div class="input-group-text">
-                                    <input class="form-check-input" type="checkbox"
-                                           checked="@QuizContent.QuizData.Options[index].IsCorrect"
-                                           @onchange="@((ChangeEventArgs e) => HandleCheckboxChange(e, index))" />
+                                    <InputCheckbox @bind-Value="QuizContent.QuizData.Options[index].IsCorrect" 
+                                                   @bind-Value:after="() => OnCorrectAnswerChanged(index)" />
                                 </div>
                             }
                             else
@@ -89,7 +118,7 @@
                                 <div class="input-group-text">
                                     <input class="form-check-input" type="radio" name="correct-answer-@Block.Order"
                                            checked="@QuizContent.QuizData.Options[index].IsCorrect"
-                                           @onchange="@((ChangeEventArgs e) => HandleRadioChange(e, index))" />
+                                           @onclick="@(() => HandleRadioClick(index))" />
                                 </div>
                             }
                             <InputText class="form-control"
@@ -196,6 +225,10 @@
                 <div class="mt-4 p-3 bg-light rounded">
                     <h6 class="text-muted mb-3">
                         <i class="bi bi-eye me-1"></i> Aperçu du quiz
+                        <span class="difficulty-badge ms-2">
+                            <i class="@GetDifficultyIcon(QuizContent.QuizData.Difficulty) me-1"></i>
+                            @QuizContent.QuizData.Difficulty
+                        </span>
                     </h6>
                     <div class="quiz-preview">
                         @if (!string.IsNullOrEmpty(QuizContent.QuizData.Question))
@@ -244,7 +277,7 @@
         }
 
         <div class="block-controls mt-3">
-            <button type="submit" class="btn-block btn-valid" disabled="@(IsEditing && !editContext.IsModified() || isSaving)">
+            <button type="submit" class="btn btn-valid m-2" disabled="@(IsEditing && !editContext.IsModified() || isSaving)">
                 @if (isSaving)
                 {
                     <span class="spinner-border spinner-border-sm me-1"></span>
@@ -259,13 +292,13 @@
             
             @if (!IsEditing)
             {
-                <button type="button" class="btn-block btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
+                <button type="button" class="btn btn-cancel" @onclick="RequestDelete" title="Supprimer ce bloc">
                     <i class="bi bi-trash"></i> Supprimer
                 </button>
             }
             else
             {
-                <button type="button" class="btn-block btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
+                <button type="button" class="btn btn-cancel" @onclick="CancelEdit" title="Annuler les modifications">
                     <i class="bi bi-x-lg"></i> Annuler
                 </button>
             }
@@ -335,6 +368,7 @@
     {
         await OnDeleteRequested.InvokeAsync(Block);
     }
+
     private void LoadQuizData()
     {
         try
@@ -349,11 +383,22 @@
                 
                 var quizData = JsonSerializer.Deserialize<QuizStructure>(Block.Content.ToString(), options) ?? new QuizStructure();
                 
+                if (quizData.Options == null || !quizData.Options.Any())
+                {
+                    quizData = CreateDefaultQuizData();
+                }
+                
                 QuizContent = new QuizBlockContent
                 {
                     Title = Block.Title,
                     QuizData = quizData
                 };
+
+                Console.WriteLine($"Quiz chargé: {quizData.Options.Count} options");
+                for (int i = 0; i < quizData.Options.Count; i++)
+                {
+                    Console.WriteLine($"Option {i}: {quizData.Options[i].Text} - IsCorrect: {quizData.Options[i].IsCorrect}");
+                }
             }
             else
             {
@@ -374,6 +419,7 @@
             };
         }
     }
+
     private void InitializeUserAnswers()
     {
         UserAnswers = new List<bool>();
@@ -385,6 +431,7 @@
             }
         }
     }
+
     private QuizStructure CreateDefaultQuizData()
     {
         var quiz = new QuizStructure();
@@ -407,16 +454,40 @@
 
     private async Task StartEditing()
     {
-        // Sauvegarder l'état original
-        _originalContent = new QuizBlockContent
-        {
-            Title = QuizContent.Title,
-            QuizData = JsonSerializer.Deserialize<QuizStructure>(JsonSerializer.Serialize(QuizContent.QuizData)) ?? new QuizStructure()
-        };
+        // ⭐ AMÉLIORATION : Clonage profond sécurisé
+        _originalContent = CloneQuizContent(QuizContent);
         
         IsEditing = true;
         ClearError();
         StateHasChanged();
+    }
+
+    // ⭐ NOUVELLE MÉTHODE : Clonage sécurisé
+    private QuizBlockContent CloneQuizContent(QuizBlockContent original)
+    {
+        var clone = new QuizBlockContent
+        {
+            Title = original.Title,
+            QuizData = new QuizStructure
+            {
+                Question = original.QuizData.Question,
+                Type = original.QuizData.Type,
+                Difficulty = original.QuizData.Difficulty,
+                ShowProgress = original.QuizData.ShowProgress,
+                ShowStats = original.QuizData.ShowStats,
+                AllowHint = original.QuizData.AllowHint,
+                Hint = original.QuizData.Hint,
+                ShowValidationFeedback = original.QuizData.ShowValidationFeedback,
+                ShowCorrectAnswer = original.QuizData.ShowCorrectAnswer,
+                Explanation = original.QuizData.Explanation,
+                Options = original.QuizData.Options.Select(o => new Option 
+                { 
+                    Text = o.Text, 
+                    IsCorrect = o.IsCorrect 
+                }).ToList()
+            }
+        };
+        return clone;
     }
 
     private async Task SaveChanges()
@@ -427,19 +498,44 @@
             StateHasChanged();
             ClearError();
 
-            // Mettre à jour le bloc avec les nouvelles données
+            // Validation avant sauvegarde
+            if (!ValidateQuizBeforeSave())
+            {
+                return;
+            }
+
+            Console.WriteLine("=== AVANT SAUVEGARDE ===");
+            for (int i = 0; i < QuizContent.QuizData.Options.Count; i++)
+            {
+                Console.WriteLine($"Option {i}: {QuizContent.QuizData.Options[i].Text} - IsCorrect: {QuizContent.QuizData.Options[i].IsCorrect}");
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
+
+            var serializedContent = JsonSerializer.Serialize(QuizContent.QuizData, options);
+            
+            Console.WriteLine($"=== CONTENU SÉRIALISÉ ===");
+            Console.WriteLine(serializedContent);
+
             Block.Title = QuizContent.Title;
-            Block.Content = JsonSerializer.Serialize(QuizContent.QuizData);
+            Block.Content = serializedContent;
 
             await OnBlockChanged.InvokeAsync(Block);
             
             _originalContent = null;
             IsEditing = false;
+            
+            InitializeEditContext();
             await ShowSuccessMessage();
         }
         catch (Exception ex)
         {
-            errorMessage = "Erreur lors de la sauvegarde. Veuillez réessayer.";
+            errorMessage = $"Erreur lors de la sauvegarde: {ex.Message}";
             Console.WriteLine($"Erreur sauvegarde: {ex.Message}");
         }
         finally
@@ -449,13 +545,45 @@
         }
     }
 
+    // ⭐ NOUVELLE MÉTHODE : Validation avant sauvegarde
+    private bool ValidateQuizBeforeSave()
+    {
+        if (string.IsNullOrWhiteSpace(QuizContent.QuizData.Question))
+        {
+            errorMessage = "La question est obligatoire";
+            return false;
+        }
+
+        if (!QuizContent.QuizData.Options.Any(o => o.IsCorrect))
+        {
+            errorMessage = "Au moins une réponse correcte doit être sélectionnée";
+            return false;
+        }
+
+        if (QuizContent.QuizData.Options.Any(o => string.IsNullOrWhiteSpace(o.Text)))
+        {
+            errorMessage = "Toutes les options doivent avoir un texte";
+            return false;
+        }
+
+        return true;
+    }
+
     private async Task CancelEdit()
     {
         if (_originalContent != null)
         {
-            QuizContent = _originalContent;
+            QuizContent = CloneQuizContent(_originalContent);
             Block.Title = _originalContent.Title;
-            Block.Content = JsonSerializer.Serialize(_originalContent.QuizData);
+            
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
+            
+            Block.Content = JsonSerializer.Serialize(_originalContent.QuizData, options);
             _originalContent = null;
         }
 
@@ -483,34 +611,57 @@
         errorMessage = null;
     }
 
-    // Méthodes conservées du code original (HandleCheckboxChange, AddOption, etc.)
-    private void HandleCheckboxChange(ChangeEventArgs e, int index)
+    // ⭐ CORRECTIONS PRINCIPALES : Nouvelles méthodes pour la gestion des réponses correctes
+
+    // Pour les checkboxes (choix multiple)
+    private void OnCorrectAnswerChanged(int index)
     {
-        if (e.Value is bool boolValue)
-        {
-            QuizContent.QuizData.Options[index].IsCorrect = boolValue;
-        }
+        Console.WriteLine($"Checkbox changé - Option {index}: IsCorrect = {QuizContent.QuizData.Options[index].IsCorrect}");
+        
+        // Notifier les changements de validation
         editContext?.NotifyFieldChanged(new FieldIdentifier(QuizContent.QuizData, nameof(QuizContent.QuizData.OptionsValidation)));
+        editContext?.NotifyValidationStateChanged();
+        
+        StateHasChanged();
     }
 
-    private void HandleRadioChange(ChangeEventArgs e, int index)
+    // Pour les boutons radio (choix unique)
+    private void HandleRadioClick(int selectedIndex)
     {
-        if (e.Value is bool boolValue && boolValue)
+        Console.WriteLine($"Radio cliqué - Option {selectedIndex} sélectionnée");
+        
+        // Décocher toutes les options
+        for (int i = 0; i < QuizContent.QuizData.Options.Count; i++)
         {
-            for (int i = 0; i < QuizContent.QuizData.Options.Count; i++)
-            {
-                QuizContent.QuizData.Options[i].IsCorrect = (i == index);
-            }
+            QuizContent.QuizData.Options[i].IsCorrect = false;
         }
+        
+        // Cocher l'option sélectionnée
+        QuizContent.QuizData.Options[selectedIndex].IsCorrect = true;
+        
+        Console.WriteLine("Nouvel état des options:");
+        for (int i = 0; i < QuizContent.QuizData.Options.Count; i++)
+        {
+            Console.WriteLine($"Option {i}: IsCorrect = {QuizContent.QuizData.Options[i].IsCorrect}");
+        }
+        
+        // Notifier les changements
         editContext?.NotifyFieldChanged(new FieldIdentifier(QuizContent.QuizData, nameof(QuizContent.QuizData.OptionsValidation)));
+        editContext?.NotifyValidationStateChanged();
+        
+        StateHasChanged();
     }
+
+    // ⭐ SUPPRIMÉES : Les anciennes méthodes HandleCheckboxChange et HandleRadioChange
 
     private void AddOption()
     {
         if (QuizContent.QuizData.Options.Count < 6)
         {
-            QuizContent.QuizData.Options.Add(new Option());
+            QuizContent.QuizData.Options.Add(new Option { Text = "", IsCorrect = false });
             UserAnswers.Add(false);
+            InitializeEditContext();
+            StateHasChanged();
         }
     }
 
@@ -523,6 +674,8 @@
             {
                 UserAnswers.RemoveAt(index);
             }
+            InitializeEditContext();
+            StateHasChanged();
         }
     }
 
@@ -540,12 +693,12 @@
         }
 
         InitializeUserAnswers();
+        InitializeEditContext();
         StateHasChanged();
     }
 
     private string GetTypeClass()
     {
-        // Retourne une classe CSS selon le type de quiz
         return QuizContent?.QuizData?.Type switch
         {
             "multiple-choice" => "quiz-mc",
@@ -555,6 +708,49 @@
         };
     }
 
-    // Conserver toutes les autres méthodes du code original...
-    // (InitializeUserAnswers, GetTypeClass, etc.)
+    private string GetDifficultyClass()
+    {
+        return QuizContent?.QuizData?.GetDifficultyClass() ?? "difficulty-beginner";
+    }
+
+    private string GetDifficultyDisplayText(QuizDifficulty difficulty)
+    {
+        return difficulty switch
+        {
+            QuizDifficulty.Débutant => "⭐ Débutant",
+            QuizDifficulty.Intermédiaire => "⭐⭐ Intermédiaire",
+            QuizDifficulty.Avancé => "⭐⭐⭐ Avancé",
+            QuizDifficulty.Expert => "⭐⭐⭐⭐ Expert",
+            _ => "⭐ Débutant"
+        };
+    }
+
+    private string GetDifficultyIcon(QuizDifficulty difficulty)
+    {
+        return difficulty switch
+        {
+            QuizDifficulty.Débutant => "bi-star",
+            QuizDifficulty.Intermédiaire => "bi-star-fill",
+            QuizDifficulty.Avancé => "bi-lightning-fill",
+            QuizDifficulty.Expert => "bi-trophy-fill",
+            _ => "bi-star"
+        };
+    }
+
+    private string GetDifficultyDescription(QuizDifficulty difficulty)
+    {
+        return difficulty switch
+        {
+            QuizDifficulty.Débutant => "Accessible à tous, concepts de base",
+            QuizDifficulty.Intermédiaire => "Quelques prérequis nécessaires",
+            QuizDifficulty.Avancé => "Connaissances solides requises",
+            QuizDifficulty.Expert => "Niveau très élevé, pour les experts",
+            _ => "Accessible à tous"
+        };
+    }
+
+    public void Dispose()
+    {
+        _successMessageTimer?.Dispose();
+    }
 }

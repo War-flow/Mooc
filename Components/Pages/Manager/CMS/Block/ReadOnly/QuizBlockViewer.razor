@@ -3,11 +3,17 @@
 @using Mooc.Data
 @inject IJSRuntime JSRuntime
 
-<div class="quiz-block-viewer">
+<div class="quiz-block-viewer @QuizData.GetDifficultyClass()">
 
     @if (!string.IsNullOrEmpty(Block.Title))
     {
-        <h4 class="quiz-title">@Block.Title</h4>
+        <h4 class="quiz-title">
+            @Block.Title
+            <span class="difficulty-badge ms-2">
+                <i class="@QuizData.GetDifficultyIcon() me-1"></i>
+                @QuizData.Difficulty
+            </span>
+        </h4>
     }
 
     @if (IsCompleted)
@@ -45,6 +51,10 @@
                     <div class="d-flex justify-content-between align-items-center">
                         <small class="text-muted">
                             ⏱️ Temps écoulé : <span class="fw-bold">@GetFormattedTime()</span>
+                        </small>
+                        <small class="difficulty-info">
+                            <i class="@QuizData.GetDifficultyIcon() me-1"></i>
+                            Niveau @QuizData.Difficulty
                         </small>
                         @if (HasUserAnswer())
                         {
@@ -164,13 +174,13 @@
                                 }
                             </span>
 
-                            <!-- Score détaillé -->
+                            <!-- Score détaillé avec bonus de difficulté -->
                             <div class="score-details mt-3">
                                 <div class="row g-2">
                                     <div class="col-auto">
                                         <div class="score-item">
                                             <div class="score-value @(IsCorrect.Value ? "text-success" : "text-warning")">
-                                                @(IsCorrect.GetValueOrDefault() ? "100" : "0")%
+                                                @GetScoreWithDifficultyBonus()%
                                             </div>
                                             <div class="score-label">Score</div>
                                         </div>
@@ -181,6 +191,15 @@
                                                 @GetFormattedTime()
                                             </div>
                                             <div class="score-label">Temps</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-auto">
+                                        <div class="score-item">
+                                            <div class="score-value @GetDifficultyTextClass()">
+                                                <i class="@QuizData.GetDifficultyIcon() me-1"></i>
+                                                @QuizData.Difficulty
+                                            </div>
+                                            <div class="score-label">Difficulté</div>
                                         </div>
                                     </div>
                                     @if (AttemptsCount > 1)
@@ -255,21 +274,30 @@
                 <div class="quiz-final-stats">
                     <h6 class="text-center mb-3 text-muted">📊 Résumé de votre performance</h6>
                     <div class="row text-center g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="stat-item">
                                 <div class="stat-value @(IsCorrect.GetValueOrDefault() ? "text-success" : "text-warning")">
-                                    @(IsCorrect.GetValueOrDefault() ? "100" : "0")%
+                                    @GetScoreWithDifficultyBonus()%
                                 </div>
                                 <div class="stat-label">Score Final</div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <div class="stat-item">
                                 <div class="stat-value text-info">@GetFormattedTime()</div>
                                 <div class="stat-label">Temps Total</div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <div class="stat-item">
+                                <div class="stat-value @GetDifficultyTextClass()">
+                                    <i class="@QuizData.GetDifficultyIcon() me-1"></i>
+                                    @QuizData.Difficulty
+                                </div>
+                                <div class="stat-label">Difficulté</div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
                             <div class="stat-item">
                                 <div class="stat-value text-secondary">@AttemptsCount</div>
                                 <div class="stat-label">Tentative(s)</div>
@@ -277,12 +305,12 @@
                         </div>
                     </div>
 
-                    <!-- Performance badge -->
+                    <!-- Performance badge avec prise en compte de la difficulté -->
                     <div class="text-center mt-3">
                         @if (IsCorrect.GetValueOrDefault() && TimeSpent.TotalSeconds <= 30 && AttemptsCount == 1)
                         {
-                            <span class="badge bg-warning text-dark px-3 py-2">
-                                ⚡ Performance Excellente !
+                            <span class="badge @GetPerformanceBadgeClass() px-3 py-2">
+                                ⚡ @GetPerformanceMessage()
                             </span>
                         }
                         else if (IsCorrect.GetValueOrDefault())
@@ -561,6 +589,60 @@
     private bool HasUserAnswer()
     {
         return UserAnswers != null && UserAnswers.Any(a => a);
+    }
+
+    // Nouvelles méthodes pour la gestion de la difficulté
+    private int GetScoreWithDifficultyBonus()
+    {
+        if (!IsCorrect.GetValueOrDefault()) return 0;
+        
+        var baseScore = 100;
+        var difficultyMultiplier = QuizData.Difficulty switch
+        {
+            QuizDifficulty.Débutant => 1.0,
+            QuizDifficulty.Intermédiaire => 1.1,
+            QuizDifficulty.Avancé => 1.25,
+            QuizDifficulty.Expert => 1.5,
+            _ => 1.0
+        };
+
+        return (int)(baseScore * difficultyMultiplier);
+    }
+
+    private string GetDifficultyTextClass()
+    {
+        return QuizData.Difficulty switch
+        {
+            QuizDifficulty.Débutant => "text-success",
+            QuizDifficulty.Intermédiaire => "text-info",
+            QuizDifficulty.Avancé => "text-warning",
+            QuizDifficulty.Expert => "text-danger",
+            _ => "text-muted"
+        };
+    }
+
+    private string GetPerformanceBadgeClass()
+    {
+        return QuizData.Difficulty switch
+        {
+            QuizDifficulty.Débutant => "bg-success",
+            QuizDifficulty.Intermédiaire => "bg-info",
+            QuizDifficulty.Avancé => "bg-warning text-dark",
+            QuizDifficulty.Expert => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    private string GetPerformanceMessage()
+    {
+        return QuizData.Difficulty switch
+        {
+            QuizDifficulty.Débutant => "Excellent début !",
+            QuizDifficulty.Intermédiaire => "Bonne maîtrise !",
+            QuizDifficulty.Avancé => "Performance avancée !",
+            QuizDifficulty.Expert => "Expertise confirmée !",
+            _ => "Bonne performance !"
+        };
     }
 
     public void Dispose()

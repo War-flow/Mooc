@@ -49,6 +49,9 @@ namespace Mooc
             // Ajout du service CourseStateService
             builder.Services.AddScoped<CourseStateService>();
 
+            // Ajouter cette ligne dans la section des services
+            builder.Services.AddScoped<ICourseValidationService, CourseValidationService>();
+
             // Ajoutez cette ligne dans votre Program.cs avec les autres services
             builder.Services.AddScoped<ISessionCompletionService, SessionCompletionService>();
 

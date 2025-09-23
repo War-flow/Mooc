@@ -32,7 +32,33 @@
         </div>
     }
 
-    <EditForm Model="@coursModel" OnValidSubmit="HandleValidSubmit" Context="formContext">
+    @if (showValidationErrors)
+    {
+        <div class="alert alert-danger">
+            <h5><i class="bi bi-exclamation-triangle me-2"></i>Erreurs de validation</h5>
+            <ul class="mb-0">
+                @foreach (var error in validationErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (showValidationWarnings)
+    {
+        <div class="alert alert-warning">
+            <h5><i class="bi bi-info-circle me-2"></i>Avertissements</h5>
+            <ul class="mb-0">
+                @foreach (var warning in validationWarnings)
+                {
+                    <li>@warning</li>
+                }
+            </ul>
+        </div>
+    }
+
+    <EditForm Model="@coursModel" OnValidSubmit="@HandleValidSubmit" Context="formContext">
         <DataAnnotationsValidator />
 
         <div class="row mb-4">
@@ -52,12 +78,6 @@
                             <label class="form-label">Description</label>
                             <InputTextArea @bind-Value="coursModel.Description" class="form-control" rows="3" />
                             <ValidationMessage For="@(() => coursModel.Description)" />
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Durée estimée (minutes)</label>
-                            <InputNumber @bind-Value="coursModel.Duration" class="form-control" />
-                            <ValidationMessage For="@(() => coursModel.Duration)" />
                         </div>
                     </div>
                 </div>
@@ -115,16 +135,60 @@
                         <i class="bi bi-x-lg"></i> Annuler
                     </button>
 
-                    <button type="submit" class="btn btn-valid">
-                        <i class="bi bi-floppy"></i> @(isEditing ? "Mettre à jour" : "Créer le cours")
+                    <button type="submit" class="btn btn-valid" disabled="@isSaving">
+                        @if (isSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>@(isValidating ? "Validation..." : "Enregistrement...")</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-floppy me-1"></i>
+                            @(isEditing ? "Valider et Mettre à jour" : "Valider et Créer le cours")
+                        }
                     </button>
                 </div>
 
-                <CourBuilder @ref="coursBuilder" @bind-SelectedBlock="selectedBlock" CoursId="@(CoursId ?? 0)" />
+                @* Modifier l'appel au CourBuilder *@
+                <CourBuilder @ref="coursBuilder" 
+                             @bind-SelectedBlock="selectedBlock" 
+                             CoursId="@(CoursId ?? 0)"
+                             OnContentChanged="OnContentChanged" />
 
             </div>
         </div>
 
+        @* Ajouter après le CourBuilder *@
+        <div class="mt-3">
+            <div class="validation-status-indicator">
+                @if (realTimeValidationResult != null)
+                {
+                    @if (realTimeValidationResult.IsValid)
+                    {
+                        <div class="alert alert-success py-2">
+                            <i class="bi bi-check-circle-fill me-2"></i>
+                            <strong>Cours valide</strong> - @realTimeValidationResult.QuizCount quiz détecté(s)
+                            @if (realTimeValidationResult.Warnings.Any())
+                            {
+                                <div class="mt-1">
+                                    <small class="text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        @string.Join(", ", realTimeValidationResult.Warnings)
+                                    </small>
+                                </div>
+                            }
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning py-2">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            <strong>Validation requise</strong> - @realTimeValidationResult.Errors.Count erreur(s)
+                        </div>
+                    }
+                }
+            </div>
+        </div>
 
     </EditForm>
 </div>
@@ -146,6 +210,21 @@
 
     // Ajoutez cette propriété pour suivre le bloc sélectionné
     private CourBuilder.CoursBlock? selectedBlock;
+
+    // Ajouter ces nouvelles propriétés
+    private bool showValidationErrors = false;
+    private bool showValidationWarnings = false;
+    private List<string> validationErrors = new();
+    private List<string> validationWarnings = new();
+    // Nouvelles propriétés pour la gestion d'état
+    private bool isSaving = false;
+    private bool isValidating = false;
+
+    // Ajouter cette propriété
+    private CourseValidationResult? realTimeValidationResult;
+    private Timer? validationTimer;
+
+    @inject ICourseValidationService CourseValidationService
 
     protected override async Task OnInitializedAsync()
     {
@@ -176,7 +255,6 @@
                 SessionId = sessionIdFromUrl ?? 0,
                 IsPublished = false,
                 Order = 1,
-                Duration = 30
             };
         }
     }
@@ -298,10 +376,46 @@
         }
     }
 
+    // Méthode HandleValidSubmit modifiée
     private async Task HandleValidSubmit()
     {
+        if (isSaving) return; // Éviter les double-clics
+
         try
         {
+            isSaving = true;
+            isValidating = true;
+            StateHasChanged();
+
+            // Étape 1 : Validation automatique
+            var validationResult = await ValidateCourseContent();
+            
+            if (!validationResult.IsValid)
+            {
+                showValidationErrors = true;
+                validationErrors = validationResult.Errors;
+                showValidationWarnings = validationResult.Warnings.Any();
+                validationWarnings = validationResult.Warnings;
+                return;
+            }
+
+            // Étape 2 : Si validation OK, afficher les avertissements mais continuer
+            if (validationResult.Warnings.Any())
+            {
+                showValidationWarnings = true;
+                validationWarnings = validationResult.Warnings;
+            }
+
+            // Masquer les erreurs de validation si tout est OK
+            showValidationErrors = false;
+            validationErrors.Clear();
+
+            // Étape 3 : Passer à l'enregistrement
+            isValidating = false;
+            StateHasChanged();
+
+            await Task.Delay(500); // Petit délai pour montrer le changement d'état
+
             using var context = await DbContextFactory.CreateDbContextAsync();
 
             // Sérialiser les blocs du CourBuilder
@@ -327,6 +441,10 @@
                     cours.UpdatedAt = DateTime.UtcNow;
 
                     await context.SaveChangesAsync();
+                    
+                    // Afficher un message de succès temporaire
+                    await ShowSuccessMessage("Cours mis à jour avec succès !");
+                    
                     NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
                 }
             }
@@ -347,6 +465,10 @@
 
                 context.Courses.Add(cours);
                 await context.SaveChangesAsync();
+                
+                // Afficher un message de succès temporaire
+                await ShowSuccessMessage("Cours créé avec succès !");
+                
                 NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
             }
         }
@@ -355,6 +477,41 @@
             showError = true;
             errorMessage = $"Erreur lors de l'enregistrement : {ex.Message}";
         }
+        finally
+        {
+            isSaving = false;
+            isValidating = false;
+            StateHasChanged();
+        }
+    }
+
+    // Nouvelle méthode pour afficher un message de succès
+    private async Task ShowSuccessMessage(string message)
+    {
+        // Vous pouvez utiliser un toast notification ici si disponible
+        // Ou simplement un message temporaire
+        showError = false;
+        errorMessage = "";
+        
+        // Exemple avec un message temporaire (optionnel)
+        var successAlert = $"<div class='alert alert-success alert-dismissible fade show' role='alert'>" +
+                          $"<i class='bi bi-check-circle-fill me-2'></i>{message}" +
+                          $"<button type='button' class='btn-close' data-bs-dismiss='alert'></button></div>";
+        
+        await Task.Delay(100); // Petit délai pour l'UX
+    }
+
+    private async Task<CourseValidationResult> ValidateCourseContent()
+    {
+        if (coursBuilder == null)
+        {
+            var result = new CourseValidationResult();
+            result.AddError("Aucun contenu de cours disponible");
+            return result;
+        }
+
+        var blocks = coursBuilder.GetBlocks();
+        return CourseValidationService.ValidateCoursBlocks(blocks);
     }
 
     private void RetourVersListe()
@@ -383,9 +540,40 @@
         [Range(1, int.MaxValue, ErrorMessage = "L'ordre doit être supérieur à 0")]
         public int Order { get; set; } = 1;
 
-        [Range(1, int.MaxValue, ErrorMessage = "La durée doit être supérieure à 0")]
-        public int Duration { get; set; } = 30;
-
         public bool IsPublished { get; set; }
+    }
+
+    // Méthode pour valider en temps réel (optionnel)
+    private async Task OnContentChanged()
+    {
+        // Débounce la validation pour éviter trop d'appels
+        validationTimer?.Dispose();
+        validationTimer = new Timer(async _ => 
+        {
+            realTimeValidationResult = await ValidateCourseContent();
+            await InvokeAsync(StateHasChanged);
+        }, null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
+    }
+
+    public void Dispose()
+    {
+        validationTimer?.Dispose();
+    }
+
+    // Ajout de la méthode ValidateCourse pour corriger l'erreur CS0103
+    private async Task ValidateCourse()
+    {
+        // Lance la validation du contenu du cours
+        var validationResult = await ValidateCourseContent();
+
+        showValidationErrors = !validationResult.IsValid;
+        validationErrors = validationResult.Errors;
+        showValidationWarnings = validationResult.Warnings.Any();
+        validationWarnings = validationResult.Warnings;
+
+        // Met à jour l'indicateur de validation en temps réel
+        realTimeValidationResult = validationResult;
+
+        StateHasChanged();
     }
 }

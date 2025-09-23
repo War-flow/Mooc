@@ -9,8 +9,8 @@
 
 <PageTitle>MOOC POINT COM</PageTitle>
 
-<!-- Hero Section avec animation -->
-<div class="hero-section">
+<!-- Hero Section avec animation de vagues -->
+<div class="hero-section page-header header-waves ocean">
     <div class="container">
         <div class="hero-content animate-fade-in">
             <AuthorizeView>
@@ -23,7 +23,7 @@
                             </div>
                             <div class="welcome-text">
                                 <h1 class="welcome-title hello">Bonjour, @currentUser.FirstName !</h1>
-                                <p class="welcome-subtitle">Prêt à continuer votre apprentissage ?</p>
+                                <p class="welcome-subtitle page-subtitle">Prêt à continuer votre apprentissage ?</p>
                             </div>
                         </div>
                     }
@@ -34,16 +34,16 @@
                                 <i class="bi bi-person-circle"></i>
                             </div>
                             <div class="welcome-text">
-                                <h1 class="welcome-title">Bonjour, @context.User.Identity?.Name !</h1>
-                                <p class="welcome-subtitle">Explorez nos formations disponibles</p>
+                                <h1 class="welcome-title page-title">Bonjour, @context.User.Identity?.Name !</h1>
+                                <p class="welcome-subtitle page-subtitle">Explorez nos formations disponibles</p>
                             </div>
                         </div>
                     }
                 </Authorized>
                 <NotAuthorized>
                     <div class="hero-guest animate-zoom-in">
-                        <h1 class="hero-title">Bienvenue sur MOOC POINT COM</h1>
-                        <p class="hero-description">Découvrez nos formations et développez vos compétences</p>
+                        <h1 class="hero-title page-title">Bienvenue sur MOOC POINT COM</h1>
+                        <p class="hero-description page-subtitle">Découvrez nos formations et développez vos compétences</p>
                         <div class="hero-actions">
                             <a href="/Account/Register" class="btn btn-primary btn-lg">
                                 <i class="bi bi-person-plus"></i> S'inscrire

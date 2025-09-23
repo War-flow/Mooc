@@ -121,10 +121,6 @@ namespace Mooc.Data
                         .HasColumnType("int")
                         .HasDefaultValue(1);
 
-                entity.Property(e => e.Duration)
-                        .HasColumnType("int")
-                        .HasDefaultValue(0);
-
                 entity.Property(e => e.IsPublished)
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);

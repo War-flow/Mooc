@@ -69,7 +69,7 @@
         </div>
 
         <div class="block-controls mt-2">
-            <button type="button" class="btn-block btn-valid"
+            <button type="button" class="btn btn-valid m-2"
                     @onclick="ToggleEdit" 
                     @onclick:preventDefault="true"
                     disabled="@(IsEditing && !IsValid())"
@@ -80,7 +80,7 @@
             
             @if (IsEditing)
             {
-                <button type="button" class="btn-block btn-cancel" 
+                <button type="button" class="btn btn-cancel"
                         @onclick="CancelEdit"
                         @onclick:preventDefault="true"
                         aria-label="Annuler les modifications">
@@ -89,7 +89,7 @@
             }
             else
             {
-                <button type="button" class="btn-block btn-cancel" 
+                <button type="button" class="btn btn-cancel"
                         @onclick="RequestDelete"
                         @onclick:preventDefault="true"
                         title="Supprimer ce bloc">

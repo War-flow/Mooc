@@ -184,6 +184,35 @@ else
                             </div>
                         }
 
+                        <!-- Nouvelle section : Indicateur de quiz -->
+                        <div class="info-item mb-3">
+                            <strong>Quiz :</strong>
+                            <div class="d-flex align-items-center">
+                                <span class="me-2">@GetTotalQuizCount() quiz disponible(s)</span>
+                                @if (GetTotalQuizCount() == 0)
+                                {
+                                    <span class="badge bg-warning">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        Aucun quiz
+                                    </span>
+                                }
+                                else if (GetTotalQuizCount() == 1)
+                                {
+                                    <span class="badge bg-info">
+                                        <i class="bi bi-check-circle me-1"></i>
+                                        Quiz disponible
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle-fill me-1"></i>
+                                        Plusieurs quiz
+                                    </span>
+                                }
+                            </div>
+                        </div>
+
                         <!-- Liste des blocs avec statut -->
                         @if (blocks != null && blocks.Any())
                         {

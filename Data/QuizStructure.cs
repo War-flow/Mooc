@@ -2,6 +2,15 @@
 
 namespace Mooc.Data
 {
+    // Énumération pour les niveaux de difficulté
+    public enum QuizDifficulty
+    {
+        Débutant = 1,
+        Intermédiaire = 2,
+        Avancé = 3,
+        Expert = 4
+    }
+
     public class QuizStructure
     {
         [Required(ErrorMessage = "La question est obligatoire")]
@@ -12,6 +21,10 @@ namespace Mooc.Data
 
         [Required(ErrorMessage = "Le type de quiz est obligatoire")]
         public string? Type { get; set; } = "multiple-choice";
+
+        // Nouvelle propriété pour le niveau de difficulté
+        [Required(ErrorMessage = "Le niveau de difficulté est obligatoire")]
+        public QuizDifficulty Difficulty { get; set; } = QuizDifficulty.Débutant;
 
         public bool ShowProgress { get; set; }
         public bool ShowStats { get; set; }
@@ -29,6 +42,32 @@ namespace Mooc.Data
         // Validation personnalisée pour les options
         [CustomValidation(typeof(QuizStructure), nameof(ValidateOptions))]
         public string? OptionsValidation => string.Empty;
+
+        // Méthode pour obtenir la couleur CSS selon la difficulté
+        public string GetDifficultyClass()
+        {
+            return Difficulty switch
+            {
+                QuizDifficulty.Débutant => "difficulty-beginner",
+                QuizDifficulty.Intermédiaire => "difficulty-intermediate", 
+                QuizDifficulty.Avancé => "difficulty-advanced",
+                QuizDifficulty.Expert => "difficulty-expert",
+                _ => "difficulty-beginner"
+            };
+        }
+
+        // Méthode pour obtenir l'icône selon la difficulté
+        public string GetDifficultyIcon()
+        {
+            return Difficulty switch
+            {
+                QuizDifficulty.Débutant => "bi-star",
+                QuizDifficulty.Intermédiaire => "bi-star-fill",
+                QuizDifficulty.Avancé => "bi-lightning-fill",
+                QuizDifficulty.Expert => "bi-trophy-fill",
+                _ => "bi-star"
+            };
+        }
 
         public static ValidationResult? ValidateOptions(string? value, ValidationContext context)
         {
