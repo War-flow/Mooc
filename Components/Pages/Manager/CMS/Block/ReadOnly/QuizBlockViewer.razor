@@ -19,10 +19,6 @@
                 <span class="points-badge @QuizData.GetPointsClass()">
                     <i class="bi bi-star-fill me-1"></i>
                     @QuizData.GetBasePoints() pts
-                    @if (!IsCompleted)
-                    {
-                        <small class="text-muted">+ bonus possible</small>
-                    }
                 </span>
             </div>
         </h4>
@@ -126,16 +122,16 @@
                             else
                             {
                                 <i class="bi bi-check-lg"></i>
-                                <span>Valider ma réponse (@QuizData.GetBasePoints() pts + bonus)</span>
+                                <span>Valider ma réponse (@QuizData.GetBasePoints() pts)</span>
                             }
                         </button>
 
-                        <!-- Bouton d'aide amélioré -->
+                        <!-- Bouton d'aide simplifié -->
                         @if (QuizData.AllowHint && !string.IsNullOrEmpty(QuizData.Hint) && !HintUsed)
                         {
                             <button type="button" class="btn btn-outline-info" @onclick="ShowHint">
                                 <i class="bi bi-lightbulb me-1"></i>
-                                💡 Indice (-10% bonus)
+                                💡 Indice
                             </button>
                         }
                     </div>
@@ -150,7 +146,7 @@
                 }
                 else if (QuizScoreResult != null)
                 {
-                    <!-- Badge de résultat avec score détaillé -->
+                    <!-- Badge de résultat avec score simplifié -->
                     <div class="result-section">
                         <span class="result-badge @(IsCorrect.Value ? "success" : "error")">
                             @if (IsCorrect.Value)
@@ -165,7 +161,7 @@
                             }
                         </span>
 
-                        <!-- Score détaillé avec nouveau système -->
+                        <!-- Score détaillé sans bonus -->
                         <div class="score-details mt-3">
                             <div class="row g-2">
                                 <div class="col-auto">
@@ -184,17 +180,6 @@
                                         <div class="score-label">Base (@QuizData.Difficulty)</div>
                                     </div>
                                 </div>
-                                @if (QuizScoreResult.PerformanceMultiplier != 1.0)
-                                {
-                                    <div class="col-auto">
-                                        <div class="score-item">
-                                            <div class="score-value @(QuizScoreResult.PerformanceMultiplier > 1.0 ? "text-success" : "text-warning")">
-                                                @(string.Format("{0:+0;-0;0}", (QuizScoreResult.PerformanceMultiplier - 1) * 100))%
-                                            </div>
-                                            <div class="score-label">Bonus</div>
-                                        </div>
-                                    </div>
-                                }
                                 <div class="col-auto">
                                     <div class="score-item">
                                         <div class="score-value text-info">
@@ -266,7 +251,7 @@
                 </div>
             }
 
-            <!-- Statistiques finales améliorées -->
+            <!-- Statistiques finales simplifiées -->
             @if (IsCompleted && QuizData.ShowStats)
             {
                 <div class="quiz-final-stats">
@@ -299,15 +284,9 @@
                         </div>
                     </div>
 
-                    <!-- Performance badge avec prise en compte de la difficulté -->
+                    <!-- Performance badge sans références aux bonus -->
                     <div class="text-center mt-3">
-                        @if (IsCorrect.GetValueOrDefault() && TimeSpent.TotalSeconds <= 30 && AttemptsCount == 1)
-                        {
-                            <span class="badge @GetPerformanceBadgeClass() px-3 py-2">
-                                ⚡ @GetPerformanceMessage()
-                            </span>
-                        }
-                        else if (IsCorrect.GetValueOrDefault())
+                        @if (IsCorrect.GetValueOrDefault())
                         {
                             <span class="badge bg-success px-3 py-2">
                                 🎯 Objectif Atteint !
@@ -322,7 +301,7 @@
                     </div>
                 </div>
             }
-        </div> <!-- <-- AJOUT DE LA FERMETURE MANQUANTE -->
+        </div>
     }
     else
     {
@@ -331,8 +310,6 @@
             Ce quiz n'a pas encore été configuré.
         </div>
     }
-
-
 </div>
 
 @code {
@@ -428,7 +405,6 @@
         }
     }
 
-    // Méthode modifiée pour la soumission avec le nouveau système de score
     private async Task SubmitAnswer()
     {
         if (IsCompleted) return;
@@ -446,7 +422,7 @@
         IsSubmitting = false;
         IsCompleted = true;
 
-        // Calculer le score avec le nouveau système
+        // Calculer le score avec le nouveau système (sans bonus)
         QuizScoreResult = QuizScoring.CalculateScore(
             QuizData.Difficulty,
             IsCorrect.GetValueOrDefault(),
@@ -455,11 +431,11 @@
             AttemptsCount
         );
 
-        // Sauvegarder le résultat avec le nouveau système - CORRECTION ICI
+        // Sauvegarder le résultat
         try
         {
             await CourseStateService.SaveQuizResultAsync(
-                CoursId, // Utiliser le vrai CoursId passé en paramètre
+                CoursId,
                 Block.Order,
                 QuizData,
                 IsCorrect.GetValueOrDefault(),
@@ -619,7 +595,7 @@
         return UserAnswers != null && UserAnswers.Any(a => a);
     }
 
-    // Nouvelles méthodes pour l'affichage des performances
+    // Méthodes pour l'affichage des performances (conservées pour l'affichage)
     private string GetPerformanceLevelClass()
     {
         return QuizScoreResult?.PerformanceLevel switch
@@ -656,22 +632,6 @@
         };
     }
 
-    private string GetPerformanceBadgeClass()
-    {
-        if (QuizScoreResult == null)
-            return "bg-secondary";
-
-        return QuizScoreResult.PerformanceLevel switch
-        {
-            QuizPerformanceLevel.Perfect => "bg-warning text-dark",
-            QuizPerformanceLevel.Excellent => "bg-info text-dark",
-            QuizPerformanceLevel.Good => "bg-primary",
-            QuizPerformanceLevel.Average => "bg-secondary",
-            _ => "bg-light text-dark"
-        };
-    }
-
-    // Ajout de la méthode manquante pour la classe CSS selon la difficulté
     private string GetDifficultyTextClass()
     {
         return QuizData.Difficulty switch
@@ -680,21 +640,6 @@
             QuizDifficulty.Intermédiaire => "text-warning",
             QuizDifficulty.Avancé => "text-danger",
             _ => "text-secondary"
-        };
-    }
-
-    private string GetPerformanceMessage()
-    {
-        if (QuizScoreResult == null)
-            return "";
-
-        return QuizScoreResult.PerformanceLevel switch
-        {
-            QuizPerformanceLevel.Perfect => "Performance parfaite !",
-            QuizPerformanceLevel.Excellent => "Excellent !",
-            QuizPerformanceLevel.Good => "Bon travail !",
-            QuizPerformanceLevel.Average => "Performance moyenne.",
-            _ => "Continue d'apprendre !"
         };
     }
 

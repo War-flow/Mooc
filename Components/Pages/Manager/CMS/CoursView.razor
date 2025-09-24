@@ -51,7 +51,7 @@ else
                 <div class="card shadow-sm">
                     <div class="card-header bg-primary text-white">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h2 class="mb-0">
+                            <h2 class="m-1">
                                 <i class="bi bi-book me-2"></i>
                                 @cours.Title
                             </h2>
@@ -181,23 +181,54 @@ else
                                                 @courseScoreResult.CorrectAnswers/@courseScoreResult.QuizCount quiz réussis
                                                 (@courseScoreResult.ScorePercentage.ToString("F1")%)
                                             </span>
-                                            <span class="badge @GetOverallLevelClass() mt-1">
-                                                @GetOverallLevelText()
-                                            </span>
+                                            <div class="progress mt-2" style="height: 8px;">
+                                                <div class="progress-bar bg-success" 
+                                                     role="progressbar" 
+                                                     style="width: @courseScoreResult.ScorePercentage%"
+                                                     aria-valuenow="@courseScoreResult.ScorePercentage" 
+                                                     aria-valuemin="0" 
+                                                     aria-valuemax="100">
+                                                </div>
+                                            </div>
                                         </div>
                                     }
                                     else
                                     {
-                                        <span class="fs-4 fw-bold text-success">
-                                            @GetCorrectAnswersCount()/@GetTotalQuizCount()
-                                        </span>
-                                        @if (GetTotalQuizCount() > 0)
-                                        {
-                                            <span class="text-muted">
-                                                (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
+                                        <div class="d-flex flex-column">
+                                            <span class="fs-4 fw-bold text-success">
+                                                @GetCorrectAnswersCount()/@GetTotalQuizCount() quiz réussis
                                             </span>
-                                        }
+                                            @if (GetTotalQuizCount() > 0)
+                                            {
+                                                <span class="text-muted">
+                                                    (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
+                                                </span>
+                                            }
+                                            <span class="text-muted small">
+                                                Score détaillé non disponible
+                                            </span>
+                                        </div>
                                     }
+                                </div>
+                            </div>
+                        }
+                        else if (GetTotalQuizCount() > 0)
+                        {
+                            <div class="info-item mb-3">
+                                <strong>Score :</strong>
+                                <div class="score-display">
+                                    <div class="d-flex flex-column">
+                                        <span class="fs-6 text-muted">
+                                            <i class="bi bi-clock me-1"></i>
+                                            Cours en progression
+                                        </span>
+                                        <span class="text-muted small">
+                                            Score maximum possible : @maxPossiblePoints pts
+                                        </span>
+                                        <span class="text-muted small">
+                                            @GetTotalQuizCount() quiz à compléter
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         }
@@ -399,6 +430,8 @@ else
     </div>
 }
 
+@implements IAsyncDisposable
+
 @code {
     [Parameter] public int CoursId { get; set; }
     [Parameter] public int? BlockIndex { get; set; }
@@ -415,65 +448,49 @@ else
     private Dictionary<int, bool> quizCompletionState = new();
     private CourseScoreResult? courseScoreResult;
 
+    // Ajout d'un token de cancellation pour éviter les opérations après disposal
+    private CancellationTokenSource? _cancellationTokenSource;
+
+    // Flag pour éviter les redirections multiples
+    private bool _isNavigating = false;
+
+    // 🆕 Nouvelle propriété
+    private int maxPossiblePoints = 0; 
+    
     protected override async Task OnInitializedAsync()
     {
-        await LoadCoursData();
-        await LoadCourseProgress();
+        _cancellationTokenSource = new CancellationTokenSource();
         
-        // Charger le score détaillé si le cours est terminé
-        if (courseProgress?.IsCompleted == true)
+        try
         {
-            await LoadCourseScore();
+            await LoadCoursData(_cancellationTokenSource.Token);
+            await LoadCourseProgress(_cancellationTokenSource.Token);
+            
+            // 🆕 CHANGEMENT : Toujours essayer de charger le score
+            await LoadCourseScore(_cancellationTokenSource.Token);
+            
+        }
+        catch (OperationCanceledException)
+        {
+            // Le composant a été disposé, ignorer
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors de l'initialisation: {ex.Message}");
         }
     }
 
-    protected override async Task OnParametersSetAsync()
-    {
-        // ✅ Attendre que les données soient chargées avant de valider les paramètres
-        if (isLoading) return;
-
-        // Rediriger vers le dernier bloc consulté si aucun bloc spécifié
-        if (!BlockIndex.HasValue && blocks != null && blocks.Any())
-        {
-            var targetBlock = Math.Max(0, Math.Min(courseProgress?.LastAccessedBlock ?? 0, blocks.Count - 1));
-            NavigationManager.NavigateTo(GetBlockUrl(targetBlock), replace: true);
-            return;
-        }
-
-        // Vérifier que l'index est valide
-        if (BlockIndex.HasValue && blocks != null &&
-            (BlockIndex.Value < 0 || BlockIndex.Value >= blocks.Count))
-        {
-            var safeIndex = Math.Max(0, Math.Min(BlockIndex.Value, blocks.Count - 1));
-            NavigationManager.NavigateTo(GetBlockUrl(safeIndex), replace: true);
-            return;
-        }
-
-        // Sauvegarder l'accès au bloc actuel
-        if (BlockIndex.HasValue && courseProgress != null && IsCurrentBlockValid())
-        {
-            courseProgress.LastAccessedBlock = BlockIndex.Value;
-            await CourseStateService.SaveProgressAsync(courseProgress);
-        }
-    }
-
-    // ✅ Nouvelle méthode pour vérifier la validité du bloc actuel
-    private bool IsCurrentBlockValid()
-    {
-        return blocks != null && 
-               blocks.Any() && 
-               CurrentBlockIndex >= 0 && 
-               CurrentBlockIndex < blocks.Count;
-    }
-
-    private async Task LoadCoursData()
+    // 🔄 MODIFIER la méthode LoadCoursData pour inclure le calcul du score maximum
+    private async Task LoadCoursData(CancellationToken cancellationToken = default)
     {
         try
         {
-            using var context = await DbContextFactory.CreateDbContextAsync();
+            // ✅ Créer et disposer le contexte dans le même scope
+            await using var context = await DbContextFactory.CreateDbContextAsync(cancellationToken);
+            
             cours = await context.Courses
                 .Include(c => c.Session)
-                .FirstOrDefaultAsync(c => c.Id == CoursId);
+                .FirstOrDefaultAsync(c => c.Id == CoursId, cancellationToken);
 
             if (cours != null && !string.IsNullOrEmpty(cours.Content))
             {
@@ -486,8 +503,19 @@ else
                             PropertyNameCaseInsensitive = true
                         });
                     
-                    // ✅ Assurer que blocks n'est jamais null
                     blocks ??= new List<CourBuilder.CoursBlock>();
+                    
+                    // 🆕 NOUVEAU : Calculer le score maximum possible réel
+                    try
+                    {
+                        maxPossiblePoints = await CourseStateService.CalculateMaxPossiblePointsAsync(CoursId);
+                        Console.WriteLine($"🎯 Score maximum calculé: {maxPossiblePoints} pts pour {GetTotalQuizCount()} quiz");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erreur lors du calcul du score maximum: {ex.Message}");
+                        maxPossiblePoints = 0;
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -500,6 +528,16 @@ else
                 blocks = new List<CourBuilder.CoursBlock>();
             }
         }
+        catch (OperationCanceledException)
+        {
+            // Opération annulée, ne pas traiter comme une erreur
+            throw;
+        }
+        catch (ObjectDisposedException)
+        {
+            Console.WriteLine("DbContext disposé - opération annulée");
+            blocks = new List<CourBuilder.CoursBlock>();
+        }
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement du cours: {ex.Message}");
@@ -510,12 +548,21 @@ else
             isLoading = false;
         }
     }
-
-    private async Task LoadCourseProgress()
+    // Ajoutez cette méthode utilitaire dans la section @code
+    private bool IsCurrentBlockValid()
+    {
+        return blocks != null && CurrentBlockIndex >= 0 && CurrentBlockIndex < blocks.Count;
+    }
+    private async Task LoadCourseProgress(CancellationToken cancellationToken = default)
     {
         try
         {
+            if (cancellationToken.IsCancellationRequested) return;
             courseProgress = await CourseStateService.GetOrCreateProgressAsync(CoursId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Composant disposé
         }
         catch (Exception ex)
         {
@@ -523,11 +570,17 @@ else
         }
     }
 
-    private async Task LoadCourseScore()
+    // 🔄 MODIFIER la méthode LoadCourseScore pour être plus robuste
+    private async Task LoadCourseScore(CancellationToken cancellationToken = default)
     {
         try
         {
+            if (cancellationToken.IsCancellationRequested) return;
             courseScoreResult = await CourseStateService.CalculateCourseScoreAsync(CoursId);
+        }
+        catch (OperationCanceledException)
+        {
+            // Composant disposé
         }
         catch (Exception ex)
         {
@@ -609,11 +662,6 @@ else
 
             await CourseStateService.SaveProgressAsync(courseProgress);
 
-            // Montrer une notification de succès
-            await JSRuntime.InvokeVoidAsync("alert", 
-                $"🎉 Félicitations ! Vous avez terminé ce cours.\n" +
-                $"Score : {GetCorrectAnswersCount()}/{GetTotalQuizCount()} quiz réussis");
-
             StateHasChanged();
         }
         catch (Exception ex)
@@ -682,6 +730,17 @@ else
             courseProgress.BlockInteractions[CurrentBlockIndex] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
             
             await CourseStateService.SaveProgressAsync(courseProgress);
+
+            // ⭐ NOUVEAU : Recharger le score après chaque quiz complété
+            try
+            {
+                courseScoreResult = await CourseStateService.CalculateCourseScoreAsync(CoursId);
+                Console.WriteLine($"🎯 Score recalculé: {courseScoreResult?.TotalEarnedPoints}/{courseScoreResult?.TotalPossiblePoints}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors du recalcul du score: {ex.Message}");
+            }
         }
 
         StateHasChanged();
@@ -710,7 +769,7 @@ else
             : $"Bloc {CurrentBlockIndex + 1}";
     }
 
-    private string GetBlockTypeDisplay(string type) => type switch
+    private string GetBlockTypeDisplay(String type) => type switch
     {
         "texte" => "Contenu textuel",
         "quiz" => "Quiz",
@@ -767,6 +826,31 @@ else
         return correctCount;
     }
 
+    private int GetCompletedQuizCount()
+    {
+        if (courseProgress?.BlockInteractions == null) return 0;
+        
+        int completedCount = 0;
+        foreach (var interaction in courseProgress.BlockInteractions)
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(interaction.Value);
+                if (document.RootElement.TryGetProperty("completed", out var completedProperty) &&
+                    completedProperty.GetBoolean())
+                {
+                    completedCount++;
+                }
+            }
+            catch
+            {
+                // Ignorer les interactions mal formées
+            }
+        }
+        
+        return completedCount;
+    }
+
     private int GetTotalQuizCount()
     {
         if (blocks == null) return 0;
@@ -782,18 +866,6 @@ else
             CoursePerformanceLevel.Average => "bg-warning text-dark",
             CoursePerformanceLevel.NeedsImprovement => "bg-danger",
             _ => "bg-secondary"
-        };
-    }
-
-    private string GetOverallLevelText()
-    {
-        return courseScoreResult?.OverallLevel switch
-        {
-            CoursePerformanceLevel.Excellent => "🏆 Excellent",
-            CoursePerformanceLevel.Good => "⭐ Bien",
-            CoursePerformanceLevel.Average => "👍 Satisfaisant",
-            CoursePerformanceLevel.NeedsImprovement => "📚 À améliorer",
-            _ => "Non évalué"
         };
     }
 
@@ -862,5 +934,68 @@ else
         }
 
         await GoToBlock(blockIndex);
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        // ✅ Éviter les opérations si le composant est en cours de destruction
+        if (_cancellationTokenSource?.IsCancellationRequested == true) return;
+        
+        // ✅ Éviter les redirections multiples
+        if (_isNavigating) return;
+        
+        // ✅ Attendre que les données soient chargées avant de valider les paramètres
+        if (isLoading) return;
+
+        try
+        {
+            _isNavigating = true;
+
+            // Rediriger vers le dernier bloc consulté si aucun bloc spécifié
+            if (!BlockIndex.HasValue && blocks != null && blocks.Any())
+            {
+                var targetBlock = Math.Max(0, Math.Min(courseProgress?.LastAccessedBlock ?? 0, blocks.Count - 1));
+                NavigationManager.NavigateTo(GetBlockUrl(targetBlock), replace: true);
+                return;
+            }
+
+            // Vérifier que l'index est valide
+            if (BlockIndex.HasValue && blocks != null &&
+                (BlockIndex.Value < 0 || BlockIndex.Value >= blocks.Count))
+            {
+                var safeIndex = Math.Max(0, Math.Min(BlockIndex.Value, blocks.Count - 1));
+                NavigationManager.NavigateTo(GetBlockUrl(safeIndex), replace: true);
+                return;
+            }
+
+            // Sauvegarder l'accès au bloc actuel
+            if (BlockIndex.HasValue && courseProgress != null && IsCurrentBlockValid())
+            {
+                courseProgress.LastAccessedBlock = BlockIndex.Value;
+                await CourseStateService.SaveProgressAsync(courseProgress);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur dans OnParametersSetAsync: {ex.Message}");
+        }
+        finally
+        {
+            _isNavigating = false;
+        }
+    }
+
+    // Implémentation de IAsyncDisposable pour nettoyer les ressources
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            _cancellationTokenSource?.Cancel();
+            _cancellationTokenSource?.Dispose();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du nettoyage: {ex.Message}");
+        }
     }
 }

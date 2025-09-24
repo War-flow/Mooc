@@ -135,17 +135,6 @@ namespace Mooc.Services
                 ValidateQuizBlock(quizBlock, result);
             }
 
-            // Avertissements additionnels
-            if (result.QuizCount == 1)
-            {
-                result.AddWarning("Il est recommandé d'avoir plusieurs quiz pour une meilleure évaluation");
-            }
-
-            if (blocks.Count(b => b.Type == "texte") == 0)
-            {
-                result.AddWarning("Il est recommandé d'avoir du contenu textuel en plus des quiz");
-            }
-
             return result;
         }
 

@@ -197,14 +197,6 @@
                                         Terminée le @completionInfo.CompletionDate.Value.ToString("dd/MM/yyyy")
                                     </small>
                                 }
-                                @if (completionInfo.HasCertificate)
-                                {
-                                    <div class="mt-1">
-                                        <small class="text-warning">
-                                            <i class="bi bi-award me-1"></i>Certificat disponible
-                                        </small>
-                                    </div>
-                                }
                             </div>
                         }
 
@@ -226,12 +218,6 @@
                                 <a href="/session/@session.Id" class="btn btn-success flex-fill">
                                     <i class="bi bi-eye me-2"></i> Revoir les cours
                                 </a>
-                                @if (completionInfo.HasCertificate)
-                                {
-                                    <a href="/certificat/@session.Id" class="btn btn-outline-warning flex-fill">
-                                        <i class="bi bi-award me-2"></i> Certificat
-                                    </a>
-                                }
                             }
                             else if (IsSessionActive(session))
                             {

@@ -11,12 +11,12 @@ namespace Mooc.Data
         }
 
         /// <summary>
-        /// Obtient la description des points pour l'affichage
+        /// Obtient la description des points pour l'affichage (sans mention de bonus)
         /// </summary>
         public static string GetPointsDescription(this QuizStructure quiz)
         {
             var basePoints = quiz.GetBasePoints();
-            return $"{basePoints} pts (base) | Bonus possible selon performance";
+            return $"{basePoints} pts";
         }
 
         /// <summary>

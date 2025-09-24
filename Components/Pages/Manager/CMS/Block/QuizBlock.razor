@@ -161,66 +161,6 @@
                     <ValidationMessage For="@(() => QuizContent.QuizData.Explanation)" />
                 </div>
 
-                <!-- Paramètres avancés -->
-                <div class="accordion" id="advancedSettings">
-                    <div class="accordion-item">
-                        <h2 class="accordion-header">
-                            <button class="accordion-button collapsed" type="button"
-                                    data-bs-toggle="collapse" data-bs-target="#collapseAdvanced">
-                                <i class="bi bi-gear me-2"></i>
-                                Paramètres avancés
-                            </button>
-                        </h2>
-                        <div id="collapseAdvanced" class="accordion-collapse collapse">
-                            <div class="accordion-body">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-2">
-                                            <InputCheckbox class="form-check-quiz" @bind-Value="QuizContent.QuizData.ShowValidationFeedback" id="@showFeedbackId" />
-                                            <label class="form-check-label" for="@showFeedbackId">
-                                                Afficher un retour détaillé
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <InputCheckbox class="form-check-quiz" @bind-Value="QuizContent.QuizData.ShowProgress" id="@($"showProgress-{Block.Order}")" />
-                                            <label class="form-check-label" for="@($"showProgress-{Block.Order}")">
-                                                Afficher la progression
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <div class="form-check mb-2">
-                                            <InputCheckbox class="form-check-quiz" @bind-Value="QuizContent.QuizData.ShowStats" id="@($"showStats-{Block.Order}")" />
-                                            <label class="form-check-label" for="@($"showStats-{Block.Order}")">
-                                                Afficher les statistiques
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <InputCheckbox class="form-check-quiz" @bind-Value="QuizContent.QuizData.AllowHint" id="@($"allowHint-{Block.Order}")" />
-                                            <label class="form-check-label" for="@($"allowHint-{Block.Order}")">
-                                                Autoriser l'aide
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                @if (QuizContent.QuizData.AllowHint)
-                                {
-                                    <div class="mt-3">
-                                        <label class="form-label">Indice (optionnel)</label>
-                                        <InputTextArea class="form-control"
-                                                       @bind-Value="QuizContent.QuizData.Hint"
-                                                       rows="2"
-                                                       maxlength="200"
-                                                       placeholder="Indice pour aider l'utilisateur..." />
-                                        <ValidationMessage For="@(() => QuizContent.QuizData.Hint)" />
-                                    </div>
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Prévisualisation -->
                 <div class="mt-4 p-3 bg-light rounded">
                     <h6 class="text-muted mb-3">

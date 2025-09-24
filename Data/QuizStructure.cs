@@ -69,7 +69,7 @@ namespace Mooc.Data
             };
         }
 
-        // **NOUVELLES MÉTHODES** : Pour l'affichage des points
+        // **NOUVELLES MÉTHODES** : Pour l'affichage des points (sans bonus)
         /// <summary>
         /// Obtient les points de base selon la difficulté
         /// </summary>
@@ -94,19 +94,12 @@ namespace Mooc.Data
         }
 
         /// <summary>
-        /// Obtient la description des points possibles
+        /// Obtient la description des points possibles (sans bonus)
         /// </summary>
         public string GetPointsDescription()
         {
             var basePoints = GetBasePoints();
-            return Difficulty switch
-            {
-                QuizDifficulty.Débutant => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
-                QuizDifficulty.Intermédiaire => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
-                QuizDifficulty.Avancé => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
-                QuizDifficulty.Expert => $"{basePoints} points de base - Performance parfaite: +{(int)(basePoints * 0.5)} pts bonus",
-                _ => $"{basePoints} points possibles"
-            };
+            return $"{basePoints} points";
         }
 
         public static ValidationResult? ValidateOptions(string? value, ValidationContext context)

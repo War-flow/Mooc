@@ -13,17 +13,8 @@ namespace Mooc.Data
             { QuizDifficulty.Expert, 8 }
         };
 
-        // Multiplicateurs pour les bonus de performance
-        public static readonly Dictionary<QuizPerformanceLevel, double> PerformanceMultipliers = new()
-        {
-            { QuizPerformanceLevel.Perfect, 1.5 },      // +50% pour performance parfaite
-            { QuizPerformanceLevel.Excellent, 1.2 },   // +20% pour excellente performance
-            { QuizPerformanceLevel.Good, 1.0 },        // Aucun bonus
-            { QuizPerformanceLevel.Average, 0.8 }      // -20% pour performance moyenne
-        };
-
         /// <summary>
-        /// Calcule le score d'un quiz basé sur la difficulté et la performance
+        /// Calcule le score d'un quiz basé uniquement sur la difficulté
         /// </summary>
         /// <param name="difficulty">Niveau de difficulté du quiz</param>
         /// <param name="isCorrect">Si la réponse est correcte</param>
@@ -55,24 +46,21 @@ namespace Mooc.Data
                 return result;
             }
 
-            // Points de base selon la difficulté
+            // Points de base selon la difficulté (plus de bonus)
             result.BasePoints = DifficultyPoints[difficulty];
-
-            // Déterminer le niveau de performance
+            
+            // Déterminer le niveau de performance (pour l'affichage seulement)
             result.PerformanceLevel = DeterminePerformanceLevel(timeSpent, hintsUsed, attempts, difficulty);
 
-            // Appliquer le multiplicateur de performance
-            var multiplier = PerformanceMultipliers[result.PerformanceLevel];
-            result.PerformanceMultiplier = multiplier;
-
-            // Calcul du score final
-            result.FinalScore = (int)Math.Round(result.BasePoints * multiplier);
+            // Plus de multiplicateur - score final = points de base
+            result.PerformanceMultiplier = 1.0;
+            result.FinalScore = result.BasePoints;
 
             return result;
         }
 
         /// <summary>
-        /// Détermine le niveau de performance basé sur les métriques
+        /// Détermine le niveau de performance basé sur les métriques (pour affichage uniquement)
         /// </summary>
         private static QuizPerformanceLevel DeterminePerformanceLevel(
             TimeSpan timeSpent, 
@@ -144,7 +132,7 @@ namespace Mooc.Data
         }
     }
 
-    // Énumérations pour les niveaux de performance
+    // Énumérations pour les niveaux de performance (conservées pour l'affichage)
     public enum QuizPerformanceLevel
     {
         Perfect,
