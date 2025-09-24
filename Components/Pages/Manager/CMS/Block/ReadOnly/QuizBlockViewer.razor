@@ -28,38 +28,6 @@
         </h4>
     }
 
-    @if (IsCompleted && QuizScoreResult != null)
-    {
-        <div class="alert alert-success d-flex align-items-center">
-            <i class="bi bi-check-circle-fill me-2 fs-5"></i>
-            <div class="flex-grow-1">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>Quiz terminé !</strong>
-                        @if (IsCorrect.HasValue)
-                        {
-                            <span class="ms-2">
-                                @(IsCorrect.Value ? "🎉 Excellente réponse !" : "📚 Continue d'apprendre !")
-                            </span>
-                        }
-                    </div>
-                    <div class="score-display">
-                        <span class="badge bg-primary fs-6">
-                            @QuizScoreResult.FinalScore / @QuizScoreResult.BasePoints pts
-                        </span>
-                        @if (QuizScoreResult.PerformanceMultiplier > 1.0)
-                        {
-                            <span class="badge bg-warning text-dark ms-1">
-                                <i class="bi bi-lightning-fill"></i>
-                                Bonus @(string.Format("{0:F0}", (QuizScoreResult.PerformanceMultiplier - 1) * 100))%
-                            </span>
-                        }
-                    </div>
-                </div>
-            </div>
-        </div>
-    }
-
     @if (!string.IsNullOrEmpty(QuizData.Question))
     {
         <div class="quiz-display">
