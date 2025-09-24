@@ -41,7 +41,7 @@ else if (cours == null)
             <i class="bi bi-arrow-left me-1"></i> Retour aux cours
         </button>
     </div>
-} 
+}
 else
 {
     <div class="container mt-4">
@@ -91,7 +91,7 @@ else
                         {
                             var progressPercentage = blocks.Count > 0 ? (courseProgress.CompletedBlocks.Count * 100 / blocks.Count) : 0;
                             <div class="progress mb-3" style="height: 12px;">
-                                <div class="progress-bar bg-gradient progress-bar-striped @(courseProgress.IsCompleted ? "bg-success" : "bg-info")" 
+                                <div class="progress-bar bg-gradient progress-bar-striped @(courseProgress.IsCompleted ? "bg-success" : "bg-info")"
                                      role="progressbar"
                                      style="width: @progressPercentage%"
                                      aria-valuenow="@progressPercentage"
@@ -119,7 +119,7 @@ else
                         {
                             <div class="block-navigation mt-3">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <button class="btn btn-outline-primary" 
+                                    <button class="btn btn-outline-primary"
                                             @onclick="GoToPreviousBlock"
                                             disabled="@(CurrentBlockIndex <= 0)">
                                         <i class="bi bi-arrow-left me-1"></i>
@@ -132,7 +132,7 @@ else
                                         </span>
                                     </div>
 
-                                    <button class="btn btn-outline-primary" 
+                                    <button class="btn btn-outline-primary"
                                             @onclick="GoToNextBlock"
                                             disabled="@(!CanNavigateToNext())">
                                         Suivant
@@ -144,7 +144,7 @@ else
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-4">
                 <div class="card shadow-sm">
                     <div class="card-header">
@@ -161,105 +161,9 @@ else
                         <div class="info-item mb-3">
                             <strong>Période :</strong>
                             <p class="mb-0">
-                                Du @cours.Session?.StartDate.ToString("dd/MM/yyyy") 
+                                Du @cours.Session?.StartDate.ToString("dd/MM/yyyy")
                                 au @cours.Session?.EndDate.ToString("dd/MM/yyyy")
                             </p>
-                        </div>
-                        
-                        @if (courseProgress?.IsCompleted == true)
-                        {
-                            <div class="info-item mb-3">
-                                <strong>Score :</strong>
-                                <div class="score-display">
-                                    @if (courseScoreResult != null)
-                                    {
-                                        <div class="d-flex flex-column">
-                                            <span class="fs-4 fw-bold text-success">
-                                                @courseScoreResult.TotalEarnedPoints / @courseScoreResult.TotalPossiblePoints pts
-                                            </span>
-                                            <span class="text-muted small">
-                                                @courseScoreResult.CorrectAnswers/@courseScoreResult.QuizCount quiz réussis
-                                                (@courseScoreResult.ScorePercentage.ToString("F1")%)
-                                            </span>
-                                            <div class="progress mt-2" style="height: 8px;">
-                                                <div class="progress-bar bg-success" 
-                                                     role="progressbar" 
-                                                     style="width: @courseScoreResult.ScorePercentage%"
-                                                     aria-valuenow="@courseScoreResult.ScorePercentage" 
-                                                     aria-valuemin="0" 
-                                                     aria-valuemax="100">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <div class="d-flex flex-column">
-                                            <span class="fs-4 fw-bold text-success">
-                                                @GetCorrectAnswersCount()/@GetTotalQuizCount() quiz réussis
-                                            </span>
-                                            @if (GetTotalQuizCount() > 0)
-                                            {
-                                                <span class="text-muted">
-                                                    (@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)
-                                                </span>
-                                            }
-                                            <span class="text-muted small">
-                                                Score détaillé non disponible
-                                            </span>
-                                        </div>
-                                    }
-                                </div>
-                            </div>
-                        }
-                        else if (GetTotalQuizCount() > 0)
-                        {
-                            <div class="info-item mb-3">
-                                <strong>Score :</strong>
-                                <div class="score-display">
-                                    <div class="d-flex flex-column">
-                                        <span class="fs-6 text-muted">
-                                            <i class="bi bi-clock me-1"></i>
-                                            Cours en progression
-                                        </span>
-                                        <span class="text-muted small">
-                                            Score maximum possible : @maxPossiblePoints pts
-                                        </span>
-                                        <span class="text-muted small">
-                                            @GetTotalQuizCount() quiz à compléter
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        }
-
-                        <!-- Nouvelle section : Indicateur de quiz -->
-                        <div class="info-item mb-3">
-                            <strong>Quiz :</strong>
-                            <div class="d-flex align-items-center">
-                                <span class="me-2">@GetTotalQuizCount() quiz disponible(s)</span>
-                                @if (GetTotalQuizCount() == 0)
-                                {
-                                    <span class="badge bg-warning">
-                                        <i class="bi bi-exclamation-triangle me-1"></i>
-                                        Aucun quiz
-                                    </span>
-                                }
-                                else if (GetTotalQuizCount() == 1)
-                                {
-                                    <span class="badge bg-info">
-                                        <i class="bi bi-check-circle me-1"></i>
-                                        Quiz disponible
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-success">
-                                        <i class="bi bi-check-circle-fill me-1"></i>
-                                        Plusieurs quiz
-                                    </span>
-                                }
-                            </div>
                         </div>
 
                         <!-- Liste des blocs avec statut -->
@@ -307,7 +211,7 @@ else
                                     <div class="alert alert-info mt-3 mb-0">
                                         <i class="bi bi-info-circle me-2"></i>
                                         <small>
-                                            <strong>Navigation séquentielle :</strong> Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours. 
+                                            <strong>Navigation séquentielle :</strong> Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours.
                                             Une fois terminé, vous pourrez naviguer librement entre tous les blocs.
                                         </small>
                                     </div>
@@ -365,35 +269,16 @@ else
                             </div>
 
                             <div class="navigation-center">
-                                @if (courseProgress?.IsCompleted == true)
-                                {
-                                    <!-- Affichage pour cours terminé -->
-                                    <div class="text-center">
-                                        <div class="alert alert-success d-inline-flex align-items-center mb-0">
-                                            <i class="bi bi-trophy-fill me-2 fs-5"></i>
-                                            <div>
-                                                <strong>Félicitations !</strong>
-                                                <div class="small">
-                                                    Score : @GetCorrectAnswersCount()/@GetTotalQuizCount() 
-                                                    @if (GetTotalQuizCount() > 0)
-                                                    {
-                                                        <span>(@(Math.Round((double)GetCorrectAnswersCount() / GetTotalQuizCount() * 100, 1))%)</span>
-                                                    }
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                }
-                                else if (IsLastBlock() && !IsCurrentBlockCompleted())
+                                @if (IsLastBlock() && !IsCurrentBlockCompleted())
                                 {
                                     <!-- Bouton pour terminer le cours -->
-                                    <button class="btn btn-success @(CanCompleteCourse() ? "" : "disabled")" 
+                                    <button class="btn btn-success @(CanCompleteCourse() ? "" : "disabled")"
                                             @onclick="CompleteCourse"
                                             disabled="@(!CanCompleteCourse())">
                                         <i class="bi bi-check-circle me-1"></i>
                                         Terminer le cours
                                     </button>
-                                    
+
                                     @if (!CanCompleteCourse() && IsCurrentBlockQuiz())
                                     {
                                         <div class="text-warning small mt-1">
@@ -407,7 +292,7 @@ else
                             <div class="navigation-right">
                                 @if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
                                 {
-                                    <button class="btn @(CanNavigateToNext() ? "btn-primary" : "btn-outline-primary disabled")" 
+                                    <button class="btn @(CanNavigateToNext() ? "btn-primary" : "btn-outline-primary disabled")"
                                             @onclick="GoToNextBlock"
                                             disabled="@(!CanNavigateToNext())">
                                         Suivant
@@ -440,13 +325,12 @@ else
     private List<CourBuilder.CoursBlock>? blocks;
     private bool isLoading = true;
     private bool showNavigationHelper = true;
-    
+
     // ✅ Propriété sécurisée pour CurrentBlockIndex
     private int CurrentBlockIndex => BlockIndex ?? 0;
-    
+
     private Services.CourseProgress? courseProgress;
     private Dictionary<int, bool> quizCompletionState = new();
-    private CourseScoreResult? courseScoreResult;
 
     // Ajout d'un token de cancellation pour éviter les opérations après disposal
     private CancellationTokenSource? _cancellationTokenSource;
@@ -454,21 +338,14 @@ else
     // Flag pour éviter les redirections multiples
     private bool _isNavigating = false;
 
-    // 🆕 Nouvelle propriété
-    private int maxPossiblePoints = 0; 
-    
     protected override async Task OnInitializedAsync()
     {
         _cancellationTokenSource = new CancellationTokenSource();
-        
+
         try
         {
             await LoadCoursData(_cancellationTokenSource.Token);
             await LoadCourseProgress(_cancellationTokenSource.Token);
-            
-            // 🆕 CHANGEMENT : Toujours essayer de charger le score
-            await LoadCourseScore(_cancellationTokenSource.Token);
-            
         }
         catch (OperationCanceledException)
         {
@@ -480,14 +357,13 @@ else
         }
     }
 
-    // 🔄 MODIFIER la méthode LoadCoursData pour inclure le calcul du score maximum
     private async Task LoadCoursData(CancellationToken cancellationToken = default)
     {
         try
         {
             // ✅ Créer et disposer le contexte dans le même scope
             await using var context = await DbContextFactory.CreateDbContextAsync(cancellationToken);
-            
+
             cours = await context.Courses
                 .Include(c => c.Session)
                 .FirstOrDefaultAsync(c => c.Id == CoursId, cancellationToken);
@@ -502,20 +378,8 @@ else
                         {
                             PropertyNameCaseInsensitive = true
                         });
-                    
+
                     blocks ??= new List<CourBuilder.CoursBlock>();
-                    
-                    // 🆕 NOUVEAU : Calculer le score maximum possible réel
-                    try
-                    {
-                        maxPossiblePoints = await CourseStateService.CalculateMaxPossiblePointsAsync(CoursId);
-                        Console.WriteLine($"🎯 Score maximum calculé: {maxPossiblePoints} pts pour {GetTotalQuizCount()} quiz");
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Erreur lors du calcul du score maximum: {ex.Message}");
-                        maxPossiblePoints = 0;
-                    }
                 }
                 catch (Exception ex)
                 {
@@ -548,11 +412,13 @@ else
             isLoading = false;
         }
     }
+
     // Ajoutez cette méthode utilitaire dans la section @code
     private bool IsCurrentBlockValid()
     {
         return blocks != null && CurrentBlockIndex >= 0 && CurrentBlockIndex < blocks.Count;
     }
+
     private async Task LoadCourseProgress(CancellationToken cancellationToken = default)
     {
         try
@@ -567,24 +433,6 @@ else
         catch (Exception ex)
         {
             Console.WriteLine($"Erreur lors du chargement du progrès: {ex.Message}");
-        }
-    }
-
-    // 🔄 MODIFIER la méthode LoadCourseScore pour être plus robuste
-    private async Task LoadCourseScore(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (cancellationToken.IsCancellationRequested) return;
-            courseScoreResult = await CourseStateService.CalculateCourseScoreAsync(CoursId);
-        }
-        catch (OperationCanceledException)
-        {
-            // Composant disposé
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Erreur lors du chargement du score: {ex.Message}");
         }
     }
 
@@ -687,7 +535,7 @@ else
         if (!IsCurrentBlockValid() || courseProgress == null) return false;
 
         var currentBlock = blocks![CurrentBlockIndex];
-        
+
         // Si ce n'est pas un quiz, permettre la completion
         if (currentBlock.Type != "quiz") return true;
 
@@ -700,7 +548,7 @@ else
         if (!IsCurrentBlockValid()) return false;
 
         var currentBlock = blocks![CurrentBlockIndex];
-        
+
         // Si ce n'est pas un quiz, permettre la navigation
         if (currentBlock.Type != "quiz") return true;
 
@@ -722,25 +570,15 @@ else
         // Enregistrer l'interaction du quiz
         if (courseProgress != null)
         {
-            var quizInteraction = new { 
-                completed = true, 
-                correct = isCorrect, 
-                timestamp = DateTime.UtcNow 
+            var quizInteraction = new
+            {
+                completed = true,
+                correct = isCorrect,
+                timestamp = DateTime.UtcNow
             };
             courseProgress.BlockInteractions[CurrentBlockIndex] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
-            
-            await CourseStateService.SaveProgressAsync(courseProgress);
 
-            // ⭐ NOUVEAU : Recharger le score après chaque quiz complété
-            try
-            {
-                courseScoreResult = await CourseStateService.CalculateCourseScoreAsync(CoursId);
-                Console.WriteLine($"🎯 Score recalculé: {courseScoreResult?.TotalEarnedPoints}/{courseScoreResult?.TotalPossiblePoints}");
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Erreur lors du recalcul du score: {ex.Message}");
-            }
+            await CourseStateService.SaveProgressAsync(courseProgress);
         }
 
         StateHasChanged();
@@ -804,7 +642,7 @@ else
     private int GetCorrectAnswersCount()
     {
         if (courseProgress?.BlockInteractions == null) return 0;
-        
+
         int correctCount = 0;
         foreach (var interaction in courseProgress.BlockInteractions)
         {
@@ -822,14 +660,14 @@ else
                 // Ignorer les interactions mal formées
             }
         }
-        
+
         return correctCount;
     }
 
     private int GetCompletedQuizCount()
     {
         if (courseProgress?.BlockInteractions == null) return 0;
-        
+
         int completedCount = 0;
         foreach (var interaction in courseProgress.BlockInteractions)
         {
@@ -847,7 +685,7 @@ else
                 // Ignorer les interactions mal formées
             }
         }
-        
+
         return completedCount;
     }
 
@@ -855,18 +693,6 @@ else
     {
         if (blocks == null) return 0;
         return blocks.Count(b => b.Type == "quiz");
-    }
-
-    private string GetOverallLevelClass()
-    {
-        return courseScoreResult?.OverallLevel switch
-        {
-            CoursePerformanceLevel.Excellent => "bg-success",
-            CoursePerformanceLevel.Good => "bg-info",
-            CoursePerformanceLevel.Average => "bg-warning text-dark",
-            CoursePerformanceLevel.NeedsImprovement => "bg-danger",
-            _ => "bg-secondary"
-        };
     }
 
     // Vérifie si l'utilisateur peut naviguer vers un bloc spécifique
@@ -927,7 +753,7 @@ else
     {
         if (!CanNavigateToBlock(blockIndex))
         {
-            await JSRuntime.InvokeVoidAsync("alert", 
+            await JSRuntime.InvokeVoidAsync("alert",
                 "Navigation bloquée : Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours. " +
                 "Une fois le cours terminé, vous pourrez naviguer librement entre tous les blocs.");
             return;
@@ -940,10 +766,10 @@ else
     {
         // ✅ Éviter les opérations si le composant est en cours de destruction
         if (_cancellationTokenSource?.IsCancellationRequested == true) return;
-        
+
         // ✅ Éviter les redirections multiples
         if (_isNavigating) return;
-        
+
         // ✅ Attendre que les données soient chargées avant de valider les paramètres
         if (isLoading) return;
 

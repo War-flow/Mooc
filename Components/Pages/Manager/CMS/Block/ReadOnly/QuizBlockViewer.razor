@@ -175,26 +175,9 @@
                                 <div class="col-auto">
                                     <div class="score-item">
                                         <div class="score-value text-info">
-                                            @QuizScoreResult.BasePoints pts
-                                        </div>
-                                        <div class="score-label">Base (@QuizData.Difficulty)</div>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="score-item">
-                                        <div class="score-value text-info">
                                             @GetFormattedTime()
                                         </div>
                                         <div class="score-label">Temps</div>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="score-item">
-                                        <div class="score-value @GetPerformanceLevelClass()">
-                                            @GetPerformanceLevelIcon()
-                                            @GetPerformanceLevelText()
-                                        </div>
-                                        <div class="score-label">Performance</div>
                                     </div>
                                 </div>
                             </div>
@@ -593,43 +576,6 @@
     private bool HasUserAnswer()
     {
         return UserAnswers != null && UserAnswers.Any(a => a);
-    }
-
-    // Méthodes pour l'affichage des performances (conservées pour l'affichage)
-    private string GetPerformanceLevelClass()
-    {
-        return QuizScoreResult?.PerformanceLevel switch
-        {
-            QuizPerformanceLevel.Perfect => "text-success",
-            QuizPerformanceLevel.Excellent => "text-info",
-            QuizPerformanceLevel.Good => "text-primary",
-            QuizPerformanceLevel.Average => "text-warning",
-            _ => "text-muted"
-        };
-    }
-
-    private string GetPerformanceLevelIcon()
-    {
-        return QuizScoreResult?.PerformanceLevel switch
-        {
-            QuizPerformanceLevel.Perfect => "🏆 ",
-            QuizPerformanceLevel.Excellent => "⭐ ",
-            QuizPerformanceLevel.Good => "👍 ",
-            QuizPerformanceLevel.Average => "👌 ",
-            _ => ""
-        };
-    }
-
-    private string GetPerformanceLevelText()
-    {
-        return QuizScoreResult?.PerformanceLevel switch
-        {
-            QuizPerformanceLevel.Perfect => "Parfait",
-            QuizPerformanceLevel.Excellent => "Excellent",
-            QuizPerformanceLevel.Good => "Bien",
-            QuizPerformanceLevel.Average => "Moyen",
-            _ => ""
-        };
     }
 
     private string GetDifficultyTextClass()
