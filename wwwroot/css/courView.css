@@ -240,3 +240,64 @@
 }
 
 
+/* Styles pour les scores de cours */
+.course-score {
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.course-score-pending {
+    padding: 0.5rem;
+    background: rgba(108, 117, 125, 0.1);
+    border-radius: 6px;
+}
+
+.course-score-empty {
+    padding: 0.25rem;
+}
+
+.score-progress .progress {
+    border-radius: 2px;
+    background-color: #f8f9fa;
+}
+
+.score-stat {
+    padding: 0.75rem;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.score-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.score-stat small {
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Animation pour les nouveaux scores */
+@keyframes scoreUpdate {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+.score-value {
+    animation: scoreUpdate 0.3s ease-out;
+}

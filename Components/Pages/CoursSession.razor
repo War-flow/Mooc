@@ -57,17 +57,17 @@ else
                 @session?.Description
             </p>
             <div>
-                <span class="badge @(IsSessionEnded() ? "bg-secondary" : IsSessionActive() ? "bg-success" : "bg-warning") me-2">
+                <span class="badge @(IsSessionEnded() ? "bg-secondary" : IsSessionActive() ? "bg-success" : "bg-warning") me-1 mb-1">
                     @(IsSessionEnded() ? "Session terminée" : IsSessionActive() ? "Session en cours" : "À venir")
                 </span>
-                <span class="badge bg-info">@coursList.Count cours</span>
-                @* **NOUVEAU**: Affichage du score total de la session *@
-                @if (sessionTotalScore > 0)
+                <span class="badge bg-info me-1 ">@coursList.Count cours</span>
+                @* **AMÉLIORÉ**: Affichage du score total de la session avec détails *@
+                @if (sessionTotalScore > 0 || sessionMaxScore > 0)
                 {
-                    <span class="badge bg-warning">
-                        <i class="bi bi-trophy me-1"></i>
-                        @sessionTotalScore pts
-                    </span>
+                        <span class="badge bg-warning me-1">
+                            <i class="bi bi-trophy me-1"></i>
+                            @sessionTotalScore/@sessionMaxScore pts
+                        </span>
                 }
             </div>
         </div>
@@ -101,16 +101,57 @@ else
                                 @GetCourseCompletionStatus(cours.Id)
                             </span>
                         </div>
-                        @* **NOUVEAU**: Affichage du score du cours *@
-                        @if (courseScores.ContainsKey(cours.Id) && courseScores[cours.Id].TotalEarnedPoints > 0)
+                        @* **AMÉLIORÉ**: Affichage complet du score du cours *@
+                        @if (courseScores.ContainsKey(cours.Id))
                         {
+                            var courseScore = courseScores[cours.Id];
                             <div class="course-score">
-                                <span class="badge bg-success">
-                                    <i class="bi bi-star-fill me-1"></i>
-                                    @courseScores[cours.Id].TotalEarnedPoints/@courseScores[cours.Id].TotalPossiblePoints pts
-                                </span>
-                                <small class="text-muted d-block mt-1">
-                                    @courseScores[cours.Id].ScorePercentage.ToString("F1")%
+                                @if (courseScore.TotalPossiblePoints > 0)
+                                {
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge @GetScoreBadgeClass(courseScore.ScorePercentage)">
+                                            <i class="bi bi-star-fill me-1"></i>
+                                            @courseScore.TotalEarnedPoints/@courseScore.TotalPossiblePoints pts
+                                        </span>
+                                        <span class="badge bg-light text-dark">
+                                            @courseScore.ScorePercentage.ToString("F1")%
+                                        </span>
+                                    </div>
+                                    
+                                    @* Barre de progression du score *@
+                                    <div class="score-progress mb-2">
+                                        <div class="progress" style="height: 4px;">
+                                            <div class="progress-bar @GetProgressBarClass(courseScore.ScorePercentage)"
+                                                 role="progressbar"
+                                                 style="width: @courseScore.ScorePercentage%"
+                                                 aria-valuenow="@courseScore.ScorePercentage"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <small class="text-muted">
+                                            @courseScore.CorrectAnswers/@courseScore.QuizCount quiz réussis
+                                        </small>
+                                    </div>
+                                }
+                                else if (courseScore.QuizCount > 0)
+                                {
+                                    <div class="course-score-pending">
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-hourglass-split me-1"></i>
+                                            @courseScore.QuizCount quiz disponible@(courseScore.QuizCount > 1 ? "s" : "")
+                                        </span>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            @* Indicateur qu'aucun quiz n'est disponible *@
+                            <div class="course-score-empty">
+                                <small class="text-muted">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    Aucun quiz disponible
                                 </small>
                             </div>
                         }
@@ -118,23 +159,6 @@ else
                     <div class="course-content">
                         <div class="course-title">@cours.Title</div>
                         <div class="course-description">@GetTruncatedDescription(cours.Description)</div>
-                        
-                        @* **NOUVEAU**: Détails du score si disponible *@
-                        @if (courseScores.ContainsKey(cours.Id) && courseScores[cours.Id].QuizCount > 0)
-                        {
-                            <div class="course-score-details mt-2">
-                                <small class="text-muted">
-                                    <i class="bi bi-check-circle me-1"></i>
-                                    @courseScores[cours.Id].CorrectAnswers/@courseScores[cours.Id].QuizCount quiz réussis
-                                </small>
-                                <div class="performance-level mt-1">
-                                    <span class="badge @GetPerformanceBadgeClass(courseScores[cours.Id].OverallLevel)">
-                                        @GetPerformanceLevelText(courseScores[cours.Id].OverallLevel)
-                                    </span>
-                                </div>
-                            </div>
-                        }
-
                         <div class="course-meta">
                             <div class="course-updated">
                                 <i class="bi bi-calendar me-1"></i> Mise à jour : @cours.UpdatedAt.ToString("dd/MM/yyyy")
@@ -188,13 +212,63 @@ else
                         @if (sessionTotalScore > 0 || sessionMaxScore > 0)
                         {
                             <div class="mt-3">
-                                <h6 class="card-title">Score global de la session</h6>
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <span class="fs-4 fw-bold text-primary">@sessionTotalScore</span>
-                                        <span class="text-muted">/ @sessionMaxScore points</span>
+                                <h6 class="card-title d-flex align-items-center">
+                                    <i class="bi bi-trophy me-2"></i>
+                                    Score global de la session
+                                </h6>
+                                
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <div class="score-stat text-center">
+                                            <div class="score-value text-primary">
+                                                @sessionTotalScore
+                                            </div>
+                                            <small class="text-muted">Points gagnés</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="score-stat text-center">
+                                            <div class="score-value text-info">
+                                                @sessionMaxScore
+                                            </div>
+                                            <small class="text-muted">Points possibles</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="score-stat text-center">
+                                            <div class="score-value @GetPerformanceTextClass(sessionScorePercentage)">
+                                                @sessionScorePercentage.ToString("F1")%
+                                            </div>
+                                            <small class="text-muted">Réussite</small>
+                                        </div>
                                     </div>
                                 </div>
+                                
+                                @* Barre de progression globale *@
+                                <div class="mt-3">
+                                    <div class="progress" style="height: 8px;">
+                                        <div class="progress-bar @GetProgressBarClass(sessionScorePercentage)"
+                                             role="progressbar"
+                                             style="width: @sessionScorePercentage%"
+                                             aria-valuenow="@sessionScorePercentage"
+                                             aria-valuemin="0"
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small class="text-muted">0 pts</small>
+                                        <small class="text-muted">@sessionMaxScore pts</small>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mt-3">
+                                <h6 class="card-title text-muted">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Aucun quiz disponible dans cette session
+                                </h6>
                             </div>
                         }
                     </div>
@@ -266,34 +340,48 @@ else
         errorMessageTimer?.Dispose(); // Nouveau
     }
 
-    // **NOUVELLE MÉTHODE**: Charger les scores des cours
+    // **MÉTHODE CORRIGÉE**: Charger les scores des cours avec analyse de contenu
     private async Task LoadCourseScores()
     {
         try
         {
-            // **CORRECTION**: Vérification et initialisation si nécessaire
             courseScores ??= new Dictionary<int, CourseScoreResult>();
             courseScores.Clear();
             
             sessionTotalScore = 0;
             sessionMaxScore = 0;
             
+            Console.WriteLine($"🔄 Chargement des scores pour {coursList.Count} cours de la session {SessionId}");
+            
             foreach (var cours in coursList)
             {
-                var scoreResult = await CourseStateService.CalculateCourseScoreAsync(cours.Id);
-                courseScores[cours.Id] = scoreResult;
-                
-                sessionTotalScore += scoreResult.TotalEarnedPoints;
-                sessionMaxScore += scoreResult.TotalPossiblePoints;
+                try
+                {
+                    // **CORRECTION PRINCIPALE**: Utiliser la nouvelle méthode avec analyse de contenu
+                    var scoreResult = await CourseStateService.CalculateCourseScoreWithContentAnalysisAsync(cours.Id);
+                    courseScores[cours.Id] = scoreResult;
+                    
+                    sessionTotalScore += scoreResult.TotalEarnedPoints;
+                    sessionMaxScore += scoreResult.TotalPossiblePoints;
+                    
+                    Console.WriteLine($"✅ Cours '{cours.Title}': {scoreResult.TotalEarnedPoints}/{scoreResult.TotalPossiblePoints} pts ({scoreResult.ScorePercentage:F1}%) - {scoreResult.QuizCount} quiz");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Erreur score cours '{cours.Title}': {ex.Message}");
+                    // Ajouter un score vide pour éviter les erreurs d'affichage
+                    courseScores[cours.Id] = new CourseScoreResult();
+                }
             }
             
             // Calculer le pourcentage global
             sessionScorePercentage = sessionMaxScore > 0 ? (double)sessionTotalScore / sessionMaxScore * 100 : 0;
+            
+            Console.WriteLine($"🏆 Score session total: {sessionTotalScore}/{sessionMaxScore} pts ({sessionScorePercentage:F1}%)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur lors du chargement des scores: {ex.Message}");
-            // **AJOUT**: Réinitialiser les scores en cas d'erreur
+            Console.WriteLine($"❌ Erreur critique lors du chargement des scores: {ex.Message}");
             courseScores ??= new Dictionary<int, CourseScoreResult>();
             sessionTotalScore = 0;
             sessionMaxScore = 0;
@@ -341,7 +429,80 @@ else
         }
     }
 
-    // **NOUVELLES MÉTHODES**: Helper pour l'affichage des performances
+    // **NOUVELLES MÉTHODES**: Helper pour l'affichage des scores
+
+    /// <summary>
+    /// Obtient la classe CSS pour le badge de score selon le pourcentage
+    /// </summary>
+    private string GetScoreBadgeClass(double scorePercentage)
+    {
+        return scorePercentage switch
+        {
+            >= 90 => "bg-success",
+            >= 75 => "bg-info", 
+            >= 50 => "bg-warning",
+            > 0 => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Obtient la classe CSS pour la barre de progression selon le pourcentage
+    /// </summary>
+    private string GetProgressBarClass(double percentage)
+    {
+        return percentage switch
+        {
+            >= 90 => "bg-success",
+            >= 75 => "bg-info",
+            >= 50 => "bg-warning", 
+            > 0 => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Obtient la classe CSS pour le texte de performance
+    /// </summary>
+    private string GetPerformanceTextClass(double percentage)
+    {
+        return percentage switch
+        {
+            >= 90 => "text-success",
+            >= 75 => "text-info",
+            >= 50 => "text-warning",
+            > 0 => "text-danger",
+            _ => "text-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Obtient la classe CSS pour le badge de performance de session
+    /// </summary>
+    private string GetSessionPerformanceBadgeClass(double percentage)
+    {
+        return percentage switch
+        {
+            >= 90 => "bg-success",
+            >= 75 => "bg-primary",
+            >= 50 => "bg-warning",
+            > 0 => "bg-danger",
+            _ => "bg-secondary"
+        };
+    }
+
+    /// <summary>
+    /// Vérifie si un cours a des quiz disponibles
+    /// </summary>
+    private bool HasAvailableQuizzes(int coursId)
+    {
+        return courseScores.ContainsKey(coursId) && 
+               (courseScores[coursId].QuizCount > 0 || courseScores[coursId].TotalPossiblePoints > 0);
+    }
+
+    /// <summary>
+    /// Obtient la classe CSS pour le badge de performance d'un cours selon le niveau global
+    /// </summary>
     private string GetPerformanceBadgeClass(CoursePerformanceLevel level)
     {
         return level switch
@@ -349,19 +510,28 @@ else
             CoursePerformanceLevel.Excellent => "bg-success",
             CoursePerformanceLevel.Good => "bg-info",
             CoursePerformanceLevel.Average => "bg-warning",
+            CoursePerformanceLevel.NeedsImprovement => "bg-danger",
             _ => "bg-secondary"
         };
     }
-    
-    private string GetPerformanceLevelText(CoursePerformanceLevel level)
+
+    /// <summary>
+    /// Obtient un résumé textuel du score d'un cours
+    /// </summary>
+    private string GetCourseScoreSummary(int coursId)
     {
-        return level switch
-        {
-            CoursePerformanceLevel.Excellent => "Excellent",
-            CoursePerformanceLevel.Good => "Bien",
-            CoursePerformanceLevel.Average => "Moyen",
-            _ => "Non évalué"
-        };
+        if (!courseScores.ContainsKey(coursId))
+            return "Aucune donnée";
+
+        var score = courseScores[coursId];
+        
+        if (score.TotalPossiblePoints == 0)
+            return "Aucun quiz";
+
+        if (score.TotalEarnedPoints == 0)
+            return "Non commencé";
+
+        return $"{score.TotalEarnedPoints}/{score.TotalPossiblePoints} pts ({score.ScorePercentage:F1}%)";
     }
 
     // Méthode pour obtenir le statut d'un cours spécifique
@@ -426,7 +596,7 @@ else
     }
 
 // Ajout de la méthode manquante pour tronquer la description
- private string GetTruncatedDescription(string? description, int maxLength = 80)
+ private string GetTruncatedDescription(string? description, int maxLength = 256)
   {
    if (string.IsNullOrWhiteSpace(description))
    return string.Empty;

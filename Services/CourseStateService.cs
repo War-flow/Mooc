@@ -27,17 +27,20 @@ namespace Mooc.Services
         private readonly AuthenticationStateProvider _authenticationStateProvider;
         private readonly Dictionary<string, CourseProgress> _courseProgresses = new();
         private readonly IAutomaticCertificateService _automaticCertificateService;
+        private readonly ICourseValidationService _courseValidationService;
 
         public CourseStateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
             UserManager<ApplicationUser> userManager,
             AuthenticationStateProvider authenticationStateProvider,
-            IAutomaticCertificateService automaticCertificateService)
+            IAutomaticCertificateService automaticCertificateService,
+            ICourseValidationService courseValidationService) // **NOUVEAU**
         {
             _contextFactory = contextFactory;
             _userManager = userManager;
             _authenticationStateProvider = authenticationStateProvider;
             _automaticCertificateService = automaticCertificateService;
+            _courseValidationService = courseValidationService; // **NOUVEAU**
         }
 
         // **MÉTHODE MISE À JOUR**: Récupération automatique de l'utilisateur connecté
@@ -554,5 +557,368 @@ namespace Mooc.Services
                 Console.WriteLine($"Erreur lors de la vérification de génération automatique de certificat: {ex.Message}");
             }
         }
+
+        /// <summary>
+        /// Calcule les scores pour plusieurs cours de manière optimisée (batch)
+        /// </summary>
+        public async Task<Dictionary<int, CourseScoreResult>> CalculateMultipleCourseScoresAsync(
+            List<int> courseIds, string? userId = null)
+        {
+            var currentUserId = userId ?? await GetCurrentUserIdAsync();
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                throw new InvalidOperationException("Aucun utilisateur connecté trouvé");
+            }
+
+            var results = new Dictionary<int, CourseScoreResult>();
+
+            // Traitement en parallèle pour améliorer les performances
+            var tasks = courseIds.Select(async courseId =>
+            {
+                try
+                {
+                    var score = await CalculateCourseScoreAsync(courseId, currentUserId);
+                    return new { CourseId = courseId, Score = score };
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Erreur lors du calcul du score pour le cours {courseId}: {ex.Message}");
+                    return new { CourseId = courseId, Score = new CourseScoreResult() };
+                }
+            });
+
+            var completedTasks = await Task.WhenAll(tasks);
+            
+            foreach (var result in completedTasks)
+            {
+                results[result.CourseId] = result.Score;
+            }
+
+            return results;
+        }
+
+        /// <summary>
+        /// Calcule le score total d'une session avec cache
+        /// </summary>
+        public async Task<SessionScoreResult> CalculateSessionScoreAsync(int sessionId, string? userId = null)
+        {
+            var currentUserId = userId ?? await GetCurrentUserIdAsync();
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                throw new InvalidOperationException("Aucun utilisateur connecté trouvé");
+            }
+
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var courses = await context.Courses
+                    .Where(c => c.SessionId == sessionId)
+                    .Select(c => c.Id)
+                    .ToListAsync();
+
+                var courseScores = await CalculateMultipleCourseScoresAsync(courses, currentUserId);
+                var courseResults = courseScores.Values.ToList();
+
+                return QuizScoring.CalculateSessionScore(courseResults);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors du calcul du score de session {sessionId}: {ex.Message}");
+                return new SessionScoreResult();
+            }
+        }
+
+        /// <summary>
+        /// Obtient un résumé rapide des scores sans calculs détaillés
+        /// </summary>
+        public async Task<ScoreSummary> GetScoreSummaryAsync(int coursId, string? userId = null)
+        {
+            var currentUserId = userId ?? await GetCurrentUserIdAsync();
+            if (string.IsNullOrEmpty(currentUserId))
+            {
+                return new ScoreSummary();
+            }
+
+            try
+            {
+                var progress = await GetOrCreateProgressAsync(coursId, currentUserId);
+                var summary = new ScoreSummary
+                {
+                    CoursId = coursId,
+                    UserId = currentUserId,
+                    TotalQuizzes = 0,
+                    CompletedQuizzes = 0,
+                    TotalPointsEarned = 0,
+                    TotalPointsPossible = 0
+                };
+
+                foreach (var interaction in progress.BlockInteractions.Values)
+                {
+                    try
+                    {
+                        using var document = JsonDocument.Parse(interaction);
+                        var root = document.RootElement;
+
+                        if (root.TryGetProperty("type", out var typeElement) && 
+                            typeElement.GetString() == "quiz")
+                        {
+                            summary.TotalQuizzes++;
+
+                            if (root.TryGetProperty("scoreResult", out var scoreElement))
+                            {
+                                summary.CompletedQuizzes++;
+                                summary.TotalPointsEarned += scoreElement.GetProperty("finalScore").GetInt32();
+                                summary.TotalPointsPossible += scoreElement.GetProperty("basePoints").GetInt32();
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Erreur lors du parsing de l'interaction: {ex.Message}");
+                    }
+                }
+
+                summary.CompletionPercentage = summary.TotalQuizzes > 0 
+                    ? (double)summary.CompletedQuizzes / summary.TotalQuizzes * 100 
+                    : 0;
+
+                summary.ScorePercentage = summary.TotalPointsPossible > 0
+                    ? (double)summary.TotalPointsEarned / summary.TotalPointsPossible * 100
+                    : 0;
+
+                return summary;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Erreur lors du calcul du résumé de score: {ex.Message}");
+                return new ScoreSummary { CoursId = coursId, UserId = currentUserId ?? "" };
+            }
+        }
+
+        /// <summary>
+        /// Analyse le contenu d'un cours pour compter les quiz disponibles
+        /// </summary>
+        public async Task<CourseScoreResult> CalculateCourseScoreWithContentAnalysisAsync(int coursId, string? userId = null)
+        {
+            try
+            {
+                Console.WriteLine($"🔍 Analyse du contenu du cours {coursId}");
+                
+                using var context = await _contextFactory.CreateDbContextAsync();
+                var course = await context.Courses.FindAsync(coursId);
+                
+                if (course == null)
+                {
+                    Console.WriteLine($"❌ Cours {coursId} introuvable");
+                    return new CourseScoreResult();
+                }
+                
+                // Analyser le contenu JSON pour trouver les quiz disponibles
+                var availableQuizzes = await AnalyzeCourseContentForQuizzesAsync(course.Content);
+                Console.WriteLine($"📊 {availableQuizzes.Count} quiz trouvés dans le contenu du cours");
+                
+                // Calculer les scores réalisés
+                var progress = await GetOrCreateProgressAsync(coursId, userId);
+                var completedQuizResults = new List<QuizScoreResult>();
+                var totalEarnedPoints = 0;
+                var totalPossiblePoints = 0;
+                var correctAnswers = 0;
+                
+                foreach (var availableQuiz in availableQuizzes)
+                {
+                    var blockIndex = availableQuiz.BlockOrder;
+                    var possiblePoints = QuizScoring.DifficultyPoints[availableQuiz.Difficulty];
+                    totalPossiblePoints += possiblePoints;
+                    
+                    Console.WriteLine($"🎯 Quiz bloc {blockIndex}: {possiblePoints} pts possibles (difficulté: {availableQuiz.Difficulty})");
+                    
+                    // Vérifier si ce quiz a été complété
+                    if (progress.BlockInteractions.TryGetValue(blockIndex, out var interactionData))
+                    {
+                        try
+                        {
+                            using var document = JsonDocument.Parse(interactionData);
+                            var root = document.RootElement;
+
+                            if (root.TryGetProperty("scoreResult", out var scoreElement))
+                            {
+                                var scoreResult = new QuizScoreResult
+                                {
+                                    Difficulty = Enum.Parse<QuizDifficulty>(scoreElement.GetProperty("difficulty").GetString() ?? "Débutant"),
+                                    IsCorrect = root.GetProperty("correct").GetBoolean(),
+                                    BasePoints = scoreElement.GetProperty("basePoints").GetInt32(),
+                                    FinalScore = scoreElement.GetProperty("finalScore").GetInt32(),
+                                    PerformanceLevel = Enum.Parse<QuizPerformanceLevel>(scoreElement.GetProperty("performanceLevel").GetString() ?? "Average"),
+                                    PerformanceMultiplier = scoreElement.GetProperty("performanceMultiplier").GetDouble(),
+                                    TimeSpent = TimeSpan.FromSeconds(scoreElement.GetProperty("timeSpentSeconds").GetDouble()),
+                                    HintsUsed = scoreElement.GetProperty("hintsUsed").GetInt32(),
+                                    Attempts = scoreElement.GetProperty("attempts").GetInt32()
+                                };
+
+                                completedQuizResults.Add(scoreResult);
+                                totalEarnedPoints += scoreResult.FinalScore;
+                                
+                                if (scoreResult.IsCorrect)
+                                {
+                                    correctAnswers++;
+                                }
+                                
+                                Console.WriteLine($"✅ Quiz bloc {blockIndex} complété: {scoreResult.FinalScore}/{possiblePoints} pts");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ Erreur parsing interaction bloc {blockIndex}: {ex.Message}");
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"⏸️ Quiz bloc {blockIndex} non complété");
+                    }
+                }
+                
+                var result = new CourseScoreResult
+                {
+                    QuizResults = completedQuizResults,
+                    TotalEarnedPoints = totalEarnedPoints,
+                    TotalPossiblePoints = totalPossiblePoints,
+                    QuizCount = availableQuizzes.Count,
+                    CorrectAnswers = correctAnswers,
+                    ScorePercentage = totalPossiblePoints > 0 ? (double)totalEarnedPoints / totalPossiblePoints * 100 : 0
+                };
+                
+                // Déterminer le niveau de performance global
+                result.OverallLevel = result.ScorePercentage switch
+                {
+                    >= 90 => CoursePerformanceLevel.Excellent,
+                    >= 75 => CoursePerformanceLevel.Good,
+                    >= 60 => CoursePerformanceLevel.Average,
+                    _ => CoursePerformanceLevel.NeedsImprovement
+                };
+                
+                Console.WriteLine($"🏆 Résultat final cours {coursId}: {totalEarnedPoints}/{totalPossiblePoints} pts ({result.ScorePercentage:F1}%)");
+                
+                return result;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Erreur analyse cours {coursId}: {ex.Message}");
+                return new CourseScoreResult();
+            }
+        }
+
+        /// <summary>
+        /// Analyse le contenu JSON d'un cours pour extraire les informations des quiz
+        /// </summary>
+        private async Task<List<AvailableQuizInfo>> AnalyzeCourseContentForQuizzesAsync(string? courseContent)
+        {
+            var quizzes = new List<AvailableQuizInfo>();
+            
+            if (string.IsNullOrEmpty(courseContent))
+            {
+                Console.WriteLine("⚠️ Contenu du cours vide");
+                return quizzes;
+            }
+            
+            try
+            {
+                var blocks = JsonSerializer.Deserialize<List<Mooc.Components.Pages.Manager.CMS.CourBuilder.CoursBlock>>(courseContent);
+                
+                if (blocks == null || !blocks.Any())
+                {
+                    Console.WriteLine("⚠️ Aucun bloc trouvé dans le contenu");
+                    return quizzes;
+                }
+                
+                Console.WriteLine($"🔍 Analyse de {blocks.Count} blocs");
+                
+                foreach (var block in blocks)
+                {
+                    if (block.Type == "quiz" && block.Content != null)
+                    {
+                        try
+                        {
+                            var quizData = JsonSerializer.Deserialize<QuizStructure>(block.Content.ToString()!);
+                            
+                            if (quizData != null && !string.IsNullOrEmpty(quizData.Question) && 
+                                quizData.Options != null && quizData.Options.Any())
+                            {
+                                var quizInfo = new AvailableQuizInfo
+                                {
+                                    BlockOrder = block.Order,
+                                    Difficulty = quizData.Difficulty,
+                                    Question = quizData.Question,
+                                    HasCorrectAnswer = quizData.Options.Any(o => o.IsCorrect)
+                            };
+                                
+                                quizzes.Add(quizInfo);
+                                Console.WriteLine($"📝 Quiz trouvé - Bloc {block.Order}: {quizData.Difficulty} ({QuizScoring.DifficultyPoints[quizData.Difficulty]} pts)");
+                            }
+                            else
+                            {
+                                Console.WriteLine($"⚠️ Quiz bloc {block.Order} incomplet (pas de question ou d'options)");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"❌ Erreur parsing quiz bloc {block.Order}: {ex.Message}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ Erreur parsing contenu cours: {ex.Message}");
+            }
+            
+            Console.WriteLine($"✅ Analyse terminée: {quizzes.Count} quiz valides trouvés");
+            return quizzes;
+        }
+
+        /// <summary>
+        /// Version avec validation des quiz avant calcul
+        /// </summary>
+        public async Task<CourseScoreResult> CalculateCourseScoreWithValidationAsync(int coursId, string? userId = null)
+        {
+            // Valider d'abord le cours
+            var validation = await _courseValidationService.ValidateCourseAsync(coursId);
+            
+            if (!validation.IsValid)
+            {
+                Console.WriteLine($"⚠️ Cours {coursId} invalide: {string.Join(", ", validation.Errors)}");
+                return new CourseScoreResult
+                {
+                    QuizCount = validation.QuizCount,
+                    // Les autres propriétés restent à 0
+                };
+            }
+            
+            Console.WriteLine($"✅ Cours {coursId} validé: {validation.QuizCount} quiz trouvés");
+            
+            // Continuer avec le calcul normal
+            return await CalculateCourseScoreWithContentAnalysisAsync(coursId, userId);
+        }
+    }
+
+    // Classe légère pour les résumés rapides
+    public class ScoreSummary
+    {
+        public int CoursId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public int TotalQuizzes { get; set; }
+        public int CompletedQuizzes { get; set; }
+        public int TotalPointsEarned { get; set; }
+        public int TotalPointsPossible { get; set; }
+        public double CompletionPercentage { get; set; }
+        public double ScorePercentage { get; set; }
+    }
+
+    // Classe pour stocker les informations des quiz disponibles
+    public class AvailableQuizInfo
+    {
+        public int BlockOrder { get; set; }
+        public QuizDifficulty Difficulty { get; set; }
+        public string Question { get; set; } = string.Empty;
+        public bool HasCorrectAnswer { get; set; }
     }
 }

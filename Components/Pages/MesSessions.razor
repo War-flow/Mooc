@@ -403,7 +403,7 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // **NOUVELLE MÉTHODE** : Charger les scores des sessions
+    // **MÉTHODE CORRIGÉE**: Charger les scores des sessions avec analyse de contenu
     private async Task LoadSessionScores()
     {
         if (string.IsNullOrEmpty(currentUserId) || enrolledSessions == null)
@@ -441,13 +441,16 @@
                 {
                     try
                     {
-                        var courseScore = await CourseStateService.CalculateCourseScoreAsync(course.Id, currentUserId);
+                        // **CORRECTION**: Utiliser la nouvelle méthode
+                        var courseScore = await CourseStateService.CalculateCourseScoreWithContentAnalysisAsync(course.Id, currentUserId);
                         sessionInfo.TotalEarnedPoints += courseScore.TotalEarnedPoints;
                         sessionInfo.TotalPossiblePoints += courseScore.TotalPossiblePoints;
+                        
+                        Console.WriteLine($"✅ Session {session.Title} - Cours {course.Title}: {courseScore.TotalEarnedPoints}/{courseScore.TotalPossiblePoints} pts");
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erreur lors du calcul du score pour le cours {course.Id}: {ex.Message}");
+                        Console.WriteLine($"❌ Erreur score cours {course.Id}: {ex.Message}");
                     }
                 }
 
@@ -465,10 +468,12 @@
             overallScorePercentage = totalPossiblePoints > 0
                 ? (double)totalEarnedPoints / totalPossiblePoints * 100
                 : 0;
+                
+            Console.WriteLine($"🏆 Total global: {totalEarnedPoints}/{totalPossiblePoints} pts ({overallScorePercentage:F1}%)");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur lors du chargement des scores de session : {ex.Message}");
+            Console.WriteLine($"❌ Erreur lors du chargement des scores de session : {ex.Message}");
             sessionScores.Clear();
             totalEarnedPoints = 0;
             totalPossiblePoints = 0;

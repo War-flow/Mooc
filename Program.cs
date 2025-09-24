@@ -58,6 +58,11 @@ namespace Mooc
             // Ajouter cette ligne avec les autres services
             builder.Services.AddScoped<IPreRegistrationService, PreRegistrationService>();
 
+            // Ajout service de gestion des scores
+            builder.Services.AddScoped<IScoresCacheService, ScoresCacheService>();
+            builder.Services.AddScoped<IScoreDisplayService, ScoreDisplayService>();
+            builder.Services.AddMemoryCache();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>

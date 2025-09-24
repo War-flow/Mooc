@@ -48,57 +48,12 @@ namespace Mooc.Data
 
             // Points de base selon la difficulté (plus de bonus)
             result.BasePoints = DifficultyPoints[difficulty];
-            
-            // Déterminer le niveau de performance (pour l'affichage seulement)
-            result.PerformanceLevel = DeterminePerformanceLevel(timeSpent, hintsUsed, attempts, difficulty);
 
-            // Plus de multiplicateur - score final = points de base
-            result.PerformanceMultiplier = 1.0;
             result.FinalScore = result.BasePoints;
 
             return result;
         }
 
-        /// <summary>
-        /// Détermine le niveau de performance basé sur les métriques (pour affichage uniquement)
-        /// </summary>
-        private static QuizPerformanceLevel DeterminePerformanceLevel(
-            TimeSpan timeSpent, 
-            int hintsUsed, 
-            int attempts, 
-            QuizDifficulty difficulty)
-        {
-            // Temps de référence selon la difficulté
-            var referenceTime = difficulty switch
-            {
-                QuizDifficulty.Débutant => TimeSpan.FromSeconds(30),
-                QuizDifficulty.Intermédiaire => TimeSpan.FromSeconds(60),
-                QuizDifficulty.Avancé => TimeSpan.FromSeconds(90),
-                QuizDifficulty.Expert => TimeSpan.FromSeconds(120),
-                _ => TimeSpan.FromSeconds(60)
-            };
-
-            // Performance parfaite : première tentative, pas d'indices, temps optimal
-            if (attempts == 1 && hintsUsed == 0 && timeSpent <= referenceTime)
-            {
-                return QuizPerformanceLevel.Perfect;
-            }
-
-            // Excellente performance : première tentative, peu ou pas d'indices
-            if (attempts == 1 && hintsUsed <= 1 && timeSpent <= referenceTime * 1.5)
-            {
-                return QuizPerformanceLevel.Excellent;
-            }
-
-            // Bonne performance : réussi sans trop de difficultés
-            if (attempts <= 2 && hintsUsed <= 2)
-            {
-                return QuizPerformanceLevel.Good;
-            }
-
-            // Performance moyenne
-            return QuizPerformanceLevel.Average;
-        }
 
         /// <summary>
         /// Calcule le score total d'un cours
@@ -130,6 +85,50 @@ namespace Mooc.Data
 
             return result;
         }
+
+        /// <summary>
+        /// Calcule le score total pour plusieurs cours de manière optimisée
+        /// </summary>
+        public static SessionScoreResult CalculateSessionScore(List<CourseScoreResult> courseResults)
+        {
+            var result = new SessionScoreResult
+            {
+                CourseResults = courseResults,
+                TotalEarnedPoints = courseResults.Sum(c => c.TotalEarnedPoints),
+                TotalPossiblePoints = courseResults.Sum(c => c.TotalPossiblePoints),
+                CourseCount = courseResults.Count,
+                CompletedCourses = courseResults.Count(c => c.QuizCount > 0 && c.CorrectAnswers > 0)
+            };
+
+            // Calcul du pourcentage global
+            result.ScorePercentage = result.TotalPossiblePoints > 0 
+                ? (double)result.TotalEarnedPoints / result.TotalPossiblePoints * 100 
+                : 0;
+
+            // Détermination du niveau global de session
+            result.OverallLevel = result.ScorePercentage switch
+            {
+                >= 90 => SessionPerformanceLevel.Excellent,
+                >= 75 => SessionPerformanceLevel.Good,
+                >= 60 => SessionPerformanceLevel.Average,
+                _ => SessionPerformanceLevel.NeedsImprovement
+            };
+
+            return result;
+        }
+
+        /// <summary>
+        /// Méthode utilitaire pour obtenir rapidement les totaux
+        /// </summary>
+        public static (int earnedPoints, int possiblePoints, double percentage) GetQuickScoreSummary(
+            List<CourseScoreResult> courseResults)
+        {
+            var earnedPoints = courseResults.Sum(c => c.TotalEarnedPoints);
+            var possiblePoints = courseResults.Sum(c => c.TotalPossiblePoints);
+            var percentage = possiblePoints > 0 ? (double)earnedPoints / possiblePoints * 100 : 0;
+            
+            return (earnedPoints, possiblePoints, percentage);
+        }
     }
 
     // Énumérations pour les niveaux de performance (conservées pour l'affichage)
@@ -142,6 +141,14 @@ namespace Mooc.Data
     }
 
     public enum CoursePerformanceLevel
+    {
+        Excellent,
+        Good,
+        Average,
+        NeedsImprovement
+    }
+
+    public enum SessionPerformanceLevel
     {
         Excellent,
         Good,
@@ -173,5 +180,17 @@ namespace Mooc.Data
         public int QuizCount { get; set; }
         public int CorrectAnswers { get; set; }
         public CoursePerformanceLevel OverallLevel { get; set; }
+    }
+
+    // Nouvelle classe pour les résultats de session
+    public class SessionScoreResult
+    {
+        public List<CourseScoreResult> CourseResults { get; set; } = new();
+        public int TotalEarnedPoints { get; set; }
+        public int TotalPossiblePoints { get; set; }
+        public double ScorePercentage { get; set; }
+        public int CourseCount { get; set; }
+        public int CompletedCourses { get; set; }
+        public SessionPerformanceLevel OverallLevel { get; set; }
     }
 }
