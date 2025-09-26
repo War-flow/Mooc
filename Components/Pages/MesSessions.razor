@@ -121,12 +121,34 @@
                                 <span class="badge bg-primary">
                                     <i class="bi bi-play-circle me-1"></i>En cours
                                 </span>
+                                @* **NOUVEAU** : Badge jours restants pour session active *@
+                                {
+                                    var daysRemaining = (session.EndDate - DateTime.Now).Days;
+                                    @if (daysRemaining > 0)
+                                    {
+                                        <span class="badge bg-warning text-dark mt-1">
+                                            <i class="bi bi-clock me-1"></i>@daysRemaining j restant@(daysRemaining > 1 ? "s" : "")
+                                        </span>
+                                    }
+                                }
                             }
                             else if (IsSessionUpcoming(session))
                             {
                                 <span class="badge bg-warning">
                                     <i class="bi bi-hourglass me-1"></i>À venir
                                 </span>
+                                @* **NOUVEAU** : Badge jours avant début *@
+                                {
+                                    var daysUntilStart = (session.StartDate - DateTime.Now).Days;
+
+                                    @if (daysUntilStart > 0)
+                                    {
+                                        <span class="badge bg-info text-white mt-1">
+                                            <i class="bi bi-calendar-event me-1"></i>Dans @daysUntilStart j
+                                        </span>
+                                    }
+                                }
+
                             }
                             else
                             {
@@ -209,6 +231,29 @@
                                 <i class="bi bi-clock me-1"></i>
                                 <small>@session.Work heures</small>
                             </div>
+                            @* **NOUVEAU** : Affichage des jours restants dans les métadonnées *@
+                            @if (IsSessionActive(session))
+                            {
+                                {
+                                    var daysRemaining = (session.EndDate - DateTime.Now).Days;
+                                    <div class="text-danger">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        <small><strong>Se termine dans @daysRemaining jour@(daysRemaining > 1 ? "s" : "")</strong></small>
+                                    </div>
+                                }
+
+                            }
+                            else if (IsSessionUpcoming(session))
+                            {
+                                {
+                                    var daysUntilStart = (session.StartDate - DateTime.Now).Days;
+                                    <div class="text-info">
+                                        <i class="bi bi-hourglass-split me-1"></i>
+                                        <small>Commence dans @daysUntilStart jour@(daysUntilStart > 1 ? "s" : "")</small>
+                                    </div>
+                                }
+   
+                            }
                         </div>
                     </div>
                     <div class="session-actions">
