@@ -151,7 +151,7 @@ namespace Mooc.Services
                     {"{{MainTitle}}", "CERTIFICAT"},
                     {"{{SecondTitle}}", "DE FORMATION"},
                     {"{{Subtitle}}", "ATTESTATION DE RÉUSSITE"},
-                    {"{{IntroText}}", "est fièrement décerné par Point Com à"},
+                    {"{{IntroText}}", "décerné par Point Com à"},
                     {"{{FullName}}", data.FullName},
                     {"{{CompletionText}}", "pour avoir terminé avec succès son parcours de formation"},
                     {"{{SessionTitle}}", data.SessionTitle},

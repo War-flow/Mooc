@@ -63,6 +63,12 @@ namespace Mooc
             builder.Services.AddScoped<IScoreDisplayService, ScoreDisplayService>();
             builder.Services.AddMemoryCache();
 
+            // Ajout du service d'éligibilité aux certificats (résout la dépendance circulaire)
+            builder.Services.AddScoped<ICertificateEligibilityService, CertificateEligibilityService>();
+
+            // Ajouter cette ligne avec les autres services
+            builder.Services.AddScoped<ICertificateNotificationService, CertificateNotificationService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>

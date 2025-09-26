@@ -26,21 +26,27 @@ namespace Mooc.Services
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly AuthenticationStateProvider _authenticationStateProvider;
         private readonly Dictionary<string, CourseProgress> _courseProgresses = new();
-        private readonly IAutomaticCertificateService _automaticCertificateService;
+        private readonly ICertificateEligibilityService _eligibilityService;
         private readonly ICourseValidationService _courseValidationService;
+        private readonly ILogger<CourseStateService>? _logger;
+        private readonly ICertificateNotificationService _certificateNotificationService;
 
         public CourseStateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
             UserManager<ApplicationUser> userManager,
             AuthenticationStateProvider authenticationStateProvider,
-            IAutomaticCertificateService automaticCertificateService,
-            ICourseValidationService courseValidationService) // **NOUVEAU**
+            ICertificateEligibilityService eligibilityService,
+            ICourseValidationService courseValidationService,
+            ICertificateNotificationService certificateNotificationService,
+            ILogger<CourseStateService>? logger = null)
         {
             _contextFactory = contextFactory;
             _userManager = userManager;
             _authenticationStateProvider = authenticationStateProvider;
-            _automaticCertificateService = automaticCertificateService;
-            _courseValidationService = courseValidationService; // **NOUVEAU**
+            _eligibilityService = eligibilityService;
+            _courseValidationService = courseValidationService;
+            _certificateNotificationService = certificateNotificationService;
+            _logger = logger;
         }
 
         // **MÉTHODE MISE À JOUR**: Récupération automatique de l'utilisateur connecté
@@ -81,9 +87,83 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors de la récupération de l'utilisateur connecté: {ex.Message}");
+                _logger?.LogError(ex, "Erreur lors de la récupération de l'utilisateur connecté");
             }
             return null;
+        }
+
+        /// <summary>
+        /// Version sécurisée qui ne lève pas d'exception si aucun utilisateur n'est connecté
+        /// </summary>
+        public async Task<string?> GetCurrentUserIdSafeAsync()
+        {
+            try
+            {
+                var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+                if (authState.User.Identity?.IsAuthenticated == true)
+                {
+                    // Vérifier si le UserManager est encore disponible
+                    if (_userManager != null)
+                    {
+                        var user = await _userManager.GetUserAsync(authState.User);
+                        return user?.Id;
+                    }
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                _logger?.LogWarning("UserManager disposé lors de la récupération de l'utilisateur connecté");
+                // Essayer d'obtenir l'ID directement depuis les claims
+                try
+                {
+                    var authState = await _authenticationStateProvider.GetAuthenticationStateAsync();
+                    if (authState.User.Identity?.IsAuthenticated == true)
+                    {
+                        return authState.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "Impossible d'obtenir l'utilisateur depuis les claims");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors de la récupération de l'utilisateur connecté");
+            }
+            return null;
+        }
+
+        // **NOUVELLE MÉTHODE**: Récupérer l'état du cours de manière sécurisée
+        public async Task<CourseProgress?> GetOrCreateProgressSafeAsync(int coursId, string? userId = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(userId))
+                {
+                    userId = await GetCurrentUserIdSafeAsync();
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        _logger?.LogWarning("Aucun utilisateur connecté disponible pour le cours {CourseId}", coursId);
+                        return null;
+                    }
+                }
+
+                var key = $"{coursId}_{userId}";
+
+                if (!_courseProgresses.ContainsKey(key))
+                {
+                    var progress = await LoadProgressFromDatabaseAsync(coursId, userId);
+                    _courseProgresses[key] = progress;
+                }
+
+                return _courseProgresses[key];
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors de la récupération du progrès pour le cours {CourseId}", coursId);
+                return null;
+            }
         }
 
         public async Task SaveProgressAsync(CourseProgress progress)
@@ -128,24 +208,23 @@ namespace Mooc.Services
                 progress.LastAccessed = DateTime.UtcNow;
 
                 // ⭐ LOGS DÉTAILLÉS pour débuggage
-                Console.WriteLine($"📝 Sauvegarde interaction - CoursId: {coursId}, Block: {blockIndex}");
-                Console.WriteLine($"📝 Type données: {interactionData.GetType().Name}");
-                Console.WriteLine($"📝 JSON généré: {jsonData}");
+                _logger?.LogInformation("📝 Sauvegarde interaction - CoursId: {CourseId}, Block: {BlockIndex}", coursId, blockIndex);
+                _logger?.LogDebug("📝 Type données: {DataType}", interactionData.GetType().Name);
+                _logger?.LogDebug("📝 JSON généré: {JsonData}", jsonData);
 
                 // Vérifier si c'est un score de quiz
                 if (jsonData.Contains("scoreResult"))
                 {
-                    Console.WriteLine("🎯 Score de quiz détecté dans l'interaction");
+                    _logger?.LogInformation("🎯 Score de quiz détecté dans l'interaction");
                 }
 
                 await SaveProgressAsync(progress);
 
-                Console.WriteLine("✅ Interaction sauvegardée avec succès");
+                _logger?.LogInformation("✅ Interaction sauvegardée avec succès");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur SaveBlockInteractionAsync: {ex.Message}");
-                Console.WriteLine($"❌ StackTrace: {ex.StackTrace}");
+                _logger?.LogError(ex, "❌ Erreur SaveBlockInteractionAsync pour le cours {CourseId}, bloc {BlockIndex}", coursId, blockIndex);
                 throw;
             }
         }
@@ -184,7 +263,7 @@ namespace Mooc.Services
         {
             try
             {
-                Console.WriteLine($"🎯 Début SaveQuizResultAsync - CoursId: {coursId}, Block: {blockIndex}");
+                _logger?.LogInformation("🎯 Début SaveQuizResultAsync - CoursId: {CourseId}, Block: {BlockIndex}", coursId, blockIndex);
 
                 // Calculer le score du quiz
                 var scoreResult = QuizScoring.CalculateScore(
@@ -195,7 +274,7 @@ namespace Mooc.Services
                     attempts
                 );
 
-                Console.WriteLine($"🎯 Score calculé: {scoreResult.FinalScore}/{scoreResult.BasePoints} pts");
+                _logger?.LogInformation("🎯 Score calculé: {FinalScore}/{BasePoints} pts", scoreResult.FinalScore, scoreResult.BasePoints);
 
                 // Créer l'objet d'interaction enrichi avec une structure plus explicite
                 var quizInteraction = new
@@ -220,16 +299,15 @@ namespace Mooc.Services
                     }
                 };
 
-                Console.WriteLine($"🎯 Interaction créée avec score: {quizInteraction.scoreResult.finalScore} pts");
+                _logger?.LogInformation("🎯 Interaction créée avec score: {FinalScore} pts", quizInteraction.scoreResult.finalScore);
 
                 await SaveBlockInteractionAsync(coursId, blockIndex, quizInteraction, userId);
 
-                Console.WriteLine("✅ Quiz result sauvegardé avec succès");
+                _logger?.LogInformation("✅ Quiz result sauvegardé avec succès");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur dans SaveQuizResultAsync: {ex.Message}");
-                Console.WriteLine($"❌ StackTrace: {ex.StackTrace}");
+                _logger?.LogError(ex, "❌ Erreur dans SaveQuizResultAsync pour le cours {CourseId}, bloc {BlockIndex}", coursId, blockIndex);
                 throw;
             }
         }
@@ -269,7 +347,7 @@ namespace Mooc.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Erreur lors du parsing du score: {ex.Message}");
+                    _logger?.LogError(ex, "Erreur lors du parsing du score pour le cours {CourseId}", coursId);
                 }
             }
 
@@ -283,7 +361,7 @@ namespace Mooc.Services
         {
             try
             {
-                Console.WriteLine($"🔍 Début vérification persistance - CoursId: {coursId}");
+                _logger?.LogInformation("🔍 Début vérification persistance - CoursId: {CourseId}", coursId);
 
                 // Vérifier en mémoire
                 var memoryProgress = await GetOrCreateProgressAsync(coursId, userId);
@@ -297,23 +375,23 @@ namespace Mooc.Services
 
                 if (dbProgress == null)
                 {
-                    Console.WriteLine("❌ Aucune progression trouvée en BD");
+                    _logger?.LogWarning("❌ Aucune progression trouvée en BD");
                     return false;
                 }
 
-                Console.WriteLine($"✅ Progression trouvée en BD - ID: {dbProgress.Id}");
+                _logger?.LogInformation("✅ Progression trouvée en BD - ID: {ProgressId}", dbProgress.Id);
 
                 if (string.IsNullOrEmpty(dbProgress.BlockInteractions))
                 {
-                    Console.WriteLine("❌ BlockInteractions vide en BD");
+                    _logger?.LogWarning("❌ BlockInteractions vide en BD");
                     return false;
                 }
 
                 var dbInteractions = JsonSerializer.Deserialize<Dictionary<int, string>>(dbProgress.BlockInteractions) ?? new Dictionary<int, string>();
 
-                Console.WriteLine($"🔍 Vérification scores - CoursId: {coursId}");
-                Console.WriteLine($"🔍 Interactions mémoire: {memoryProgress.BlockInteractions.Count}");
-                Console.WriteLine($"🔍 Interactions BD: {dbInteractions.Count}");
+                _logger?.LogInformation("🔍 Vérification scores - CoursId: {CourseId}", coursId);
+                _logger?.LogInformation("🔍 Interactions mémoire: {MemoryCount}", memoryProgress.BlockInteractions.Count);
+                _logger?.LogInformation("🔍 Interactions BD: {DbCount}", dbInteractions.Count);
 
                 int scoresFoundInMemory = 0;
                 int scoresFoundInDB = 0;
@@ -328,12 +406,12 @@ namespace Mooc.Services
                         {
                             scoresFoundInMemory++;
                             var finalScore = scoreElement.GetProperty("finalScore").GetInt32();
-                            Console.WriteLine($"🔍 Score mémoire bloc {kvp.Key}: {finalScore} pts");
+                            _logger?.LogDebug("🔍 Score mémoire bloc {BlockIndex}: {Score} pts", kvp.Key, finalScore);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"⚠️ Erreur parsing score mémoire bloc {kvp.Key}: {ex.Message}");
+                        _logger?.LogWarning(ex, "⚠️ Erreur parsing score mémoire bloc {BlockIndex}", kvp.Key);
                     }
                 }
 
@@ -342,7 +420,7 @@ namespace Mooc.Services
                 {
                     if (!memoryProgress.BlockInteractions.ContainsKey(kvp.Key))
                     {
-                        Console.WriteLine($"⚠️ Interaction en BD manquante en mémoire pour bloc {kvp.Key}");
+                        _logger?.LogWarning("⚠️ Interaction en BD manquante en mémoire pour bloc {BlockIndex}", kvp.Key);
                     }
 
                     try
@@ -352,26 +430,25 @@ namespace Mooc.Services
                         {
                             scoresFoundInDB++;
                             var finalScore = scoreElement.GetProperty("finalScore").GetInt32();
-                            Console.WriteLine($"✅ Score BD bloc {kvp.Key}: {finalScore} pts");
+                            _logger?.LogDebug("✅ Score BD bloc {BlockIndex}: {Score} pts", kvp.Key, finalScore);
                         }
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"⚠️ Erreur parsing score BD bloc {kvp.Key}: {ex.Message}");
+                        _logger?.LogWarning(ex, "⚠️ Erreur parsing score BD bloc {BlockIndex}", kvp.Key);
                     }
                 }
 
-                Console.WriteLine($"📊 Résumé: {scoresFoundInMemory} scores en mémoire, {scoresFoundInDB} scores en BD");
+                _logger?.LogInformation("📊 Résumé: {MemoryScores} scores en mémoire, {DbScores} scores en BD", scoresFoundInMemory, scoresFoundInDB);
 
                 var isValid = scoresFoundInMemory == scoresFoundInDB && scoresFoundInDB > 0;
-                Console.WriteLine($"🎯 Persistance {(isValid ? "VALIDÉE" : "ÉCHOUÉE")}");
+                _logger?.LogInformation("🎯 Persistance {Status}", isValid ? "VALIDÉE" : "ÉCHOUÉE");
 
                 return isValid;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur vérification persistence: {ex.Message}");
-                Console.WriteLine($"❌ StackTrace: {ex.StackTrace}");
+                _logger?.LogError(ex, "❌ Erreur vérification persistence pour le cours {CourseId}", coursId);
                 return false;
             }
         }
@@ -404,7 +481,7 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors du chargement du progrès: {ex.Message}");
+                _logger?.LogError(ex, "Erreur lors du chargement du progrès pour le cours {CourseId}, utilisateur {UserId}", coursId, userId);
             }
 
             return new CourseProgress
@@ -482,35 +559,11 @@ namespace Mooc.Services
                 dbProgress.IsCompleted = progress.IsCompleted;
 
                 // ⭐ AJOUT : Log pour débuggage amélioré
-                Console.WriteLine($"💾 Sauvegarde BD - CoursId: {progress.CoursId}, UserId: {progress.UserId}");
-                Console.WriteLine($"💾 BlockInteractions count: {progress.BlockInteractions.Count}");
-                Console.WriteLine($"💾 BlockInteractions JSON: {blockInteractionsJson}");
+                _logger?.LogDebug("💾 Sauvegarde BD - CoursId: {CourseId}, UserId: {UserId}", progress.CoursId, progress.UserId);
+                _logger?.LogDebug("💾 BlockInteractions count: {Count}", progress.BlockInteractions.Count);
 
                 var changes = await context.SaveChangesAsync();
-                Console.WriteLine($"✅ {changes} entité(s) sauvegardée(s) en BD");
-
-                // ⭐ VÉRIFICATION IMMÉDIATE : Confirmer que la sauvegarde a réussi
-                var savedProgress = await context.CourseProgresses
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(cp => cp.CoursId == progress.CoursId && cp.UserId == progress.UserId);
-
-                if (savedProgress != null)
-                {
-                    Console.WriteLine($"✅ Progression confirmée en BD - ID: {savedProgress.Id}");
-                    Console.WriteLine($"✅ BlockInteractions BD: {savedProgress.BlockInteractions?.Substring(0, Math.Min(100, savedProgress.BlockInteractions?.Length ?? 0))}...");
-
-                    // Vérifier que les scores sont bien dans les données
-                    if (!string.IsNullOrEmpty(savedProgress.BlockInteractions))
-                    {
-                        var interactions = JsonSerializer.Deserialize<Dictionary<int, string>>(savedProgress.BlockInteractions);
-                        var scoresCount = interactions?.Values.Count(v => v.Contains("scoreResult")) ?? 0;
-                        Console.WriteLine($"✅ {scoresCount} score(s) trouvé(s) en BD");
-                    }
-                }
-                else
-                {
-                    Console.WriteLine("❌ ERREUR: Progression non trouvée après sauvegarde !");
-                }
+                _logger?.LogDebug("✅ {Changes} entité(s) sauvegardée(s) en BD", changes);
 
                 // Vérification de génération automatique de certificat
                 if (!wasCompleted && progress.IsCompleted && !string.IsNullOrEmpty(progress.UserId))
@@ -524,37 +577,39 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur critique lors de la sauvegarde du progrès: {ex.Message}");
-                Console.WriteLine($"❌ StackTrace: {ex.StackTrace}");
-
-                // ⭐ NOUVEAU : Log détaillé pour débuggage
-                Console.WriteLine($"❌ CoursId: {progress.CoursId}, UserId: {progress.UserId}");
-                Console.WriteLine($"❌ BlockInteractions count: {progress.BlockInteractions?.Count ?? 0}");
-
+                _logger?.LogError(ex, "❌ Erreur critique lors de la sauvegarde du progrès pour le cours {CourseId}, utilisateur {UserId}", progress.CoursId, progress.UserId);
                 throw; // Relancer l'exception pour un debugging plus approfondi
             }
         }
 
-        // **NOUVELLE MÉTHODE AMÉLIORÉE**
+        // **NOUVELLE MÉTHODE AMÉLIORÉE** - Utilise maintenant le service d'éligibilité
         private async Task CheckForAutomaticCertificateGeneration(string userId, int coursId)
         {
             try
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
 
-                // Récupérer la session du cours
                 var course = await context.Courses
                     .FirstOrDefaultAsync(c => c.Id == coursId);
 
                 if (course?.SessionId != null)
                 {
-                    // Vérifier et générer le certificat si nécessaire
-                    await _automaticCertificateService.CheckAndGenerateCertificateAsync(userId, course.SessionId);
+                    _logger?.LogInformation("🔍 Vérification certificat automatique - Course {CourseId}, Session {SessionId}, User {UserId}", coursId, course.SessionId, userId);
+                    
+                    // Vérifier d'abord l'éligibilité
+                    var eligibility = await _eligibilityService.CheckCertificateEligibilityAsync(userId, course.SessionId);
+                    
+                    if (eligibility.IsEligible && !eligibility.HasExistingCertificate)
+                    {
+                        _logger?.LogInformation("✅ Utilisateur éligible au certificat - Notification de génération");
+                        // ⭐ CORRECTION: Utiliser le service de notification
+                        await _certificateNotificationService.NotifySessionCompletedAsync(userId, course.SessionId);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors de la vérification de génération automatique de certificat: {ex.Message}");
+                _logger?.LogError(ex, "❌ Erreur lors de la vérification de génération automatique de certificat pour le cours {CourseId}, utilisateur {UserId}", coursId, userId);
             }
         }
 
@@ -582,7 +637,7 @@ namespace Mooc.Services
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Erreur lors du calcul du score pour le cours {courseId}: {ex.Message}");
+                    _logger?.LogError(ex, "Erreur lors du calcul du score pour le cours {CourseId}", courseId);
                     return new { CourseId = courseId, Score = new CourseScoreResult() };
                 }
             });
@@ -623,7 +678,7 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors du calcul du score de session {sessionId}: {ex.Message}");
+                _logger?.LogError(ex, "Erreur lors du calcul du score de session {SessionId}", sessionId);
                 return new SessionScoreResult();
             }
         }
@@ -674,7 +729,7 @@ namespace Mooc.Services
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Erreur lors du parsing de l'interaction: {ex.Message}");
+                        _logger?.LogError(ex, "Erreur lors du parsing de l'interaction pour le cours {CourseId}", coursId);
                     }
                 }
 
@@ -690,7 +745,7 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors du calcul du résumé de score: {ex.Message}");
+                _logger?.LogError(ex, "Erreur lors du calcul du résumé de score pour le cours {CourseId}", coursId);
                 return new ScoreSummary { CoursId = coursId, UserId = currentUserId ?? "" };
             }
         }
@@ -702,177 +757,139 @@ namespace Mooc.Services
         {
             try
             {
-                Console.WriteLine($"🔍 Analyse du contenu du cours {coursId}");
+                _logger?.LogInformation("🔍 Analyse du contenu du cours {CourseId}", coursId);
                 
                 using var context = await _contextFactory.CreateDbContextAsync();
                 var course = await context.Courses.FindAsync(coursId);
                 
                 if (course == null)
                 {
-                    Console.WriteLine($"❌ Cours {coursId} introuvable");
+                    _logger?.LogWarning("❌ Cours {CourseId} introuvable", coursId);
                     return new CourseScoreResult();
                 }
                 
                 // Analyser le contenu JSON pour trouver les quiz disponibles
                 var availableQuizzes = await AnalyzeCourseContentForQuizzesAsync(course.Content);
-                Console.WriteLine($"📊 {availableQuizzes.Count} quiz trouvés dans le contenu du cours");
+                _logger?.LogInformation("📊 {QuizCount} quiz trouvés dans le contenu du cours", availableQuizzes.Count);
                 
-                // Calculer les scores réalisés
-                var progress = await GetOrCreateProgressAsync(coursId, userId);
-                var completedQuizResults = new List<QuizScoreResult>();
-                var totalEarnedPoints = 0;
-                var totalPossiblePoints = 0;
-                var correctAnswers = 0;
-                
-                foreach (var availableQuiz in availableQuizzes)
+                // Si un userId spécifique est fourni, calculer les scores réalisés
+                if (!string.IsNullOrEmpty(userId))
                 {
-                    var blockIndex = availableQuiz.BlockOrder;
-                    var possiblePoints = QuizScoring.DifficultyPoints[availableQuiz.Difficulty];
-                    totalPossiblePoints += possiblePoints;
-                    
-                    Console.WriteLine($"🎯 Quiz bloc {blockIndex}: {possiblePoints} pts possibles (difficulté: {availableQuiz.Difficulty})");
-                    
-                    // Vérifier si ce quiz a été complété
-                    if (progress.BlockInteractions.TryGetValue(blockIndex, out var interactionData))
+                    var progress = await GetOrCreateProgressSafeAsync(coursId, userId);
+                    if (progress != null)
                     {
-                        try
-                        {
-                            using var document = JsonDocument.Parse(interactionData);
-                            var root = document.RootElement;
-
-                            if (root.TryGetProperty("scoreResult", out var scoreElement))
-                            {
-                                var scoreResult = new QuizScoreResult
-                                {
-                                    Difficulty = Enum.Parse<QuizDifficulty>(scoreElement.GetProperty("difficulty").GetString() ?? "Débutant"),
-                                    IsCorrect = root.GetProperty("correct").GetBoolean(),
-                                    BasePoints = scoreElement.GetProperty("basePoints").GetInt32(),
-                                    FinalScore = scoreElement.GetProperty("finalScore").GetInt32(),
-                                    PerformanceLevel = Enum.Parse<QuizPerformanceLevel>(scoreElement.GetProperty("performanceLevel").GetString() ?? "Average"),
-                                    PerformanceMultiplier = scoreElement.GetProperty("performanceMultiplier").GetDouble(),
-                                    TimeSpent = TimeSpan.FromSeconds(scoreElement.GetProperty("timeSpentSeconds").GetDouble()),
-                                    HintsUsed = scoreElement.GetProperty("hintsUsed").GetInt32(),
-                                    Attempts = scoreElement.GetProperty("attempts").GetInt32()
-                                };
-
-                                completedQuizResults.Add(scoreResult);
-                                totalEarnedPoints += scoreResult.FinalScore;
-                                
-                                if (scoreResult.IsCorrect)
-                                {
-                                    correctAnswers++;
-                                }
-                                
-                                Console.WriteLine($"✅ Quiz bloc {blockIndex} complété: {scoreResult.FinalScore}/{possiblePoints} pts");
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"❌ Erreur parsing interaction bloc {blockIndex}: {ex.Message}");
-                        }
-                    }
-                    else
-                    {
-                        Console.WriteLine($"⏸️ Quiz bloc {blockIndex} non complété");
+                        return await CalculateScoreFromProgressAsync(availableQuizzes, progress);
                     }
                 }
                 
+                // Sinon, essayer avec l'utilisateur connecté
+                var currentUserId = await GetCurrentUserIdSafeAsync();
+                if (!string.IsNullOrEmpty(currentUserId))
+                {
+                    var progress = await GetOrCreateProgressSafeAsync(coursId, currentUserId);
+                    if (progress != null)
+                    {
+                        return await CalculateScoreFromProgressAsync(availableQuizzes, progress);
+                    }
+                }
+                
+                // Si aucun utilisateur n'est disponible, retourner juste les informations du cours
                 var result = new CourseScoreResult
                 {
-                    QuizResults = completedQuizResults,
-                    TotalEarnedPoints = totalEarnedPoints,
-                    TotalPossiblePoints = totalPossiblePoints,
+                    QuizResults = new List<QuizScoreResult>(),
+                    TotalEarnedPoints = 0,
+                    TotalPossiblePoints = availableQuizzes.Sum(q => QuizScoring.DifficultyPoints[q.Difficulty]),
                     QuizCount = availableQuizzes.Count,
-                    CorrectAnswers = correctAnswers,
-                    ScorePercentage = totalPossiblePoints > 0 ? (double)totalEarnedPoints / totalPossiblePoints * 100 : 0
+                    CorrectAnswers = 0,
+                    ScorePercentage = 0
                 };
                 
-                // Déterminer le niveau de performance global
-                result.OverallLevel = result.ScorePercentage switch
-                {
-                    >= 90 => CoursePerformanceLevel.Excellent,
-                    >= 75 => CoursePerformanceLevel.Good,
-                    >= 60 => CoursePerformanceLevel.Average,
-                    _ => CoursePerformanceLevel.NeedsImprovement
-                };
-                
-                Console.WriteLine($"🏆 Résultat final cours {coursId}: {totalEarnedPoints}/{totalPossiblePoints} pts ({result.ScorePercentage:F1}%)");
+                _logger?.LogInformation("🏆 Résultat final cours {CourseId}: 0/{PossiblePoints} pts (0.0%) - Aucun utilisateur connecté", coursId, result.TotalPossiblePoints);
                 
                 return result;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"❌ Erreur analyse cours {coursId}: {ex.Message}");
+                _logger?.LogError(ex, "❌ Erreur analyse cours {CourseId}", coursId);
                 return new CourseScoreResult();
             }
         }
 
         /// <summary>
-        /// Analyse le contenu JSON d'un cours pour extraire les informations des quiz
+        /// Méthode helper pour calculer les scores à partir du progrès
         /// </summary>
-        private async Task<List<AvailableQuizInfo>> AnalyzeCourseContentForQuizzesAsync(string? courseContent)
+        private async Task<CourseScoreResult> CalculateScoreFromProgressAsync(List<AvailableQuizInfo> availableQuizzes, CourseProgress progress)
         {
-            var quizzes = new List<AvailableQuizInfo>();
+            var completedQuizResults = new List<QuizScoreResult>();
+            var totalEarnedPoints = 0;
+            var totalPossiblePoints = 0;
+            var correctAnswers = 0;
             
-            if (string.IsNullOrEmpty(courseContent))
+            foreach (var availableQuiz in availableQuizzes)
             {
-                Console.WriteLine("⚠️ Contenu du cours vide");
-                return quizzes;
-            }
-            
-            try
-            {
-                var blocks = JsonSerializer.Deserialize<List<Mooc.Components.Pages.Manager.CMS.CourBuilder.CoursBlock>>(courseContent);
+                var blockIndex = availableQuiz.BlockOrder;
+                var possiblePoints = QuizScoring.DifficultyPoints[availableQuiz.Difficulty];
+                totalPossiblePoints += possiblePoints;
                 
-                if (blocks == null || !blocks.Any())
+                // Vérifier si ce quiz a été complété
+                if (progress.BlockInteractions.TryGetValue(blockIndex, out var interactionData))
                 {
-                    Console.WriteLine("⚠️ Aucun bloc trouvé dans le contenu");
-                    return quizzes;
-                }
-                
-                Console.WriteLine($"🔍 Analyse de {blocks.Count} blocs");
-                
-                foreach (var block in blocks)
-                {
-                    if (block.Type == "quiz" && block.Content != null)
+                    try
                     {
-                        try
+                        using var document = JsonDocument.Parse(interactionData);
+                        var root = document.RootElement;
+
+                        if (root.TryGetProperty("scoreResult", out var scoreElement))
                         {
-                            var quizData = JsonSerializer.Deserialize<QuizStructure>(block.Content.ToString()!);
-                            
-                            if (quizData != null && !string.IsNullOrEmpty(quizData.Question) && 
-                                quizData.Options != null && quizData.Options.Any())
+                            var scoreResult = new QuizScoreResult
                             {
-                                var quizInfo = new AvailableQuizInfo
-                                {
-                                    BlockOrder = block.Order,
-                                    Difficulty = quizData.Difficulty,
-                                    Question = quizData.Question,
-                                    HasCorrectAnswer = quizData.Options.Any(o => o.IsCorrect)
+                                Difficulty = Enum.Parse<QuizDifficulty>(scoreElement.GetProperty("difficulty").GetString() ?? "Débutant"),
+                                IsCorrect = root.GetProperty("correct").GetBoolean(),
+                                BasePoints = scoreElement.GetProperty("basePoints").GetInt32(),
+                                FinalScore = scoreElement.GetProperty("finalScore").GetInt32(),
+                                PerformanceLevel = Enum.Parse<QuizPerformanceLevel>(scoreElement.GetProperty("performanceLevel").GetString() ?? "Average"),
+                                PerformanceMultiplier = scoreElement.GetProperty("performanceMultiplier").GetDouble(),
+                                TimeSpent = TimeSpan.FromSeconds(scoreElement.GetProperty("timeSpentSeconds").GetDouble()),
+                                HintsUsed = scoreElement.GetProperty("hintsUsed").GetInt32(),
+                                Attempts = scoreElement.GetProperty("attempts").GetInt32()
                             };
-                                
-                                quizzes.Add(quizInfo);
-                                Console.WriteLine($"📝 Quiz trouvé - Bloc {block.Order}: {quizData.Difficulty} ({QuizScoring.DifficultyPoints[quizData.Difficulty]} pts)");
-                            }
-                            else
+
+                            completedQuizResults.Add(scoreResult);
+                            totalEarnedPoints += scoreResult.FinalScore;
+                            
+                            if (scoreResult.IsCorrect)
                             {
-                                Console.WriteLine($"⚠️ Quiz bloc {block.Order} incomplet (pas de question ou d'options)");
+                                correctAnswers++;
                             }
                         }
-                        catch (Exception ex)
-                        {
-                            Console.WriteLine($"❌ Erreur parsing quiz bloc {block.Order}: {ex.Message}");
-                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger?.LogError(ex, "❌ Erreur parsing interaction bloc {BlockIndex}", blockIndex);
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"❌ Erreur parsing contenu cours: {ex.Message}");
-            }
             
-            Console.WriteLine($"✅ Analyse terminée: {quizzes.Count} quiz valides trouvés");
-            return quizzes;
+            var result = new CourseScoreResult
+            {
+                QuizResults = completedQuizResults,
+                TotalEarnedPoints = totalEarnedPoints,
+                TotalPossiblePoints = totalPossiblePoints,
+                QuizCount = availableQuizzes.Count,
+                CorrectAnswers = correctAnswers,
+                ScorePercentage = totalPossiblePoints > 0 ? (double)totalEarnedPoints / totalPossiblePoints * 100 : 0
+            };
+            
+            // Déterminer le niveau de performance global
+            result.OverallLevel = result.ScorePercentage switch
+            {
+                >= 90 => CoursePerformanceLevel.Excellent,
+                >= 75 => CoursePerformanceLevel.Good,
+                >= 60 => CoursePerformanceLevel.Average,
+                _ => CoursePerformanceLevel.NeedsImprovement
+            };
+            
+            return result;
         }
 
         /// <summary>
@@ -885,7 +902,7 @@ namespace Mooc.Services
             
             if (!validation.IsValid)
             {
-                Console.WriteLine($"⚠️ Cours {coursId} invalide: {string.Join(", ", validation.Errors)}");
+                _logger?.LogWarning("⚠️ Cours {CourseId} invalide: {Errors}", coursId, string.Join(", ", validation.Errors));
                 return new CourseScoreResult
                 {
                     QuizCount = validation.QuizCount,
@@ -893,10 +910,67 @@ namespace Mooc.Services
                 };
             }
             
-            Console.WriteLine($"✅ Cours {coursId} validé: {validation.QuizCount} quiz trouvés");
+            _logger?.LogInformation("✅ Cours {CourseId} validé: {QuizCount} quiz trouvés", coursId, validation.QuizCount);
             
             // Continuer avec le calcul normal
             return await CalculateCourseScoreWithContentAnalysisAsync(coursId, userId);
+        }
+
+        /// <summary>
+        /// Analyse le contenu JSON d'un cours pour extraire les quiz disponibles.
+        /// </summary>
+        private async Task<List<AvailableQuizInfo>> AnalyzeCourseContentForQuizzesAsync(string? courseContent)
+        {
+            var quizzes = new List<AvailableQuizInfo>();
+            if (string.IsNullOrWhiteSpace(courseContent))
+                return quizzes;
+
+            try
+            {
+                using var document = JsonDocument.Parse(courseContent);
+                var root = document.RootElement;
+
+                // Supposons que le contenu du cours contient un tableau "blocks"
+                if (root.TryGetProperty("blocks", out var blocksElement) && blocksElement.ValueKind == JsonValueKind.Array)
+                {
+                    int order = 0;
+                    foreach (var block in blocksElement.EnumerateArray())
+                    {
+                        if (block.TryGetProperty("type", out var typeElement) &&
+                            typeElement.GetString() == "quiz")
+                        {
+                            var difficulty = QuizDifficulty.Débutant;
+                            if (block.TryGetProperty("difficulty", out var diffElement))
+                            {
+                                Enum.TryParse(diffElement.GetString(), out difficulty);
+                            }
+
+                            var question = block.TryGetProperty("question", out var qElement)
+                                ? qElement.GetString() ?? ""
+                                : "";
+
+                            var hasCorrectAnswer = block.TryGetProperty("hasCorrectAnswer", out var correctElement)
+                                ? correctElement.GetBoolean()
+                                : false;
+
+                            quizzes.Add(new AvailableQuizInfo
+                            {
+                                BlockOrder = order,
+                                Difficulty = difficulty,
+                                Question = question,
+                                HasCorrectAnswer = hasCorrectAnswer
+                            });
+                        }
+                        order++;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors de l'analyse du contenu du cours pour les quiz.");
+            }
+
+            return quizzes;
         }
     }
 

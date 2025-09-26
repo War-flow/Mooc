@@ -7,6 +7,8 @@ namespace Mooc.Services
     {
         Task CheckAndGenerateCertificateAsync(string userId, int sessionId);
         Task<bool> IsSessionCompletedByUserAsync(string userId, int sessionId);
+        Task<double> CalculateSessionScorePercentageAsync(string userId, int sessionId);
+        Task<CertificateEligibilityResult> CheckCertificateEligibilityAsync(string userId, int sessionId);
     }
 
     public class AutomaticCertificateService : IAutomaticCertificateService
@@ -14,55 +16,42 @@ namespace Mooc.Services
         private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
         private readonly ICertificateGenerationService _certificateService;
         private readonly ILogger<AutomaticCertificateService> _logger;
+        private readonly ICertificateEligibilityService _eligibilityService;
 
         public AutomaticCertificateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
             ICertificateGenerationService certificateService,
-            ILogger<AutomaticCertificateService> logger)
+            ILogger<AutomaticCertificateService> logger,
+            ICertificateEligibilityService eligibilityService)
         {
             _contextFactory = contextFactory;
             _certificateService = certificateService;
             _logger = logger;
+            _eligibilityService = eligibilityService;
         }
 
+        /// <summary>
+        /// Délègue au service d'éligibilité
+        /// </summary>
+        public async Task<double> CalculateSessionScorePercentageAsync(string userId, int sessionId)
+        {
+            return await _eligibilityService.CalculateSessionScorePercentageAsync(userId, sessionId);
+        }
+
+        /// <summary>
+        /// Délègue au service d'éligibilité
+        /// </summary>
         public async Task<bool> IsSessionCompletedByUserAsync(string userId, int sessionId)
         {
-            try
-            {
-                using var context = await _contextFactory.CreateDbContextAsync();
+            return await _eligibilityService.IsSessionCompletedByUserAsync(userId, sessionId);
+        }
 
-                // Récupérer tous les cours obligatoires de la session
-                var requiredCourses = await context.Courses
-                    .Where(c => c.SessionId == sessionId && c.IsPublished)
-                    .Select(c => c.Id)
-                    .ToListAsync();
-
-                if (!requiredCourses.Any())
-                {
-                    _logger.LogInformation("Aucun cours obligatoire trouvé pour la session {SessionId}", sessionId);
-                    return false;
-                }
-
-                // Vérifier que tous les cours obligatoires sont complétés
-                var completedRequiredCourses = await context.CourseProgresses
-                    .Where(cp => cp.UserId == userId &&
-                                requiredCourses.Contains(cp.CoursId) &&
-                                cp.IsCompleted)
-                    .CountAsync();
-
-                var isCompleted = completedRequiredCourses == requiredCourses.Count;
-
-                _logger.LogInformation(
-                    "Session {SessionId} pour l'utilisateur {UserId}: {CompletedCount}/{TotalCount} cours complétés. Session terminée: {IsCompleted}",
-                    sessionId, userId, completedRequiredCourses, requiredCourses.Count, isCompleted);
-
-                return isCompleted;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erreur lors de la vérification de completion de session {SessionId} pour l'utilisateur {UserId}", sessionId, userId);
-                return false;
-            }
+        /// <summary>
+        /// Délègue au service d'éligibilité
+        /// </summary>
+        public async Task<CertificateEligibilityResult> CheckCertificateEligibilityAsync(string userId, int sessionId)
+        {
+            return await _eligibilityService.CheckCertificateEligibilityAsync(userId, sessionId);
         }
 
         public async Task CheckAndGenerateCertificateAsync(string userId, int sessionId)
@@ -71,24 +60,32 @@ namespace Mooc.Services
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
 
-                // Vérifier si un certificat existe déjà
-                var existingCertificate = await context.Certificates
-                    .FirstOrDefaultAsync(c => c.UserId == userId && c.SessionId == sessionId);
+                // Utiliser le service d'éligibilité pour vérifier tous les critères
+                var eligibilityResult = await _eligibilityService.CheckCertificateEligibilityAsync(userId, sessionId);
 
-                if (existingCertificate != null)
+                if (eligibilityResult.HasExistingCertificate)
                 {
                     _logger.LogInformation("Certificat déjà existant pour l'utilisateur {UserId} et la session {SessionId}", userId, sessionId);
                     return;
                 }
 
-                // Vérifier si la session est complétée
-                var isSessionCompleted = await IsSessionCompletedByUserAsync(userId, sessionId);
-
-                if (!isSessionCompleted)
+                if (!eligibilityResult.IsSessionCompleted)
                 {
                     _logger.LogInformation("Session {SessionId} non complétée pour l'utilisateur {UserId}", sessionId, userId);
                     return;
                 }
+
+                if (!eligibilityResult.HasMinimumScore)
+                {
+                    _logger.LogInformation(
+                        "🚫 Score insuffisant pour la génération du certificat - Session {SessionId}, Utilisateur {UserId}: {Score}% < 70%",
+                        sessionId, userId, eligibilityResult.SessionScorePercentage.ToString("F1"));
+                    return;
+                }
+
+                _logger.LogInformation(
+                    "✅ Score suffisant pour la génération du certificat - Session {SessionId}, Utilisateur {UserId}: {Score}% >= 70%",
+                    sessionId, userId, eligibilityResult.SessionScorePercentage.ToString("F1"));
 
                 // Récupérer les informations de la session
                 var session = await context.Sessions
@@ -119,8 +116,8 @@ namespace Mooc.Services
                 await context.SaveChangesAsync();
 
                 _logger.LogInformation(
-                    "Certificat généré automatiquement pour l'utilisateur {UserId} et la session {SessionId}. Numéro: {CertificateNumber}",
-                    userId, sessionId, certificateNumber);
+                    "🎉 Certificat généré automatiquement pour l'utilisateur {UserId} et la session {SessionId}. Numéro: {CertificateNumber} - Score: {Score}%",
+                    userId, sessionId, certificateNumber, eligibilityResult.SessionScorePercentage.ToString("F1"));
 
                 // Optionnel : Générer le fichier PDF immédiatement
                 await GenerateCertificateFileAsync(certificate);
@@ -182,6 +179,37 @@ namespace Mooc.Services
             {
                 _logger.LogError(ex, "Erreur lors de la génération du fichier certificat pour {CertificateNumber}", certificate.CertificateNumber);
             }
+        }
+    }
+
+    /// <summary>
+    /// Résultat de la vérification d'éligibilité au certificat
+    /// </summary>
+    public class CertificateEligibilityResult
+    {
+        public int SessionId { get; set; }
+        public string UserId { get; set; } = string.Empty;
+        public bool IsSessionCompleted { get; set; }
+        public double SessionScorePercentage { get; set; }
+        public bool HasMinimumScore { get; set; }
+        public bool IsEligible { get; set; }
+        public bool HasExistingCertificate { get; set; }
+        
+        public string GetStatusMessage()
+        {
+            if (HasExistingCertificate)
+                return "Certificat déjà généré";
+            
+            if (!IsSessionCompleted)
+                return "Session non terminée";
+            
+            if (!HasMinimumScore)
+                return $"Score insuffisant ({SessionScorePercentage:F1}% < 70%)";
+            
+            if (IsEligible)
+                return "Éligible au certificat";
+            
+            return "Non éligible";
         }
     }
 }
