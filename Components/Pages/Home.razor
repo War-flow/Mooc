@@ -58,41 +58,6 @@
         </div>
     </div>
 </div>
-
-<!-- Section des statistiques -->
-<AuthorizeView>
-    <Authorized>
-        <div class="stats-section">
-            <div class="container">
-                <div class="row">
-                    <div class="col-md-4 col-3 mb-3">
-                        <div class="stat-card animate-slide-in-right">
-                            <div class="stat-icon bg-primary">
-                                <i class="bi bi-book"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h4 class="stat-number">@(availableSessions?.Count ?? 0)</h4>
-                                <p class="stat-label">Sessions disponibles</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 col-3 mb-3">
-                        <div class="stat-card animate-slide-in-right" style="animation-delay: 0.2s">
-                            <div class="stat-icon bg-info">
-                                <i class="bi bi-clock-history"></i>
-                            </div>
-                            <div class="stat-content">
-                                <h4 class="stat-number">24/7</h4>
-                                <p class="stat-label">Accès disponible</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </Authorized>
-</AuthorizeView>
-
 <!-- Section principale des sessions -->
 <div class="sessions-section">
     <div class="container">
