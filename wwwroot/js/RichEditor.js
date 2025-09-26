@@ -1,6 +1,14 @@
 ﻿window.richTextEditors = {};
 let stickyToolbars = new Map();
 
+// Configuration des dimensions par défaut pour les médias
+const DEFAULT_MEDIA_DIMENSIONS = {
+    width: 800,
+    height: 600,
+    maxWidth: '100%',
+    aspectRatio: 4/3 // 800/600
+};
+
 // Fonction utilitaire pour limiter la fréquence des appels
 function throttle(func, limit) {
     let inThrottle;
@@ -325,7 +333,7 @@ function insertMediaElement(editorId, url, type) {
     }
 }
 
-// Création d'un élément vidéo optimisé
+// ⭐ MODIFIÉ : Création d'un élément vidéo avec dimensions par défaut
 function createVideoElement(url) {
     const urlObj = new URL(url);
 
@@ -367,53 +375,92 @@ function createAudioElement(url) {
     Object.assign(audio.style, { 
         width: '100%', 
         display: 'block', 
-        margin: '10px 0' 
+        margin: '10px auto' 
     });
     container.appendChild(audio);
     
     return container;
 }
 
-// Création d'un élément embed optimisé
+// ⭐ MODIFIÉ : Création d'un élément embed avec dimensions par défaut 800x600
 function createEmbed(src, platform) {
     const iframe = Object.assign(document.createElement('iframe'), {
-        src, frameBorder: '0', allowFullscreen: true
+        src, 
+        frameBorder: '0', 
+        allowFullscreen: true,
+        width: DEFAULT_MEDIA_DIMENSIONS.width,
+        height: DEFAULT_MEDIA_DIMENSIONS.height
     });
     return wrapMedia(iframe, platform);
 }
 
-// Création d'une vidéo directe optimisée
+// ⭐ MODIFIÉ : Création d'une vidéo directe avec dimensions par défaut 800x600
 function createDirectVideo(url) {
     const video = Object.assign(document.createElement('video'), {
-        controls: true, preload: 'metadata'
+        controls: true, 
+        preload: 'metadata',
+        width: DEFAULT_MEDIA_DIMENSIONS.width,
+        height: DEFAULT_MEDIA_DIMENSIONS.height
     });
     const source = Object.assign(document.createElement('source'), {
-        src: url, type: getMimeType(url, 'video')
+        src: url, 
+        type: getMimeType(url, 'video')
     });
     video.appendChild(source);
     return wrapMedia(video, 'direct');
 }
 
-// Création d'un élément media wrapper optimisé
+// ⭐ MODIFIÉ : Wrapper media avec centrage et dimensions optimisées
 function wrapMedia(element, platform) {
     const container = document.createElement('div');
     container.className = `video-container video-${platform}`;
     container.setAttribute('data-video-element', 'true');
 
-    // Styles optimisés
+    // Styles optimisés avec centrage et dimensions par défaut
+    const containerStyles = {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        margin: '20px auto',
+        maxWidth: '100%',
+        width: 'fit-content'
+    };
+
+    Object.assign(container.style, containerStyles);
+
     const isIframe = element.tagName === 'IFRAME';
     if (isIframe) {
         const aspectRatio = document.createElement('div');
         Object.assign(aspectRatio.style, {
-            position: 'relative', width: '100%', paddingBottom: '56.25%', height: '0'
+            position: 'relative',
+            width: `${DEFAULT_MEDIA_DIMENSIONS.width}px`,
+            maxWidth: DEFAULT_MEDIA_DIMENSIONS.maxWidth,
+            height: `${DEFAULT_MEDIA_DIMENSIONS.height}px`,
+            margin: '0 auto'
         });
+        
         Object.assign(element.style, {
-            position: 'absolute', top: '0', left: '0', width: '100%', height: '100%'
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
         });
+        
         aspectRatio.appendChild(element);
         container.appendChild(aspectRatio);
     } else {
-        Object.assign(element.style, { width: '100%', height: 'auto', display: 'block' });
+        Object.assign(element.style, {
+            width: `${DEFAULT_MEDIA_DIMENSIONS.width}px`,
+            height: `${DEFAULT_MEDIA_DIMENSIONS.height}px`,
+            maxWidth: DEFAULT_MEDIA_DIMENSIONS.maxWidth,
+            display: 'block',
+            margin: '0 auto',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+        });
         container.appendChild(element);
     }
 
@@ -445,13 +492,37 @@ function createMediaElement(url, type) {
     }
 }
 
-// ⭐ CORRECTION : Fonction pour créer un élément image améliorée
+// ⭐ MODIFIÉ : Fonction pour créer un élément image avec dimensions par défaut 800x600 et centrage
 function createImageElement(url) {
+    const container = document.createElement('div');
+    container.className = 'image-container';
+    
+    // Styles du conteneur pour le centrage
+    Object.assign(container.style, {
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        margin: '20px auto',
+        maxWidth: '100%',
+        width: 'fit-content'
+    });
+
     const img = document.createElement('img');
     img.src = url;
     img.alt = 'Image insérée';
     img.loading = 'lazy';
-    img.style.cssText = 'max-width: 100%; height: auto; display: block; margin: 10px auto; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);';
+    
+    // Appliquer les dimensions par défaut avec styles améliorés
+    Object.assign(img.style, {
+        width: `${DEFAULT_MEDIA_DIMENSIONS.width}px`,
+        height: `${DEFAULT_MEDIA_DIMENSIONS.height}px`,
+        maxWidth: DEFAULT_MEDIA_DIMENSIONS.maxWidth,
+        objectFit: 'cover', // Maintient les proportions en remplissant l'espace
+        display: 'block',
+        borderRadius: '8px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        transition: 'transform 0.2s ease-in-out'
+    });
     
     // ⭐ Ajouter des gestionnaires d'événements pour l'affichage
     img.addEventListener('load', () => {
@@ -461,14 +532,46 @@ function createImageElement(url) {
     
     img.addEventListener('error', (e) => {
         console.error('Erreur de chargement de l\'image:', url, e);
-        img.alt = 'Erreur de chargement de l\'image';
-        img.style.border = '2px dashed #dc3545';
-        img.style.color = '#dc3545';
-        img.style.textAlign = 'center';
-        img.style.padding = '20px';
+        
+        // Créer un conteneur d'erreur avec dimensions par défaut
+        const errorContainer = document.createElement('div');
+        Object.assign(errorContainer.style, {
+            width: `${DEFAULT_MEDIA_DIMENSIONS.width}px`,
+            height: `${DEFAULT_MEDIA_DIMENSIONS.height}px`,
+            maxWidth: DEFAULT_MEDIA_DIMENSIONS.maxWidth,
+            border: '2px dashed #dc3545',
+            backgroundColor: '#f8d7da',
+            color: '#721c24',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            borderRadius: '8px',
+            fontSize: '14px'
+        });
+        
+        errorContainer.innerHTML = `
+            <i class="bi bi-exclamation-triangle" style="font-size: 24px;"></i>
+            <span>Impossible de charger l'image</span>
+            <small style="opacity: 0.7;">Vérifiez que l'URL est correcte et accessible</small>
+        `;
+        
+        // Remplacer l'image défaillante par le conteneur d'erreur
+        container.replaceChild(errorContainer, img);
     });
     
-    return img;
+    // Ajouter un effet de survol
+    img.addEventListener('mouseenter', () => {
+        img.style.transform = 'scale(1.02)';
+    });
+    
+    img.addEventListener('mouseleave', () => {
+        img.style.transform = 'scale(1)';
+    });
+    
+    container.appendChild(img);
+    return container;
 }
 
 // Fonction pour insérer un élément dans l'éditeur
