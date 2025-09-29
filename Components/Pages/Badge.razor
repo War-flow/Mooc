@@ -1,0 +1,41 @@
+﻿@page "/badge"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.AspNetCore.Authorization
+@using Mooc.Data
+@using Mooc.Services
+@using Microsoft.EntityFrameworkCore
+@inject UserManager<ApplicationUser> UserManagerService
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject ICertificateGenerationService CertificateService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<Certification> _logger
+@attribute [Authorize]
+@attribute [StreamRendering]
+
+<PageTitle>Mes Succès</PageTitle>
+
+<!-- En-tête de page avec design moderne -->
+<div class="page-header header-waves ocean header-animated">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col">
+                <i class="bi bi-award-fill header-icon morphing"></i>
+                <h1 class="page-title typewriter">Mes succès</h1>
+                <p class="page-subtitle">Collection de vos succès</p>
+                <div class="header-stats">
+                    <!-- <span class="stat-badge bouncing">
+                        <i class="bi bi-trophy-fill me-2"></i>
+                        @availableCertificates.Count certificat@(availableCertificates.Count > 1 ? "s" : "")
+                    </span> -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+
+}
