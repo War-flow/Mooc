@@ -198,8 +198,8 @@
                 }
             }
 
-            // Total des badges (formations terminées + certificats)
-            totalBadgesCount = completedSessionsCount + certificatesCount + courseBadgesCount;
+            // Total des badges = nombre de cours terminés uniquement
+            totalBadgesCount = completedSessionsCount;
         }
         catch (Exception ex)
         {

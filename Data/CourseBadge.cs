@@ -94,7 +94,7 @@ namespace Mooc.Data
         Gold = 3,
 
         /// <summary>
-        /// Badge Perfectionniste : 100% sans aide
+        /// Badge Perfectionniste
         /// </summary>
         Perfect = 4
     }

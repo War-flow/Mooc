@@ -20,98 +20,53 @@
             {
                 <div class="col">
                     <div class="circular-badge-container">
-                        <!-- Badge circulaire principal -->
+                        <!-- Badge circulaire avec toutes les informations -->
                         <div class="circular-badge @GetBadgeCardClass(badge)">
                             <div class="badge-outer-circle">
-                                <!-- Texte en arc supérieur -->
+                                <!-- Texte en arc supérieur - Titre du badge -->
                                 <div class="badge-arc-text">
                                     <div class="arc-text-top">
-                                        @GetTopArcText(badge.CourseBadgeType)
+                                        @GetBadgeTypeDisplayName(badge.CourseBadgeType)
                                     </div>
                                     <div class="arc-text-bottom">
                                         @badge.EarnedDate.ToString("MMMM yyyy").ToUpper()
                                     </div>
                                 </div>
 
-                                <!-- Cercle intérieur -->
+                                <!-- Cercle intérieur avec toutes les infos -->
                                 <div class="badge-inner-circle">
                                     <!-- Logo central -->
                                     <div class="badge-center-logo @GetBadgeIconClass(badge.CourseBadgeType)">
                                         <i class="@GetBadgeIcon(badge.CourseBadgeType)"></i>
                                     </div>
 
-                                    <!-- Titre central -->
-                                    <div class="badge-center-title">
-                                        CAVILAM
+                                    <!-- Score principal -->
+                                    <div class="badge-center-score">
+                                        @badge.ScorePercentage.ToString("F1")%
                                     </div>
 
-                                    <!-- Sous-titre -->
-                                    <div class="badge-center-subtitle">
-                                        @GetCenterSubtitle(badge.CourseBadgeType)
+                                    <!-- Points obtenus -->
+                                    <div class="badge-center-points">
+                                        @badge.PointsEarned/@badge.TotalPointsPossible pts
+                                    </div>
+
+                                    <!-- Module/Cours -->
+                                    <div class="badge-center-course">
+                                        @badge.CoursTitle
+                                    </div>
+
+
+                                    <!-- Date d'obtention -->
+                                    <div class="badge-center-date">
+                                        @badge.EarnedDate.ToString("dd/MM/yyyy")
                                     </div>
                                 </div>
 
                                 <!-- Numéro du badge -->
                                 <div class="badge-number">
-                                    @badgeCounter
+                                    #@badgeCounter
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Informations en dessous du badge -->
-                        <div class="badge-info-below">
-                            <h3 class="badge-main-title">@GetBadgeTypeDisplayName(badge.CourseBadgeType)</h3>
-                            <p class="badge-main-subtitle">@badge.Description</p>
-
-                            <!-- Badge Stats -->
-                            <div class="badge-stats">
-                                <div class="stat-item">
-                                    <i class="bi bi-star-fill text-warning"></i>
-                                    <span>@badge.ScorePercentage.ToString("F1")% de réussite</span>
-                                </div>
-                                <div class="stat-item">
-                                    <i class="bi bi-trophy-fill text-success"></i>
-                                    <span>@badge.PointsEarned/@badge.TotalPointsPossible points</span>
-                                </div>
-                                <div class="stat-item">
-                                    <i class="bi bi-calendar-check text-primary"></i>
-                                    <span>Obtenu le @badge.EarnedDate.ToString("dd/MM/yyyy")</span>
-                                </div>
-                            </div>
-
-                            <!-- Badge Course Info -->
-                            @if (badge.Session != null)
-                            {
-                                <div class="badge-session-info">
-                                    <small class="text-muted">
-                                        <i class="bi bi-book me-1"></i>
-                                        Cours : @badge.CoursTitle
-                                    </small>
-                                    <br>
-                                    <small class="text-muted">
-                                        <i class="bi bi-collection me-1"></i>
-                                        Formation : @badge.Session.Title
-                                    </small>
-                                </div>
-                            }
-
-                            <!-- Badge Actions -->
-                            @if (ShowActions && badge.Session != null)
-                            {
-                                <div class="badge-actions-below">
-                                    <a href="/session/@badge.SessionId" class="btn btn-outline-secondary btn-sm">
-                                        <i class="bi bi-eye me-1"></i>
-                                        Voir la formation
-                                    </a>
-                                    @if (badge.CoursId.HasValue)
-                                    {
-                                        <a href="/session/@badge.SessionId/cours/@badge.CoursId" class="btn btn-primary btn-sm">
-                                            <i class="bi bi-play-circle me-1"></i>
-                                            Revoir le cours
-                                        </a>
-                                    }
-                                </div>
-                            }
                         </div>
                     </div>
                 </div>
@@ -228,11 +183,10 @@
         try
         {
             isLoading = true;
-            StateHasChanged(); // Forcer la mise à jour de l'UI
+            StateHasChanged();
 
             Logger.LogInformation("Chargement des badges pour l'utilisateur {UserId}", currentUserId);
 
-            // Charger uniquement les badges de cours
             var courseBadges = await CourseBadgeService.GetUserCourseBadgesAsync(currentUserId);
 
             userBadges = new List<UserBadge>();
@@ -255,7 +209,6 @@
                 });
             }
 
-            // Trier par date décroissante
             userBadges = userBadges.OrderByDescending(b => b.EarnedDate).ToList();
 
             Logger.LogInformation("Chargement terminé : {Count} badges trouvés", userBadges.Count);
@@ -269,7 +222,7 @@
         finally
         {
             isLoading = false;
-            StateHasChanged(); // Forcer la mise à jour de l'UI
+            StateHasChanged();
         }
     }
 
@@ -295,43 +248,18 @@
         };
     }
 
-    private string GetTopArcText(CourseBadgeType? type)
-    {
-        return type switch
-        {
-            CourseBadgeType.Bronze => "Réussite Bronze",
-            CourseBadgeType.Silver => "Réussite Argent",
-            CourseBadgeType.Gold => "Réussite Or",
-            CourseBadgeType.Perfect => "Performance Parfaite",
-            _ => "Réussite du cours"
-        };
-    }
-
-    private string GetCenterSubtitle(CourseBadgeType? type)
-    {
-        return type switch
-        {
-            CourseBadgeType.Bronze => "70-79% de réussite",
-            CourseBadgeType.Silver => "80-89% de réussite",
-            CourseBadgeType.Gold => "90-99% de réussite",
-            CourseBadgeType.Perfect => "100% sans aide",
-            _ => "Cours réussi"
-        };
-    }
-
     private string GetBadgeTypeDisplayName(CourseBadgeType? type)
     {
         return type switch
         {
-            CourseBadgeType.Bronze => "Badge Bronze",
-            CourseBadgeType.Silver => "Badge Argent",
-            CourseBadgeType.Gold => "Badge Or",
-            CourseBadgeType.Perfect => "Badge Perfectionniste",
-            _ => "Badge de Cours"
+            CourseBadgeType.Bronze => "BADGE BRONZE",
+            CourseBadgeType.Silver => "BADGE ARGENT",
+            CourseBadgeType.Gold => "BADGE OR",
+            CourseBadgeType.Perfect => "BADGE PARFAIT",
+            _ => "BADGE DE COURS"
         };
     }
 
-    // Modèle simplifié pour représenter un badge de cours uniquement
     public class UserBadge
     {
         public string Title { get; set; } = string.Empty;
