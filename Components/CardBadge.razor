@@ -1,0 +1,349 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Mooc.Data
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.AspNetCore.Components.Authorization
+@using Mooc.Services
+@using System.Security.Claims
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IDbContextFactory<ApplicationDbContext> DbContextFactory
+@inject ICourseBadgeService CourseBadgeService
+@inject ILogger<CardBadge> Logger
+
+<div class="badges-container">
+    @if (userBadges != null && userBadges.Any())
+    {
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            @{
+                int badgeCounter = 1;
+            }
+            @foreach (var badge in userBadges)
+            {
+                <div class="col">
+                    <div class="circular-badge-container">
+                        <!-- Badge circulaire principal -->
+                        <div class="circular-badge @GetBadgeCardClass(badge)">
+                            <div class="badge-outer-circle">
+                                <!-- Texte en arc supérieur -->
+                                <div class="badge-arc-text">
+                                    <div class="arc-text-top">
+                                        @GetTopArcText(badge.CourseBadgeType)
+                                    </div>
+                                    <div class="arc-text-bottom">
+                                        @badge.EarnedDate.ToString("MMMM yyyy").ToUpper()
+                                    </div>
+                                </div>
+
+                                <!-- Cercle intérieur -->
+                                <div class="badge-inner-circle">
+                                    <!-- Logo central -->
+                                    <div class="badge-center-logo @GetBadgeIconClass(badge.CourseBadgeType)">
+                                        <i class="@GetBadgeIcon(badge.CourseBadgeType)"></i>
+                                    </div>
+
+                                    <!-- Titre central -->
+                                    <div class="badge-center-title">
+                                        CAVILAM
+                                    </div>
+
+                                    <!-- Sous-titre -->
+                                    <div class="badge-center-subtitle">
+                                        @GetCenterSubtitle(badge.CourseBadgeType)
+                                    </div>
+                                </div>
+
+                                <!-- Numéro du badge -->
+                                <div class="badge-number">
+                                    @badgeCounter
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Informations en dessous du badge -->
+                        <div class="badge-info-below">
+                            <h3 class="badge-main-title">@GetBadgeTypeDisplayName(badge.CourseBadgeType)</h3>
+                            <p class="badge-main-subtitle">@badge.Description</p>
+
+                            <!-- Badge Stats -->
+                            <div class="badge-stats">
+                                <div class="stat-item">
+                                    <i class="bi bi-star-fill text-warning"></i>
+                                    <span>@badge.ScorePercentage.ToString("F1")% de réussite</span>
+                                </div>
+                                <div class="stat-item">
+                                    <i class="bi bi-trophy-fill text-success"></i>
+                                    <span>@badge.PointsEarned/@badge.TotalPointsPossible points</span>
+                                </div>
+                                <div class="stat-item">
+                                    <i class="bi bi-calendar-check text-primary"></i>
+                                    <span>Obtenu le @badge.EarnedDate.ToString("dd/MM/yyyy")</span>
+                                </div>
+                            </div>
+
+                            <!-- Badge Course Info -->
+                            @if (badge.Session != null)
+                            {
+                                <div class="badge-session-info">
+                                    <small class="text-muted">
+                                        <i class="bi bi-book me-1"></i>
+                                        Cours : @badge.CoursTitle
+                                    </small>
+                                    <br>
+                                    <small class="text-muted">
+                                        <i class="bi bi-collection me-1"></i>
+                                        Formation : @badge.Session.Title
+                                    </small>
+                                </div>
+                            }
+
+                            <!-- Badge Actions -->
+                            @if (ShowActions && badge.Session != null)
+                            {
+                                <div class="badge-actions-below">
+                                    <a href="/session/@badge.SessionId" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-eye me-1"></i>
+                                        Voir la formation
+                                    </a>
+                                    @if (badge.CoursId.HasValue)
+                                    {
+                                        <a href="/session/@badge.SessionId/cours/@badge.CoursId" class="btn btn-primary btn-sm">
+                                            <i class="bi bi-play-circle me-1"></i>
+                                            Revoir le cours
+                                        </a>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+                badgeCounter++;
+            }
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="loading-container">
+            <div class="loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Chargement des badges...</span>
+                </div>
+            </div>
+            <p class="loading-text">Chargement de vos badges...</p>
+        </div>
+    }
+    else if (hasError)
+    {
+        <div class="alert alert-warning">
+            <div class="empty-icon">
+                <i class="bi bi-exclamation-triangle"></i>
+            </div>
+            <h4 class="empty-title">Erreur de chargement</h4>
+            <p class="empty-description">
+                Une erreur s'est produite lors du chargement de vos badges. Veuillez actualiser la page.
+            </p>
+            <button class="btn btn-outline-primary" @onclick="LoadUserBadges">
+                <i class="bi bi-arrow-clockwise me-2"></i>
+                Réessayer
+            </button>
+        </div>
+    }
+    else
+    {
+        <div class="empty-badges-state">
+            <div class="empty-icon">
+                <i class="bi bi-award"></i>
+            </div>
+            <h4 class="empty-title">Aucun badge obtenu</h4>
+            <p class="empty-description">
+                Terminez vos cours avec de bons résultats pour obtenir des badges de récompense !
+            </p>
+            <a href="/" class="btn btn-primary">
+                <i class="bi bi-book me-2"></i>
+                Découvrir les formations
+            </a>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public string? UserId { get; set; }
+    [Parameter] public EventCallback<string> OnBadgeAction { get; set; }
+    [Parameter] public bool ShowActions { get; set; } = true;
+
+    private List<UserBadge>? userBadges;
+    private bool isLoading = true;
+    private bool hasError = false;
+    private string? currentUserId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCurrentUserId();
+        await LoadUserBadges();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!string.IsNullOrEmpty(UserId) && UserId != currentUserId)
+        {
+            currentUserId = UserId;
+            await LoadUserBadges();
+        }
+    }
+
+    private async Task GetCurrentUserId()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(UserId))
+            {
+                currentUserId = UserId;
+                return;
+            }
+
+            var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+            if (authState.User.Identity?.IsAuthenticated == true)
+            {
+                currentUserId = authState.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ??
+                               authState.User.FindFirst("sub")?.Value;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erreur lors de la récupération de l'utilisateur connecté");
+            hasError = true;
+        }
+    }
+
+    private async Task LoadUserBadges()
+    {
+        hasError = false;
+
+        if (string.IsNullOrEmpty(currentUserId))
+        {
+            userBadges = new List<UserBadge>();
+            isLoading = false;
+            return;
+        }
+
+        try
+        {
+            isLoading = true;
+            StateHasChanged(); // Forcer la mise à jour de l'UI
+
+            Logger.LogInformation("Chargement des badges pour l'utilisateur {UserId}", currentUserId);
+
+            // Charger uniquement les badges de cours
+            var courseBadges = await CourseBadgeService.GetUserCourseBadgesAsync(currentUserId);
+
+            userBadges = new List<UserBadge>();
+
+            foreach (var courseBadge in courseBadges)
+            {
+                userBadges.Add(new UserBadge
+                {
+                    Title = courseBadge.CustomTitle ?? GetBadgeTypeDisplayName(courseBadge.BadgeType),
+                    Description = courseBadge.Description ?? $"Score: {courseBadge.ScorePercentage:F1}%",
+                    EarnedDate = courseBadge.EarnedDate,
+                    Session = courseBadge.Cours?.Session,
+                    SessionId = courseBadge.Cours?.SessionId ?? 0,
+                    CoursId = courseBadge.CoursId,
+                    CoursTitle = courseBadge.Cours?.Title ?? "Cours",
+                    PointsEarned = courseBadge.PointsEarned,
+                    TotalPointsPossible = courseBadge.TotalPointsPossible,
+                    CourseBadgeType = courseBadge.BadgeType,
+                    ScorePercentage = courseBadge.ScorePercentage
+                });
+            }
+
+            // Trier par date décroissante
+            userBadges = userBadges.OrderByDescending(b => b.EarnedDate).ToList();
+
+            Logger.LogInformation("Chargement terminé : {Count} badges trouvés", userBadges.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Erreur lors du chargement des badges pour l'utilisateur {UserId}", currentUserId);
+            userBadges = new List<UserBadge>();
+            hasError = true;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged(); // Forcer la mise à jour de l'UI
+        }
+    }
+
+    private string GetBadgeCardClass(UserBadge badge)
+    {
+        return badge.CourseBadgeType?.ToString().ToLower() ?? "default";
+    }
+
+    private string GetBadgeIconClass(CourseBadgeType? type)
+    {
+        return type?.ToString().ToLower() ?? "default";
+    }
+
+    private string GetBadgeIcon(CourseBadgeType? type)
+    {
+        return type switch
+        {
+            CourseBadgeType.Bronze => "bi bi-award",
+            CourseBadgeType.Silver => "bi bi-award-fill",
+            CourseBadgeType.Gold => "bi bi-trophy-fill",
+            CourseBadgeType.Perfect => "bi bi-gem",
+            _ => "bi bi-trophy-fill"
+        };
+    }
+
+    private string GetTopArcText(CourseBadgeType? type)
+    {
+        return type switch
+        {
+            CourseBadgeType.Bronze => "Réussite Bronze",
+            CourseBadgeType.Silver => "Réussite Argent",
+            CourseBadgeType.Gold => "Réussite Or",
+            CourseBadgeType.Perfect => "Performance Parfaite",
+            _ => "Réussite du cours"
+        };
+    }
+
+    private string GetCenterSubtitle(CourseBadgeType? type)
+    {
+        return type switch
+        {
+            CourseBadgeType.Bronze => "70-79% de réussite",
+            CourseBadgeType.Silver => "80-89% de réussite",
+            CourseBadgeType.Gold => "90-99% de réussite",
+            CourseBadgeType.Perfect => "100% sans aide",
+            _ => "Cours réussi"
+        };
+    }
+
+    private string GetBadgeTypeDisplayName(CourseBadgeType? type)
+    {
+        return type switch
+        {
+            CourseBadgeType.Bronze => "Badge Bronze",
+            CourseBadgeType.Silver => "Badge Argent",
+            CourseBadgeType.Gold => "Badge Or",
+            CourseBadgeType.Perfect => "Badge Perfectionniste",
+            _ => "Badge de Cours"
+        };
+    }
+
+    // Modèle simplifié pour représenter un badge de cours uniquement
+    public class UserBadge
+    {
+        public string Title { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public DateTime EarnedDate { get; set; }
+        public Session? Session { get; set; }
+        public int SessionId { get; set; }
+        public int? CoursId { get; set; }
+        public string CoursTitle { get; set; } = string.Empty;
+        public int PointsEarned { get; set; }
+        public int TotalPointsPossible { get; set; }
+        public CourseBadgeType? CourseBadgeType { get; set; }
+        public double ScorePercentage { get; set; }
+    }
+}

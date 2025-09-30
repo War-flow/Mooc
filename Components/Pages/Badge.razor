@@ -11,6 +11,7 @@
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ISessionCompletionService SessionCompletionService
 @inject ILogger<Certification> _logger
 @attribute [Authorize]
 @attribute [StreamRendering]
@@ -24,18 +25,217 @@
             <div class="col">
                 <i class="bi bi-award-fill header-icon morphing"></i>
                 <h1 class="page-title typewriter">Mes succès</h1>
-                <p class="page-subtitle">Collection de vos succès</p>
+                <p class="page-subtitle">Collection de vos succès et badges de récompense</p>
                 <div class="header-stats">
-                    <!-- <span class="stat-badge bouncing">
-                        <i class="bi bi-trophy-fill me-2"></i>
-                        @availableCertificates.Count certificat@(availableCertificates.Count > 1 ? "s" : "")
-                    </span> -->
+                    @if (totalBadgesCount > 0)
+                    {
+                        <span class="stat-badge bouncing">
+                            <i class="bi bi-trophy-fill me-2"></i>
+                            @totalBadgesCount badge@(totalBadgesCount > 1 ? "s" : "")
+                        </span>
+                    }
+                    @if (certificatesCount > 0)
+                    {
+                        <span class="stat-badge bouncing" style="animation-delay: 0.2s;">
+                            <i class="bi bi-award me-2"></i>
+                            @certificatesCount certificat@(certificatesCount > 1 ? "s" : "")
+                        </span>
+                    }
+                    @if (completedSessionsCount > 0)
+                    {
+                        <span class="stat-badge bouncing" style="animation-delay: 0.4s;">
+                            <i class="bi bi-check-circle me-2"></i>
+                            @completedSessionsCount formation@(completedSessionsCount > 1 ? "s" : "") terminée@(completedSessionsCount > 1 ? "s" : "")
+                        </span>
+                    }
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-@code {
+<div class="container mt-4">
 
+    <!-- Section Filtres -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="bi bi-graph-up me-2"></i>
+                        Progression globale
+                    </h6>
+                    <div class="progress mb-2" style="height: 10px;">
+                        <div class="progress-bar bg-gradient-primary"
+                             role="progressbar"
+                             style="width: @overallProgressPercentage%"
+                             aria-valuenow="@overallProgressPercentage"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    <small class="text-muted">@overallProgressPercentage.ToString("F0")% de vos formations terminées</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Composant CardBadge réutilisable -->
+    <CardBadge OnBadgeAction="HandleBadgeAction" />
+
+    <!-- Section Statistiques détaillées -->
+    @if (totalBadgesCount > 0)
+    {
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card bg-light">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-bar-chart me-2"></i>
+                            Vos statistiques de réussite
+                        </h5>
+                        <div class="row text-center">
+                            <div class="col-md-3">
+                                <div class="stat-item">
+                                    <div class="stat-value text-success">@completedSessionsCount</div>
+                                    <div class="stat-label">Formations terminées</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-item">
+                                    <div class="stat-value text-primary">@certificatesCount</div>
+                                    <div class="stat-label">Certificats obtenus</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-item">
+                                    <div class="stat-value text-warning">@totalBadgesCount</div>
+                                    <div class="stat-label">Total badges</div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="stat-item">
+                                    <div class="stat-value text-info">@overallProgressPercentage.ToString("F0")%</div>
+                                    <div class="stat-label">Taux de réussite</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+@code {
+    private string selectedFilter = "all";
+    private int totalBadgesCount = 0;
+    private int certificatesCount = 0;
+    private int completedSessionsCount = 0;
+    private double overallProgressPercentage = 0;
+    private string? currentUserId;
+    
+    // Variable pour contrôler l'affichage des badges de test
+    private bool showTestBadges = true; // Mettre à false en production
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCurrentUserId();
+        await LoadBadgeStatistics();
+    }
+
+    private void ToggleTestBadges()
+    {
+        showTestBadges = !showTestBadges;
+        StateHasChanged();
+    }
+
+    private async Task GetCurrentUserId()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (authState.User.Identity?.IsAuthenticated == true)
+        {
+            currentUserId = authState.User.FindFirst("sub")?.Value
+                           ?? authState.User.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+        }
+    }
+
+    private async Task LoadBadgeStatistics()
+    {
+        if (string.IsNullOrEmpty(currentUserId))
+            return;
+
+        try
+        {
+            using var context = await DbContextFactory.CreateDbContextAsync();
+
+            // Compter les certificats
+            certificatesCount = await context.Certificates
+                .Where(c => c.UserId == currentUserId)
+                .CountAsync();
+
+            // Compter les badges de cours
+            var courseBadgesCount = await context.CourseBadges
+                .Where(cb => cb.UserId == currentUserId)
+                .CountAsync();
+
+            // Compter les sessions terminées
+            var user = await context.Users
+                .Include(u => u.EnrolledSessions)
+                .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+            if (user?.EnrolledSessions != null)
+            {
+                var enrolledSessionIds = user.EnrolledSessions.Select(s => s.Id).ToList();
+                var sessionCompletionService = SessionCompletionService;
+                var completionInfos = await sessionCompletionService.GetUserSessionsCompletionInfoAsync(currentUserId);
+
+                completedSessionsCount = completionInfos.Count(c => c.Value.IsCompleted);
+
+                // Calculer le pourcentage de progression global
+                if (enrolledSessionIds.Any())
+                {
+                    overallProgressPercentage = (double)completedSessionsCount / enrolledSessionIds.Count * 100;
+                }
+            }
+
+            // Total des badges (formations terminées + certificats)
+            totalBadgesCount = completedSessionsCount + certificatesCount + courseBadgesCount;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur lors du chargement des statistiques : {ex.Message}");
+        }
+    }
+
+    private async Task HandleBadgeAction(string action)
+    {
+        if (action.StartsWith("download-certificate-"))
+        {
+            var sessionIdStr = action.Replace("download-certificate-", "");
+            if (int.TryParse(sessionIdStr, out var sessionId))
+            {
+                await DownloadCertificate(sessionId);
+            }
+        }
+    }
+
+    private async Task DownloadCertificate(int sessionId)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(currentUserId))
+                return;
+
+            var certificateData = await CertificateService.GenerateCertificateAsync(sessionId, currentUserId, CertificateType.Pdf);
+
+            var fileName = $"Certificat_{sessionId}_{DateTime.Now:yyyyMMdd}.pdf";
+
+            await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, fileName, "application/pdf");
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Erreur lors du téléchargement du certificat {SessionId}", sessionId);
+            await JSRuntime.InvokeVoidAsync("alert", "Erreur lors du téléchargement du certificat. Veuillez réessayer.");
+        }
+    }
 }

@@ -1,0 +1,344 @@
+﻿.badges-container {
+    padding: 20px 0;
+}
+
+/* Nouveau design circulaire pour les badges */
+.circular-badge-container {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+}
+
+.circular-badge {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    margin: 20px auto;
+    transition: all 0.3s ease;
+}
+
+    .circular-badge:hover {
+        transform: scale(1.05);
+    }
+
+/* Cercle extérieur avec bordure */
+.badge-outer-circle {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: relative;
+    background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e0 100%);
+    border: 8px solid #a0aec0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Cercle intérieur */
+.badge-inner-circle {
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    box-shadow: inset 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Logo/Icône central */
+.badge-center-logo {
+    font-size: 3rem;
+    color: #4a5568;
+    margin-bottom: 10px;
+}
+
+    .badge-center-logo.completion {
+        color: #28a745;
+    }
+
+    .badge-center-logo.score {
+        color: #ffc107;
+    }
+
+    .badge-center-logo.certificate {
+        color: #007bff;
+    }
+
+/* Nom du badge au centre */
+.badge-center-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e53e3e;
+    text-align: center;
+    margin-bottom: 5px;
+    font-family: 'Arial', sans-serif;
+}
+
+/* Sous-titre du badge */
+.badge-center-subtitle {
+    font-size: 0.9rem;
+    color: #718096;
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+/* Texte en arc autour du cercle */
+.badge-arc-text {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+.arc-text-top {
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    white-space: nowrap;
+    transform-origin: center;
+}
+
+.arc-text-bottom {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #4a5568;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    white-space: nowrap;
+}
+
+/* Numéro du badge */
+.badge-number {
+    position: absolute;
+    bottom: 25px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: #e53e3e;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    font-weight: 700;
+    box-shadow: 0 4px 15px rgba(229, 62, 62, 0.3);
+}
+
+/* Couleurs spécifiques par type de badge */
+.circular-badge.completion .badge-outer-circle {
+    background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+    border-color: #28a745;
+}
+
+.circular-badge.completion .badge-number {
+    background: #28a745;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+}
+
+.circular-badge.score .badge-outer-circle {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+    border-color: #ffc107;
+}
+
+.circular-badge.score .badge-number {
+    background: #ffc107;
+    color: #212529;
+    box-shadow: 0 4px 15px rgba(255, 193, 7, 0.3);
+}
+
+.circular-badge.certificate .badge-outer-circle {
+    background: linear-gradient(135deg, #cce7ff 0%, #b3d9ff 100%);
+    border-color: #007bff;
+}
+
+.circular-badge.certificate .badge-number {
+    background: #007bff;
+    box-shadow: 0 4px 15px rgba(0, 123, 255, 0.3);
+}
+
+/* Informations sous le badge */
+.badge-info-below {
+    text-align: center;
+    margin-top: 20px;
+    padding: 15px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.badge-main-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 5px;
+}
+
+.badge-main-subtitle {
+    font-size: 1rem;
+    color: #718096;
+    font-style: italic;
+    margin-bottom: 15px;
+}
+
+/* Actions et stats en dessous */
+.badge-actions-below {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+    .badge-actions-below .btn {
+        border-radius: 20px;
+        padding: 8px 20px;
+        font-size: 0.9rem;
+    }
+
+/* États d'affichage pour loading et empty */
+.loading-container,
+.empty-badges-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #718096;
+}
+
+.empty-icon {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 30px;
+    font-size: 2.5rem;
+    color: white;
+}
+
+.empty-title {
+    color: #2d3748;
+    font-weight: 700;
+    margin-bottom: 15px;
+    font-size: 1.5rem;
+}
+
+.empty-description {
+    margin-bottom: 30px;
+    font-size: 1.1rem;
+    line-height: 1.6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .circular-badge {
+        width: 200px;
+        height: 200px;
+    }
+
+    .badge-center-title {
+        font-size: 1.2rem;
+    }
+
+    .badge-center-logo {
+        font-size: 2.5rem;
+    }
+
+    .arc-text-top,
+    .arc-text-bottom {
+        font-size: 0.8rem;
+        letter-spacing: 1px;
+    }
+}
+
+/* Animation pour le texte en arc */
+@keyframes rotate-text {
+    0% {
+        transform: translateX(-50%) rotate(0deg);
+    }
+
+    100% {
+        transform: translateX(-50%) rotate(360deg);
+    }
+}
+
+.arc-text-animated {
+    animation: rotate-text 20s linear infinite;
+}
+
+/* Effet hover sur le badge circulaire */
+.circular-badge:hover .badge-outer-circle {
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+}
+
+.circular-badge:hover .badge-number {
+    transform: translateX(-50%) scale(1.1);
+}
+
+/* Ajout de l'ancien CSS pour compatibilité */
+.badge-card {
+    background: white;
+    border-radius: 20px;
+    padding: 25px;
+    text-align: center;
+    transition: all 0.3s ease;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+    .badge-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+    }
+
+.badge-icon-container {
+    position: relative;
+    margin-bottom: 20px;
+}
+
+.badge-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+    color: white;
+    margin: 0 auto;
+    position: relative;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loading-spinner {
+    margin-bottom: 20px;
+}
+
+.loading-text {
+    color: #718096;
+    font-size: 1.1rem;
+    margin: 0;
+}

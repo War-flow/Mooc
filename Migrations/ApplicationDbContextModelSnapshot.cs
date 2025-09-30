@@ -332,6 +332,62 @@ namespace Mooc.Migrations
                     b.ToTable("Cours", (string)null);
                 });
 
+            modelBuilder.Entity("Mooc.Data.CourseBadge", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("BadgeType")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CorrectAnswers")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("CoursId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CustomTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("EarnedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("PointsEarned")
+                        .HasColumnType("integer");
+
+                    b.Property<double>("ScorePercentage")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("double precision");
+
+                    b.Property<int>("TotalPointsPossible")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TotalQuestions")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CoursId");
+
+                    b.HasIndex("UserId", "CoursId")
+                        .IsUnique()
+                        .HasDatabaseName("IX_CourseBadge_User_Cours");
+
+                    b.ToTable("CourseBadges");
+                });
+
             modelBuilder.Entity("Mooc.Data.CourseProgress", b =>
                 {
                     b.Property<int>("Id")
@@ -631,6 +687,25 @@ namespace Mooc.Migrations
                         .IsRequired();
 
                     b.Navigation("Session");
+                });
+
+            modelBuilder.Entity("Mooc.Data.CourseBadge", b =>
+                {
+                    b.HasOne("Mooc.Data.Cours", "Cours")
+                        .WithMany()
+                        .HasForeignKey("CoursId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Mooc.Data.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Cours");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("Mooc.Data.CourseProgress", b =>

@@ -40,6 +40,7 @@
     <Folder Include="wwwroot\uploads\audio\" />
     <Folder Include="wwwroot\uploads\files\" />
     <Folder Include="wwwroot\uploads\images\" />
+    <Folder Include="wwwroot\uploads\sessions\" />
   </ItemGroup>
 
 </Project>

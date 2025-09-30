@@ -14,6 +14,7 @@ namespace Mooc.Data
         public DbSet<Certificate> Certificates { get; set; } = null!;
         public DbSet<PreRegistration> PreRegistrations { get; set; } = null!; // NOUVEAU
         public DbSet<EnrollmentHistory> EnrollmentHistories { get; set; } = null!;
+        public DbSet<CourseBadge> CourseBadges { get; set; } = null!;
 
         protected override void OnModelCreating(ModelBuilder builder)
         {
@@ -239,6 +240,30 @@ namespace Mooc.Data
                       
                 entity.Property(e => e.UnenrollmentDate)
                       .HasColumnType("timestamp with time zone");
+            });
+
+            // Configuration pour CourseBadge
+            builder.Entity<CourseBadge>(entity =>
+            {
+                entity.HasKey(cb => cb.Id);
+                
+                entity.HasOne(cb => cb.User)
+                      .WithMany()
+                      .HasForeignKey(cb => cb.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(cb => cb.Cours)
+                      .WithMany()
+                      .HasForeignKey(cb => cb.CoursId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // Index unique pour éviter les doublons
+                entity.HasIndex(cb => new { cb.UserId, cb.CoursId })
+                      .IsUnique()
+                      .HasDatabaseName("IX_CourseBadge_User_Cours");
+
+                entity.Property(cb => cb.ScorePercentage)
+                      .HasPrecision(5, 2);
             });
         }
 

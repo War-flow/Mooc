@@ -8,6 +8,7 @@
     overflow: hidden;
     box-shadow: var(--shadow-lg);
     animation: slideInFromTop 0.8s ease-out;
+    border-radius: 10px;
 }
 
     .page-header::before {

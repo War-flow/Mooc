@@ -47,7 +47,35 @@ namespace Mooc
             builder.Services.AddScoped<BlockService>();
 
             // Ajout du service CourseStateService
-            builder.Services.AddScoped<CourseStateService>();
+            builder.Services.AddScoped<CourseStateService>(serviceProvider =>
+            {
+                var contextFactory = serviceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+                var userManager = serviceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+                var authStateProvider = serviceProvider.GetRequiredService<AuthenticationStateProvider>();
+                var eligibilityService = serviceProvider.GetRequiredService<ICertificateEligibilityService>();
+                var validationService = serviceProvider.GetRequiredService<ICourseValidationService>();
+                var certNotificationService = serviceProvider.GetRequiredService<ICertificateNotificationService>();
+                var logger = serviceProvider.GetRequiredService<ILogger<CourseStateService>>();
+                
+                var courseStateService = new CourseStateService(
+                    contextFactory,
+                    userManager,
+                    authStateProvider,
+                    eligibilityService,
+                    validationService,
+                    certNotificationService,
+                    logger
+                );
+                
+                // Injecter le CourseBadgeService après création pour éviter la dépendance circulaire
+                var courseBadgeService = serviceProvider.GetService<ICourseBadgeService>();
+                if (courseBadgeService != null)
+                {
+                    courseStateService.SetCourseBadgeService(courseBadgeService);
+                }
+                
+                return courseStateService;
+            });
 
             // Ajouter cette ligne dans la section des services
             builder.Services.AddScoped<ICourseValidationService, CourseValidationService>();
@@ -68,6 +96,9 @@ namespace Mooc
 
             // Ajouter cette ligne avec les autres services
             builder.Services.AddScoped<ICertificateNotificationService, CertificateNotificationService>();
+
+            // Ajouter cette ligne dans la configuration des services
+            builder.Services.AddScoped<ICourseBadgeService, CourseBadgeService>();
 
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");

@@ -358,7 +358,16 @@ else
                 try
                 {
                     // **CORRECTION PRINCIPALE**: Utiliser la nouvelle méthode avec analyse de contenu
-                    var scoreResult = await CourseStateService.CalculateCourseScoreWithContentAnalysisAsync(cours.Id);
+                    var scoreInfo = await CourseStateService.CalculateCourseScoreWithContentAnalysisAsync(cours.Id);
+                    var scoreResult = new CourseScoreResult
+                    {
+                        TotalEarnedPoints = scoreInfo.TotalEarnedPoints,
+                        TotalPossiblePoints = scoreInfo.TotalPossiblePoints,
+                        ScorePercentage = scoreInfo.TotalPossiblePoints > 0 ? (double)scoreInfo.TotalEarnedPoints / scoreInfo.TotalPossiblePoints * 100 : 0,
+                        QuizCount = 0, // À ajuster si vous avez l'info dans scoreInfo
+                        CorrectAnswers = 0, // À ajuster si vous avez l'info dans scoreInfo
+                        OverallLevel = CoursePerformanceLevel.Average // À ajuster selon votre logique
+                    };
                     courseScores[cours.Id] = scoreResult;
                     
                     sessionTotalScore += scoreResult.TotalEarnedPoints;
