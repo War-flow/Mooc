@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Mooc.Data;
 
 namespace Mooc.Services
@@ -32,7 +32,7 @@ namespace Mooc.Services
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
                 
-                // R�cup�rer toutes les sessions de l'utilisateur
+                // Récupérer toutes les sessions de l'utilisateur
                 var userSessions = await context.Users
                     .Where(u => u.Id == userId)
                     .SelectMany(u => u.EnrolledSessions)
@@ -65,7 +65,7 @@ namespace Mooc.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Erreur lors du calcul de l'aper�u utilisateur: {ex.Message}");
+                Console.WriteLine($"Erreur lors du calcul de l'aperçu utilisateur: {ex.Message}");
                 return new UserScoreOverview { UserId = userId };
             }
         }
@@ -74,6 +74,8 @@ namespace Mooc.Services
         {
             try
             {
+                Console.WriteLine($"🔍 DEBUT GetSessionDisplayScoreAsync - Session {sessionId}, User {userId}");
+                
                 using var context = await _contextFactory.CreateDbContextAsync();
                 
                 var session = await context.Sessions
@@ -86,7 +88,16 @@ namespace Mooc.Services
                 }
 
                 var courseIds = session.Courses.Select(c => c.Id).ToList();
+                Console.WriteLine($"🔍 Cours dans la session: [{string.Join(", ", courseIds)}]");
+                
+                // **UTILISONS LE CACHE SERVICE DIRECT**
                 var courseScores = await _cacheService.GetMultipleCourseScoresAsync(courseIds, userId);
+                
+                Console.WriteLine($"🔍 Scores récupérés du cache:");
+                foreach (var kvp in courseScores)
+                {
+                    Console.WriteLine($"  - Cours {kvp.Key}: {kvp.Value.TotalEarnedPoints}/{kvp.Value.TotalPossiblePoints} pts");
+                }
 
                 var displayScore = new SessionDisplayScore
                 {
@@ -97,20 +108,25 @@ namespace Mooc.Services
                         CourseId = kvp.Key,
                         CourseTitle = session.Courses.FirstOrDefault(c => c.Id == kvp.Key)?.Title ?? "",
                         EarnedPoints = kvp.Value.TotalEarnedPoints,
-                        PossiblePoints = kvp.Value.TotalPossiblePoints,
-                        ScorePercentage = kvp.Value.ScorePercentage,
-                        QuizCount = kvp.Value.QuizCount,
+                        PossiblePoints = kvp.Value.TotalPossiblePoints, // **TRACE ICI**
+                        ScorePercentage = kvp.Value.ScorePercentage,     // **TRACE ICI**
+                        QuizCount = kvp.Value.QuizCount,                 // **TRACE ICI**
                         CorrectAnswers = kvp.Value.CorrectAnswers,
                         PerformanceLevel = kvp.Value.OverallLevel.ToString()
                     }).ToList()
                 };
 
-                // Totaux de session
+                // Totaux de session avec les vrais totaux
                 displayScore.TotalEarnedPoints = displayScore.CourseScores.Sum(c => c.EarnedPoints);
-                displayScore.TotalPossiblePoints = displayScore.CourseScores.Sum(c => c.PossiblePoints);
+                displayScore.TotalPossiblePoints = displayScore.CourseScores.Sum(c => c.PossiblePoints); // **TRACE ICI**
                 displayScore.ScorePercentage = displayScore.TotalPossiblePoints > 0
                     ? (double)displayScore.TotalEarnedPoints / displayScore.TotalPossiblePoints * 100
                     : 0;
+
+                Console.WriteLine($"🔍 FINAL SESSION RESULT:");
+                Console.WriteLine($"  - Total Earned: {displayScore.TotalEarnedPoints}");
+                Console.WriteLine($"  - Total Possible: {displayScore.TotalPossiblePoints}");
+                Console.WriteLine($"  - Percentage: {displayScore.ScorePercentage:F1}%");
 
                 return displayScore;
             }
@@ -125,6 +141,9 @@ namespace Mooc.Services
         {
             try
             {
+                Console.WriteLine($"🔍 DEBUT GetCoursesDisplayScoresAsync - Cours [{string.Join(", ", courseIds)}], User {userId}");
+                
+                // **UTILISONS LE CACHE SERVICE DIRECT**
                 var courseScores = await _cacheService.GetMultipleCourseScoresAsync(courseIds, userId);
                 
                 using var context = await _contextFactory.CreateDbContextAsync();
@@ -132,17 +151,25 @@ namespace Mooc.Services
                     .Where(c => courseIds.Contains(c.Id))
                     .ToDictionaryAsync(c => c.Id, c => c.Title);
 
-                return courseScores.Select(kvp => new CourseDisplayScore
+                var results = courseScores.Select(kvp => new CourseDisplayScore
                 {
                     CourseId = kvp.Key,
                     CourseTitle = courses.GetValueOrDefault(kvp.Key, "Cours inconnu"),
                     EarnedPoints = kvp.Value.TotalEarnedPoints,
-                    PossiblePoints = kvp.Value.TotalPossiblePoints,
-                    ScorePercentage = kvp.Value.ScorePercentage,
-                    QuizCount = kvp.Value.QuizCount,
+                    PossiblePoints = kvp.Value.TotalPossiblePoints, // **TRACE ICI**
+                    ScorePercentage = kvp.Value.ScorePercentage,     // **TRACE ICI**
+                    QuizCount = kvp.Value.QuizCount,                 // **TRACE ICI**
                     CorrectAnswers = kvp.Value.CorrectAnswers,
                     PerformanceLevel = kvp.Value.OverallLevel.ToString()
                 }).ToList();
+
+                Console.WriteLine($"🔍 FINAL COURSES RESULT:");
+                foreach (var result in results)
+                {
+                    Console.WriteLine($"  - Cours {result.CourseId}: {result.EarnedPoints}/{result.PossiblePoints} pts");
+                }
+
+                return results;
             }
             catch (Exception ex)
             {
@@ -152,7 +179,7 @@ namespace Mooc.Services
         }
     }
 
-    // Classes pour l'affichage optimis�
+    // Classes pour l'affichage optimisé
     public class UserScoreOverview
     {
         public string UserId { get; set; } = string.Empty;

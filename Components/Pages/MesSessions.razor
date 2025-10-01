@@ -453,7 +453,7 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // **MÉTHODE CORRIGÉE**: Charger les scores des sessions avec le bon calcul
+    // **MÉTHODE CORRIGÉE**: Charger les scores des sessions avec le bon calcul utilisant les vrais totaux
     private async Task LoadSessionScores()
     {
         if (string.IsNullOrEmpty(currentUserId) || enrolledSessions == null)
@@ -491,35 +491,49 @@
                 {
                     try
                     {
-                        // **CORRECTION**: Utiliser directement CalculateCourseScoreAsync
-                        var courseScore = await CourseStateService.CalculateCourseScoreAsync(course.Id, currentUserId);
-                        sessionInfo.TotalEarnedPoints += courseScore.TotalEarnedPoints;
-                        sessionInfo.TotalPossiblePoints += courseScore.TotalPossiblePoints;
+                        // **CORRECTION PRINCIPALE** : Utiliser CalculateCourseScoreWithTotalAsync qui calcule les vrais totaux
+                        var courseScoreWithTotal = await CourseStateService.CalculateCourseScoreWithTotalAsync(course.Id, currentUserId);
                         
-                        Console.WriteLine($"✅ Session {session.Title} - Cours {course.Title}: {courseScore.TotalEarnedPoints}/{courseScore.TotalPossiblePoints} pts");
+                        // **UTILISER LES VRAIS TOTAUX** : TotalPossiblePoints inclut maintenant TOUS les quiz du cours
+                        sessionInfo.TotalEarnedPoints += courseScoreWithTotal.TotalEarnedPoints;
+                        sessionInfo.TotalPossiblePoints += courseScoreWithTotal.TotalPossiblePoints; // **CORRECTION**
+                        
+                        Console.WriteLine($"✅ Session {session.Title} - Cours {course.Title}: {courseScoreWithTotal.TotalEarnedPoints}/{courseScoreWithTotal.TotalPossiblePoints} pts (CORRIGÉ avec tous les quiz)");
                     }
                     catch (Exception ex)
                     {
                         Console.WriteLine($"❌ Erreur score cours {course.Id}: {ex.Message}");
+                        
+                        // **AMÉLIORATION** : En cas d'erreur, essayer d'obtenir au moins le nombre total de quiz
+                        try
+                        {
+                            var (totalQuizCount, totalPossiblePoints) = await CourseStateService.AnalyzeCourseQuizzesAsync(course.Id);
+                            sessionInfo.TotalPossiblePoints += totalPossiblePoints; // **CORRECTION** : Ajouter les vrais totaux même en cas d'erreur
+                            Console.WriteLine($"🔧 Fallback pour cours {course.Id}: 0/{totalPossiblePoints} pts (récupération après erreur)");
+                        }
+                        catch
+                        {
+                            Console.WriteLine($"❌ Impossible de récupérer les totaux pour le cours {course.Id}");
+                        }
                     }
                 }
 
-                // Calculer le pourcentage de la session
+                // Calculer le pourcentage de la session avec les vrais totaux
                 sessionInfo.ScorePercentage = sessionInfo.TotalPossiblePoints > 0
                     ? (double)sessionInfo.TotalEarnedPoints / sessionInfo.TotalPossiblePoints * 100
                     : 0;
 
                 sessionScores[session.Id] = sessionInfo;
                 totalEarnedPoints += sessionInfo.TotalEarnedPoints;
-                totalPossiblePoints += sessionInfo.TotalPossiblePoints;
+                totalPossiblePoints += sessionInfo.TotalPossiblePoints; // **CORRECTION** : Vrais totaux
             }
 
-            // Calculer le pourcentage global
+            // Calculer le pourcentage global avec les vrais totaux
             overallScorePercentage = totalPossiblePoints > 0
                 ? (double)totalEarnedPoints / totalPossiblePoints * 100
                 : 0;
                 
-            Console.WriteLine($"🏆 Total global: {totalEarnedPoints}/{totalPossiblePoints} pts ({overallScorePercentage:F1}%)");
+            Console.WriteLine($"🏆 Total global CORRIGÉ: {totalEarnedPoints}/{totalPossiblePoints} pts ({overallScorePercentage:F1}%) - Tous les quiz comptabilisés");
         }
         catch (Exception ex)
         {
