@@ -1,27 +1,27 @@
-using System.ComponentModel.DataAnnotations;
+Ôªøusing System.ComponentModel.DataAnnotations;
 
 namespace Mooc.Data
 {
     public static class QuizScoring
     {
-        // DÈfinition des points par niveau de difficultÈ
+        // D√©finition des points par niveau de difficult√©
         public static readonly Dictionary<QuizDifficulty, int> DifficultyPoints = new()
         {
-            { QuizDifficulty.DÈbutant, 2 },
-            { QuizDifficulty.IntermÈdiaire, 4 },
-            { QuizDifficulty.AvancÈ, 6 },
+            { QuizDifficulty.D√©butant, 2 },
+            { QuizDifficulty.Interm√©diaire, 4 },
+            { QuizDifficulty.Avanc√©, 6 },
             { QuizDifficulty.Expert, 8 }
         };
 
         /// <summary>
-        /// Calcule le score d'un quiz basÈ uniquement sur la difficultÈ
+        /// Calcule le score d'un quiz bas√© uniquement sur la difficult√©
         /// </summary>
-        /// <param name="difficulty">Niveau de difficultÈ du quiz</param>
-        /// <param name="isCorrect">Si la rÈponse est correcte</param>
-        /// <param name="timeSpent">Temps passÈ sur le quiz</param>
-        /// <param name="hintsUsed">Nombre d'indices utilisÈs</param>
+        /// <param name="difficulty">Niveau de difficult√© du quiz</param>
+        /// <param name="isCorrect">Si la r√©ponse est correcte</param>
+        /// <param name="timeSpent">Temps pass√© sur le quiz</param>
+        /// <param name="hintsUsed">Nombre d'indices utilis√©s</param>
         /// <param name="attempts">Nombre de tentatives</param>
-        /// <returns>Score calculÈ</returns>
+        /// <returns>Score calcul√©</returns>
         public static QuizScoreResult CalculateScore(
             QuizDifficulty difficulty,
             bool isCorrect,
@@ -38,22 +38,21 @@ namespace Mooc.Data
                 Attempts = attempts
             };
 
+            // Points de base selon la difficult√© (m√™me si incorrect pour le calcul total)
+            result.BasePoints = DifficultyPoints[difficulty];
+
             if (!isCorrect)
             {
-                result.BasePoints = 0;
-                result.FinalScore = 0;
+                result.FinalScore = 0; // Aucun point gagn√© pour une mauvaise r√©ponse
                 result.PerformanceLevel = QuizPerformanceLevel.Average;
                 return result;
             }
 
-            // Points de base selon la difficultÈ (plus de bonus)
-            result.BasePoints = DifficultyPoints[difficulty];
-
+            // Si correct, on donne les points de base
             result.FinalScore = result.BasePoints;
 
             return result;
         }
-
 
         /// <summary>
         /// Calcule le score total d'un cours
@@ -63,18 +62,20 @@ namespace Mooc.Data
             var result = new CourseScoreResult
             {
                 QuizResults = quizResults,
+                // ‚úÖ CORRECTION : Les points possibles incluent TOUS les quiz (corrects ET incorrects)
                 TotalPossiblePoints = quizResults.Sum(q => DifficultyPoints[q.Difficulty]),
+                // ‚úÖ CORRECTION : Seuls les points effectivement gagn√©s (FinalScore)
                 TotalEarnedPoints = quizResults.Sum(q => q.FinalScore),
                 QuizCount = quizResults.Count,
                 CorrectAnswers = quizResults.Count(q => q.IsCorrect)
             };
 
-            // Calcul du pourcentage basÈ sur les points possibles
+            // Calcul du pourcentage bas√© sur les points possibles
             result.ScorePercentage = result.TotalPossiblePoints > 0 
                 ? (double)result.TotalEarnedPoints / result.TotalPossiblePoints * 100 
                 : 0;
 
-            // DÈtermination du niveau global
+            // D√©termination du niveau global
             result.OverallLevel = result.ScorePercentage switch
             {
                 >= 90 => CoursePerformanceLevel.Excellent,
@@ -87,7 +88,7 @@ namespace Mooc.Data
         }
 
         /// <summary>
-        /// Calcule le score total pour plusieurs cours de maniËre optimisÈe
+        /// Calcule le score total pour plusieurs cours de mani√®re optimis√©e
         /// </summary>
         public static SessionScoreResult CalculateSessionScore(List<CourseScoreResult> courseResults)
         {
@@ -105,7 +106,7 @@ namespace Mooc.Data
                 ? (double)result.TotalEarnedPoints / result.TotalPossiblePoints * 100 
                 : 0;
 
-            // DÈtermination du niveau global de session
+            // D√©termination du niveau global de session
             result.OverallLevel = result.ScorePercentage switch
             {
                 >= 90 => SessionPerformanceLevel.Excellent,
@@ -118,7 +119,7 @@ namespace Mooc.Data
         }
 
         /// <summary>
-        /// MÈthode utilitaire pour obtenir rapidement les totaux
+        /// M√©thode utilitaire pour obtenir rapidement les totaux
         /// </summary>
         public static (int earnedPoints, int possiblePoints, double percentage) GetQuickScoreSummary(
             List<CourseScoreResult> courseResults)
@@ -131,7 +132,7 @@ namespace Mooc.Data
         }
     }
 
-    // …numÈrations pour les niveaux de performance (conservÈes pour l'affichage)
+    // √ânum√©rations pour les niveaux de performance (conserv√©es pour l'affichage)
     public enum QuizPerformanceLevel
     {
         Perfect,
@@ -156,7 +157,7 @@ namespace Mooc.Data
         NeedsImprovement
     }
 
-    // Classe pour stocker le rÈsultat d'un quiz
+    // Classe pour stocker le r√©sultat d'un quiz
     public class QuizScoreResult
     {
         public QuizDifficulty Difficulty { get; set; }
@@ -170,7 +171,7 @@ namespace Mooc.Data
         public int Attempts { get; set; }
     }
 
-    // Classe pour stocker le rÈsultat d'un cours
+    // Classe pour stocker le r√©sultat d'un cours
     public class CourseScoreResult
     {
         public List<QuizScoreResult> QuizResults { get; set; } = new();
@@ -182,7 +183,7 @@ namespace Mooc.Data
         public CoursePerformanceLevel OverallLevel { get; set; }
     }
 
-    // Nouvelle classe pour les rÈsultats de session
+    // Nouvelle classe pour les r√©sultats de session
     public class SessionScoreResult
     {
         public List<CourseScoreResult> CourseResults { get; set; } = new();

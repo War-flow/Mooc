@@ -33,6 +33,7 @@ namespace Mooc.Services
                 return cachedScore;
             }
 
+            // **CORRECTION**: Utiliser directement CalculateCourseScoreAsync
             var score = await _courseStateService.CalculateCourseScoreAsync(coursId, userId);
             await SetCourseScoreAsync(coursId, userId, score);
             return score;
@@ -81,6 +82,7 @@ namespace Mooc.Services
             {
                 try
                 {
+                    // **CORRECTION**: Utiliser directement CalculateCourseScoreAsync
                     var score = await _courseStateService.CalculateCourseScoreAsync(courseId, userId);
                     results[courseId] = score;
                     await SetCourseScoreAsync(courseId, userId, score);
@@ -88,7 +90,15 @@ namespace Mooc.Services
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Erreur lors du chargement du score pour le cours {courseId}: {ex.Message}");
-                    results[courseId] = new CourseScoreResult(); // Score vide par défaut
+                    results[courseId] = new CourseScoreResult
+                    {
+                        TotalEarnedPoints = 0,
+                        TotalPossiblePoints = 0,
+                        ScorePercentage = 0,
+                        QuizCount = 0,
+                        CorrectAnswers = 0,
+                        OverallLevel = CoursePerformanceLevel.NeedsImprovement
+                    }; // Score vide par défaut
                 }
             }
 

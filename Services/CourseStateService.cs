@@ -586,11 +586,15 @@ namespace Mooc.Services
                 // Utiliser la méthode existante pour obtenir le résultat détaillé
                 var courseScoreResult = await CalculateCourseScoreAsync(coursId, userId);
                 
-                // Convertir en CourseScoreInfo pour compatibilité avec MesSessions.razor
+                // **CORRECTION** : Retourner toutes les informations nécessaires
                 return new CourseScoreInfo
                 {
                     TotalEarnedPoints = courseScoreResult.TotalEarnedPoints,
-                    TotalPossiblePoints = courseScoreResult.TotalPossiblePoints
+                    TotalPossiblePoints = courseScoreResult.TotalPossiblePoints,
+                    ScorePercentage = courseScoreResult.ScorePercentage,
+                    QuizCount = courseScoreResult.QuizCount,
+                    CorrectAnswers = courseScoreResult.CorrectAnswers,
+                    OverallLevel = courseScoreResult.OverallLevel
                 };
             }
             catch (Exception ex)
@@ -599,18 +603,195 @@ namespace Mooc.Services
                 return new CourseScoreInfo
                 {
                     TotalEarnedPoints = 0,
-                    TotalPossiblePoints = 0
+                    TotalPossiblePoints = 0,
+                    ScorePercentage = 0,
+                    QuizCount = 0,
+                    CorrectAnswers = 0,
+                    OverallLevel = CoursePerformanceLevel.NeedsImprovement
                 };
             }
         }
 
         /// <summary>
-        /// Classe simple pour retourner les informations de score
+        /// **ÉTENDUE** : Classe pour retourner toutes les informations de score
         /// </summary>
         public class CourseScoreInfo
         {
             public int TotalEarnedPoints { get; set; }
             public int TotalPossiblePoints { get; set; }
+            public double ScorePercentage { get; set; }
+            public int QuizCount { get; set; }
+            public int CorrectAnswers { get; set; }
+            public CoursePerformanceLevel OverallLevel { get; set; }
+        }
+
+        /// <summary>
+        /// **NOUVELLE MÉTHODE** : Compte le nombre total de quiz dans un cours
+        /// </summary>
+        public async Task<int> CountQuizzesInCourseAsync(int coursId)
+        {
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+
+                var cours = await context.Courses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == coursId);
+
+                if (cours == null || string.IsNullOrEmpty(cours.Content))
+                {
+                    return 0;
+                }
+
+                // Analyser le contenu JSON du cours
+                var blocks = System.Text.Json.JsonSerializer.Deserialize<List<dynamic>>(cours.Content);
+                if (blocks == null) return 0;
+
+                int quizCount = 0;
+                foreach (var block in blocks)
+                {
+                    if (block is JsonElement element &&
+                        element.TryGetProperty("Type", out var typeProperty) &&
+                        typeProperty.GetString() == "quiz")
+                    {
+                        quizCount++;
+                    }
+                }
+
+                return quizCount;
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors du comptage des quiz pour le cours {CourseId}", coursId);
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// **NOUVELLE MÉTHODE** : Compte le nombre total de quiz dans un cours et calcule les points possibles
+        /// </summary>
+        public async Task<(int totalQuizCount, int totalPossiblePoints)> AnalyzeCourseQuizzesAsync(int coursId)
+        {
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+                
+                var cours = await context.Courses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == coursId);
+                    
+                if (cours == null || string.IsNullOrEmpty(cours.Content))
+                {
+                    return (0, 0);
+                }
+                
+                // Analyser le contenu JSON du cours
+                var blocks = System.Text.Json.JsonSerializer.Deserialize<List<JsonElement>>(cours.Content);
+                if (blocks == null) return (0, 0);
+                
+                int totalQuizCount = 0;
+                int totalPossiblePoints = 0;
+                
+                foreach (var block in blocks)
+                {
+                    if (block.TryGetProperty("Type", out var typeProperty) &&
+                        typeProperty.GetString() == "quiz")
+                    {
+                        totalQuizCount++;
+                        
+                        // Analyser le contenu du quiz pour obtenir la difficulté
+                        if (block.TryGetProperty("Content", out var contentProperty))
+                        {
+                            try
+                            {
+                                var quizStructure = JsonSerializer.Deserialize<QuizStructure>(contentProperty.GetRawText());
+                                if (quizStructure != null)
+                                {
+                                    // Ajouter les points de base selon la difficulté
+                                    totalPossiblePoints += quizStructure.GetBasePoints();
+                                }
+                                else
+                                {
+                                    // Difficulté par défaut si pas spécifiée
+                                    totalPossiblePoints += QuizScoring.DifficultyPoints[QuizDifficulty.Débutant];
+                                }
+                            }
+                            catch
+                            {
+                                // En cas d'erreur, utiliser la difficulté par défaut
+                                totalPossiblePoints += QuizScoring.DifficultyPoints[QuizDifficulty.Débutant];
+                            }
+                        }
+                        else
+                        {
+                            // Pas de contenu, utiliser la difficulté par défaut
+                            totalPossiblePoints += QuizScoring.DifficultyPoints[QuizDifficulty.Débutant];
+                        }
+                    }
+                }
+                
+                _logger?.LogInformation("📊 Analyse cours {CourseId}: {QuizCount} quiz, {TotalPoints} points possibles", 
+                    coursId, totalQuizCount, totalPossiblePoints);
+                
+                return (totalQuizCount, totalPossiblePoints);
+            }
+            catch (Exception ex)
+            {
+                _logger?.LogError(ex, "Erreur lors de l'analyse des quiz pour le cours {CourseId}", coursId);
+                return (0, 0);
+            }
+        }
+
+        /// <summary>
+        /// **MÉTHODE CORRIGÉE** : Calcule le score avec le nombre total de quiz et points possibles
+        /// </summary>
+        public async Task<CourseScoreResultWithTotal> CalculateCourseScoreWithTotalAsync(int coursId, string? userId = null)
+        {
+            // Obtenir le score actuel (quiz tentés)
+            var currentScoreResult = await CalculateCourseScoreAsync(coursId, userId);
+            
+            // Analyser le contenu du cours pour obtenir le total possible
+            var (totalQuizCount, totalPossiblePoints) = await AnalyzeCourseQuizzesAsync(coursId);
+            
+            // Calculer le pourcentage basé sur le total réel
+            double realScorePercentage = totalPossiblePoints > 0 
+                ? (double)currentScoreResult.TotalEarnedPoints / totalPossiblePoints * 100 
+                : 0;
+            
+            return new CourseScoreResultWithTotal
+            {
+                TotalEarnedPoints = currentScoreResult.TotalEarnedPoints,
+                TotalPossiblePoints = totalPossiblePoints, // **CORRECTION** : Utiliser le vrai total
+                ScorePercentage = realScorePercentage,     // **CORRECTION** : Pourcentage basé sur le vrai total
+                QuizCount = currentScoreResult.QuizCount,   // Quiz tentés
+                TotalQuizCount = totalQuizCount,            // Quiz totaux dans le cours
+                CorrectAnswers = currentScoreResult.CorrectAnswers,
+                OverallLevel = DeterminePerformanceLevel(realScorePercentage),
+                QuizResults = currentScoreResult.QuizResults
+            };
+        }
+
+        /// <summary>
+        /// Détermine le niveau de performance basé sur le pourcentage
+        /// </summary>
+        private CoursePerformanceLevel DeterminePerformanceLevel(double percentage)
+        {
+            return percentage switch
+            {
+                >= 90 => CoursePerformanceLevel.Excellent,
+                >= 75 => CoursePerformanceLevel.Good,
+                >= 50 => CoursePerformanceLevel.Average,
+                _ => CoursePerformanceLevel.NeedsImprovement
+            };
+        }
+
+        /// <summary>
+        /// Classe étendue pour inclure le nombre total de quiz et les vrais totaux
+        /// </summary>
+        public class CourseScoreResultWithTotal : CourseScoreResult
+        {
+            public int TotalQuizCount { get; set; }      // Nombre total de quiz dans le cours
+            public int AttemptedQuizCount { get; set; }  // Nombre de quiz tentés
         }
     }
 }

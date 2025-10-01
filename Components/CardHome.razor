@@ -59,9 +59,12 @@
                             @* **NOUVEAU** : Badge pour les jours restants *@
                             @if (DateTime.Now >= session.StartDate && DateTime.Now <= session.EndDate)
                             {
-                                <span class="badge bg-danger text-white rounded-pill">
-                                    <i class="bi bi-clock me-1"></i> @daysUntilEnd j restants
-                                </span>
+                                @if (daysUntilEnd < 14)
+                                {
+                                    <span class="badge bg-danger text-white rounded-pill">
+                                        <i class="bi bi-clock me-1"></i> @daysUntilEnd j restants
+                                    </span>
+                                }
                             }
                             else if (daysUntilStart > 0 && daysUntilStart <= 30)
                             {
@@ -124,10 +127,13 @@
                                 <div class="col-12 mt-2">
                                     @if (DateTime.Now >= session.StartDate && DateTime.Now <= session.EndDate)
                                     {
+                                        @if (daysUntilEnd < 14)
+                                        {
                                         <div class="d-flex align-items-center">
                                             <i class="bi bi-exclamation-triangle-fill text-danger me-2"></i>
                                             <small class="text-danger fw-bold">Se termine dans @daysUntilEnd jour@(daysUntilEnd > 1 ? "s" : "")</small>
                                         </div>
+                                        }
                                     }
                                     else if (daysUntilStart > 0)
                                     {

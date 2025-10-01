@@ -124,7 +124,7 @@
                                 @* **NOUVEAU** : Badge jours restants pour session active *@
                                 {
                                     var daysRemaining = (session.EndDate - DateTime.Now).Days;
-                                    @if (daysRemaining > 0)
+                                    @if (daysRemaining > 0 && daysRemaining < 14)
                                     {
                                         <span class="badge bg-warning text-dark mt-1">
                                             <i class="bi bi-clock me-1"></i>@daysRemaining j restant@(daysRemaining > 1 ? "s" : "")
@@ -234,12 +234,17 @@
                             @* **NOUVEAU** : Affichage des jours restants dans les métadonnées *@
                             @if (IsSessionActive(session))
                             {
+                                
                                 {
+
                                     var daysRemaining = (session.EndDate - DateTime.Now).Days;
+                                    @if (daysRemaining < 14)
+                                    {
                                     <div class="text-danger">
                                         <i class="bi bi-exclamation-triangle me-1"></i>
                                         <small><strong>Se termine dans @daysRemaining jour@(daysRemaining > 1 ? "s" : "")</strong></small>
                                     </div>
+                                    }
                                 }
 
                             }
@@ -448,7 +453,7 @@
         await InvokeAsync(StateHasChanged);
     }
 
-    // **MÉTHODE CORRIGÉE**: Charger les scores des sessions avec analyse de contenu
+    // **MÉTHODE CORRIGÉE**: Charger les scores des sessions avec le bon calcul
     private async Task LoadSessionScores()
     {
         if (string.IsNullOrEmpty(currentUserId) || enrolledSessions == null)
@@ -486,8 +491,8 @@
                 {
                     try
                     {
-                        // **CORRECTION**: Utiliser la nouvelle méthode
-                        var courseScore = await CourseStateService.CalculateCourseScoreWithContentAnalysisAsync(course.Id, currentUserId);
+                        // **CORRECTION**: Utiliser directement CalculateCourseScoreAsync
+                        var courseScore = await CourseStateService.CalculateCourseScoreAsync(course.Id, currentUserId);
                         sessionInfo.TotalEarnedPoints += courseScore.TotalEarnedPoints;
                         sessionInfo.TotalPossiblePoints += courseScore.TotalPossiblePoints;
                         
