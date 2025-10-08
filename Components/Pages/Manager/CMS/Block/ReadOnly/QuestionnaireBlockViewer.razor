@@ -1,0 +1,446 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@using Mooc.Data
+@using Mooc.Services
+@inject IJSRuntime JSRuntime
+@inject CourseStateService CourseStateService
+
+<div class="questionnaire-block-viewer">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            <h4 class="mb-0">
+                <i class="bi bi-ui-checks me-2"></i>
+                @(!string.IsNullOrEmpty(QuestionnaireContent.Title) ? QuestionnaireContent.Title : "Questionnaire")
+            </h4>
+        </div>
+        <div class="card-body">
+            @if (QuestionnaireContent.Questions.Any())
+            {
+                <!-- Barre de progression -->
+                <div class="progress mb-4" style="height: 8px;">
+                    <div class="progress-bar @(IsQuestionnaireCompleted ? "bg-success" : "bg-primary")"
+                         role="progressbar"
+                         style="width: @GetProgressPercentage()%"
+                         aria-valuenow="@GetProgressPercentage()"
+                         aria-valuemin="0"
+                         aria-valuemax="100">
+                    </div>
+                </div>
+
+                <!-- Affichage des questions -->
+                @for (int i = 0; i < QuestionnaireContent.Questions.Count; i++)
+                {
+                    var questionIndex = i;
+                    var question = QuestionnaireContent.Questions[questionIndex];
+                    var isAnswered = UserAnswers.ContainsKey(questionIndex) && UserAnswers[questionIndex].Any(a => a);
+                    var isCorrectlyAnswered = QuestionResults.ContainsKey(questionIndex) && QuestionResults[questionIndex];
+
+                    <div class="question-container mb-4 @(IsQuestionnaireCompleted ? "completed" : "")">
+                        <div class="question-header d-flex justify-content-between align-items-start mb-3">
+                            <h5 class="question-title">
+                                <span class="badge bg-secondary me-2">@(questionIndex + 1)</span>
+                                @question.Question
+                            </h5>
+                            @if (IsQuestionnaireCompleted)
+                            {
+                                @if (isCorrectlyAnswered)
+                                {
+                                    <span class="badge bg-success">
+                                        <i class="bi bi-check-circle-fill me-1"></i>
+                                        Correct
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle-fill me-1"></i>
+                                        Incorrect
+                                    </span>
+                                }
+                            }
+                            else if (isAnswered)
+                            {
+                                <span class="badge bg-info">
+                                    <i class="bi bi-check2 me-1"></i>
+                                    Répondu
+                                </span>
+                            }
+                        </div>
+
+                        <!-- Options de réponse -->
+                        <div class="options-container">
+                            @for (int j = 0; j < question.Options.Count; j++)
+                            {
+                                var optionIndex = j;
+                                var option = question.Options[optionIndex];
+                                var optionClass = GetOptionClass(questionIndex, optionIndex, option.IsCorrect);
+                                var isUserAnswer = UserAnswers.ContainsKey(questionIndex) && 
+                                                  UserAnswers[questionIndex][optionIndex];
+
+                                <div class="form-check option-item @optionClass"
+                                     @onclick="() => HandleOptionClick(questionIndex, optionIndex)">
+                                    @if (question.Type == "multiple-select")
+                                    {
+                                        <input class="form-check-input" type="checkbox"
+                                               id="q-@questionIndex-opt-@optionIndex"
+                                               disabled="@IsQuestionnaireCompleted"
+                                               checked="@isUserAnswer" />
+                                    }
+                                    else
+                                    {
+                                        <input class="form-check-input" type="radio"
+                                               name="question-@questionIndex"
+                                               id="q-@questionIndex-opt-@optionIndex"
+                                               disabled="@IsQuestionnaireCompleted"
+                                               checked="@isUserAnswer" />
+                                    }
+
+                                    <label class="form-check-label" for="q-@questionIndex-opt-@optionIndex">
+                                        @option.Text
+                                        
+                                        @if (IsQuestionnaireCompleted)
+                                        {
+                                            @if (option.IsCorrect)
+                                            {
+                                                <i class="bi bi-check-circle-fill text-success ms-2"></i>
+                                            }
+                                            else if (isUserAnswer)
+                                            {
+                                                <i class="bi bi-x-circle-fill text-danger ms-2"></i>
+                                            }
+                                        }
+                                    </label>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- Indice -->
+                        @if (!IsQuestionnaireCompleted && question.AllowHint && !string.IsNullOrEmpty(question.Hint))
+                        {
+                            <div class="hint-container mt-3">
+                                @if (ShownHints.Contains(questionIndex))
+                                {
+                                    <div class="alert alert-info">
+                                        <i class="bi bi-lightbulb me-2"></i>
+                                        <strong>Indice :</strong> @question.Hint
+                                    </div>
+                                }
+                                else
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-info" 
+                                            @onclick="() => ShowHint(questionIndex)">
+                                        <i class="bi bi-lightbulb me-1"></i>
+                                        Afficher l'indice
+                                    </button>
+                                }
+                            </div>
+                        }
+
+                        <!-- Explication après validation -->
+                        @if (IsQuestionnaireCompleted && !string.IsNullOrEmpty(question.Explanation))
+                        {
+                            <div class="alert @(isCorrectlyAnswered ? "alert-success" : "alert-warning") mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Explication :</strong> @question.Explanation
+                            </div>
+                        }
+                    </div>
+                }
+
+                <!-- Boutons d'action -->
+                <div class="action-buttons mt-4">
+                    @if (!IsQuestionnaireCompleted)
+                    {
+                        <button type="button" class="btn btn-primary btn-lg"
+                                @onclick="SubmitQuestionnaire"
+                                disabled="@(!CanSubmitQuestionnaire() || IsSubmitting)">
+                            @if (IsSubmitting)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Validation en cours...</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-lg me-2"></i>
+                                <span>Valider mes réponses</span>
+                            }
+                        </button>
+
+                        <div class="mt-2">
+                            <small class="text-muted">
+                                <i class="bi bi-info-circle me-1"></i>
+                                @GetAnsweredQuestionsCount() / @QuestionnaireContent.Questions.Count questions répondues
+                            </small>
+                        </div>
+                    }
+                    else
+                    {
+                        <!-- Résultats finaux -->
+                        <div class="results-summary card">
+                            <div class="card-body">
+                                <h5 class="card-title">
+                                    <i class="bi bi-trophy me-2"></i>
+                                    Résultats
+                                </h5>
+                                <div class="row text-center">
+                                    <div class="col-md-4">
+                                        <div class="result-stat">
+                                            <div class="stat-value text-primary">@CorrectAnswersCount</div>
+                                            <div class="stat-label">Bonnes réponses</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="result-stat">
+                                            <div class="stat-value text-info">@QuestionnaireContent.Questions.Count</div>
+                                            <div class="stat-label">Questions totales</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="result-stat">
+                                            <div class="stat-value @GetScoreColorClass()">
+                                                @FinalScorePercentage.ToString("F0")%
+                                            </div>
+                                            <div class="stat-label">Score final</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                @if (CoursId > 0)
+                                {
+                                    <div class="alert alert-info mt-3 mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        Votre score de <strong>@CorrectAnswersCount point@(CorrectAnswersCount > 1 ? "s" : "")</strong> a été enregistré.
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Ce questionnaire n'a pas encore été configuré.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public CourBuilder.CoursBlock Block { get; set; } = default!;
+    [Parameter] public bool IsReadOnly { get; set; } = true;
+    [Parameter] public EventCallback<bool> OnQuizCompleted { get; set; }
+    [Parameter] public bool IsCompleted { get; set; } = false;
+    [Parameter] public EventCallback<bool> IsCompletedChanged { get; set; }
+    [Parameter] public int CoursId { get; set; }
+
+    private QuestionnaireContentModel QuestionnaireContent { get; set; } = new();
+    
+    // État du questionnaire
+    private bool IsQuestionnaireCompleted { get; set; } = false;
+    private bool IsSubmitting { get; set; } = false;
+    private Dictionary<int, List<bool>> UserAnswers { get; set; } = new();
+    private Dictionary<int, bool> QuestionResults { get; set; } = new();
+    private HashSet<int> ShownHints { get; set; } = new();
+    private int CorrectAnswersCount { get; set; } = 0;
+    private double FinalScorePercentage { get; set; } = 0;
+
+    protected override void OnInitialized()
+    {
+        LoadQuestionnaireData();
+        InitializeUserAnswers();
+    }
+
+    private void LoadQuestionnaireData()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(Block.Content?.ToString()))
+            {
+                QuestionnaireContent = System.Text.Json.JsonSerializer.Deserialize<QuestionnaireContentModel>(
+                    Block.Content.ToString()) ?? new QuestionnaireContentModel();
+            }
+        }
+        catch
+        {
+            QuestionnaireContent = new QuestionnaireContentModel();
+        }
+    }
+
+    private void InitializeUserAnswers()
+    {
+        UserAnswers.Clear();
+        foreach (var item in QuestionnaireContent.Questions.Select((q, i) => new { q, i }))
+        {
+            UserAnswers[item.i] = new List<bool>(new bool[item.q.Options.Count]);
+        }
+    }
+
+    private void HandleOptionClick(int questionIndex, int optionIndex)
+    {
+        if (IsQuestionnaireCompleted) return;
+
+        var question = QuestionnaireContent.Questions[questionIndex];
+        
+        if (question.Type == "multiple-select")
+        {
+            UserAnswers[questionIndex][optionIndex] = !UserAnswers[questionIndex][optionIndex];
+        }
+        else
+        {
+            // Choix unique : décocher les autres
+            for (int i = 0; i < UserAnswers[questionIndex].Count; i++)
+            {
+                UserAnswers[questionIndex][i] = (i == optionIndex);
+            }
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task SubmitQuestionnaire()
+    {
+        if (IsQuestionnaireCompleted) return;
+
+        IsSubmitting = true;
+        await Task.Delay(500); // Effet visuel
+
+        // Évaluer chaque question
+        CorrectAnswersCount = 0;
+        QuestionResults.Clear();
+
+        for (int i = 0; i < QuestionnaireContent.Questions.Count; i++)
+        {
+            var question = QuestionnaireContent.Questions[i];
+            var isCorrect = CheckQuestionAnswer(i, question);
+            QuestionResults[i] = isCorrect;
+            
+            if (isCorrect)
+            {
+                CorrectAnswersCount++;
+                
+                // **NOUVEAU** : Enregistrer le score pour chaque question correcte
+                if (CoursId > 0)
+                {
+                    try
+                    {
+                        await CourseStateService.SaveQuizResultAsync(
+                            CoursId,
+                            Block.Order,
+                            true // Question correcte = 1 point
+                        );
+                        Console.WriteLine($"✅ Point enregistré pour question {i + 1}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"❌ Erreur sauvegarde score question {i}: {ex.Message}");
+                    }
+                }
+            }
+        }
+
+        FinalScorePercentage = QuestionnaireContent.Questions.Count > 0
+            ? (double)CorrectAnswersCount / QuestionnaireContent.Questions.Count * 100
+            : 0;
+
+        IsQuestionnaireCompleted = true;
+        IsSubmitting = false;
+
+        if (IsCompletedChanged.HasDelegate)
+        {
+            await IsCompletedChanged.InvokeAsync(true);
+        }
+
+        if (OnQuizCompleted.HasDelegate)
+        {
+            await OnQuizCompleted.InvokeAsync(CorrectAnswersCount > 0);
+        }
+
+        StateHasChanged();
+    }
+
+    private bool CheckQuestionAnswer(int questionIndex, QuizStructure question)
+    {
+        var userAnswer = UserAnswers[questionIndex];
+        
+        if (question.Type == "multiple-select")
+        {
+            // Toutes les réponses doivent correspondre
+            for (int i = 0; i < question.Options.Count; i++)
+            {
+                if (userAnswer[i] != question.Options[i].IsCorrect)
+                    return false;
+            }
+            return true;
+        }
+        else
+        {
+            // Une seule bonne réponse
+            for (int i = 0; i < question.Options.Count; i++)
+            {
+                if (userAnswer[i] && question.Options[i].IsCorrect)
+                    return true;
+            }
+            return false;
+        }
+    }
+
+    private bool CanSubmitQuestionnaire()
+    {
+        // Toutes les questions doivent être répondues
+        return UserAnswers.All(kvp => kvp.Value.Any(a => a));
+    }
+
+    private int GetAnsweredQuestionsCount()
+    {
+        return UserAnswers.Count(kvp => kvp.Value.Any(a => a));
+    }
+
+    private string GetProgressPercentage()
+    {
+        if (IsQuestionnaireCompleted)
+            return "100";
+        
+        var answered = GetAnsweredQuestionsCount();
+        return QuestionnaireContent.Questions.Count > 0
+            ? ((double)answered / QuestionnaireContent.Questions.Count * 100).ToString("F0")
+            : "0";
+    }
+
+    private string GetOptionClass(int questionIndex, int optionIndex, bool isCorrect)
+    {
+        if (!IsQuestionnaireCompleted)
+        {
+            return UserAnswers[questionIndex][optionIndex] ? "selected" : "";
+        }
+
+        var isUserAnswer = UserAnswers[questionIndex][optionIndex];
+        
+        if (isCorrect)
+            return "correct";
+        
+        if (isUserAnswer && !isCorrect)
+            return "incorrect";
+        
+        return "";
+    }
+
+    private string GetScoreColorClass()
+    {
+        return FinalScorePercentage switch
+        {
+            >= 80 => "text-success",
+            >= 60 => "text-info",
+            >= 40 => "text-warning",
+            _ => "text-danger"
+        };
+    }
+
+    private void ShowHint(int questionIndex)
+    {
+        ShownHints.Add(questionIndex);
+        StateHasChanged();
+    }
+}

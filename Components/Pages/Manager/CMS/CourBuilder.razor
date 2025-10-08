@@ -4,7 +4,7 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("quiz")'>Ajouter un quiz</button>
+    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("questionnaire")'>Ajouter un questionnaire</button>
 </div>
 
 <div class="cours-container">
@@ -37,13 +37,13 @@
         /// <summary>Identifiant unique du bloc.</summary>
         public Guid Id { get; set; } = Guid.NewGuid();
 
-        /// <summary>Type du bloc (texte, image, quiz, etc.).</summary>
+        /// <summary>Type du bloc (texte, questionnaire, etc.).</summary>
         public required string Type { get; set; }
 
         /// <summary>Contenu générique du bloc.</summary>
         public object? Content { get; set; }
 
-        /// <summary>Ordre d’affichage du bloc.</summary>
+        /// <summary>Ordre d'affichage du bloc.</summary>
         public int Order { get; set; }
 
         /// <summary>Titre du bloc.</summary>
@@ -52,23 +52,24 @@
         /// <summary>Texte du bloc.</summary>
         public string Text { get; set; } = string.Empty;
 
-        /// <summary>Message d’information ou d’erreur.</summary>
+        /// <summary>Message d'information ou d'erreur.</summary>
         public string? Message { get; set; }
 
-        /// <summary>Identifiant du quiz associé.</summary>
+        /// <summary>Identifiant du quiz associé (obsolète, conservé pour compatibilité).</summary>
+        [Obsolete("Utilisez Content avec QuestionnaireContentModel pour le nouveau système")]
         public string? QuizId { get; set; }
 
-        /// <summary>URL d’un fichier associé.</summary>
+        /// <summary>URL d'un fichier associé.</summary>
         public string? FileUrl { get; set; }
 
-        /// <summary>Liste d’URLs de fichiers associés.</summary>
+        /// <summary>Liste d'URLs de fichiers associés.</summary>
         public List<string> FileUrls { get; set; } = new();
 
         /// <summary>Identifiant du cours associé (si applicable).</summary>
         public Guid CoursId { get; set; }
 
         /// <summary>
-        /// Constructeur par défaut pour garantir l’initialisation des propriétés.
+        /// Constructeur par défaut pour garantir l'initialisation des propriétés.
         /// </summary>
         public CoursBlock()
         {
@@ -101,7 +102,7 @@
         };
 
         // Ajouter CoursId seulement si c'est un bloc qui en a besoin
-        if (block.Type == "tableau" || block.Type == "texte" || block.Type == "quiz")
+        if (block.Type == "tableau" || block.Type == "texte" || block.Type == "questionnaire")
         {
             parameters["CoursId"] = CoursId;
         }
@@ -230,7 +231,9 @@
     Type GetBlockComponent(string type) => type switch
     {
         "texte" => typeof(TextBlock),
-        "quiz" => typeof(QuizBlock),
+        "questionnaire" => typeof(QuestionnaireBlock),
+        // Rétrocompatibilité : mapper "quiz" vers QuestionnaireBlock
+        "quiz" => typeof(QuestionnaireBlock),
         _ => typeof(TextBlock)
     };
 }

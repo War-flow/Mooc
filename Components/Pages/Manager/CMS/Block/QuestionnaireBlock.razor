@@ -1,0 +1,654 @@
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.JSInterop
+@using Mooc.Services
+@using Mooc.Data
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using System.ComponentModel.DataAnnotations
+@inject IJSRuntime JSRuntime
+
+<EditForm Model="_questionnaireContent" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+
+    <div class="questionnaire-block" @attributes="AdditionalAttributes">
+        <!-- En-tête du questionnaire -->
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-ui-checks me-2"></i>
+                    @(!string.IsNullOrEmpty(_questionnaireContent.Title) ? _questionnaireContent.Title : "Questionnaire")
+                </h4>
+            </div>
+            <div class="card-body">
+                @if (IsEditing)
+                {
+                    <div class="mb-3">
+                        <label class="form-label">Titre du questionnaire</label>
+                        <InputText class="form-control" @bind-Value="_questionnaireContent.Title"
+                                   placeholder="Ex: Évaluation finale" />
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(_questionnaireContent.Title))
+                {
+                    <p class="text-muted mb-0">@_questionnaireContent.Title</p>
+                }
+            </div>
+        </div>
+
+        <!-- Liste des questions -->
+        @if (IsEditing)
+        {
+            <div class="questions-editor">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>
+                        <i class="bi bi-list-ol me-2"></i>
+                        Questions (@_questionnaireContent.Questions.Count)
+                    </h5>
+                    <button type="button" class="btn btn-success" @onclick="AddQuestion">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        Ajouter une question
+                    </button>
+                </div>
+
+                @if (!_questionnaireContent.Questions.Any())
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Aucune question ajoutée. Cliquez sur "Ajouter une question" pour commencer.
+                    </div>
+                }
+                else
+                {
+                    @for (int i = 0; i < _questionnaireContent.Questions.Count; i++)
+                    {
+                        var questionIndex = i;
+                        var question = _questionnaireContent.Questions[questionIndex];
+
+                        <div class="card mb-3 question-card">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">
+                                    <i class="bi bi-question-circle me-2"></i>
+                                    Question @(questionIndex + 1)
+                                </h6>
+                                <div class="btn-group btn-group-sm">
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => MoveQuestionUp(questionIndex)"
+                                            disabled="@(questionIndex == 0)">
+                                        <i class="bi bi-arrow-up"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary"
+                                            @onclick="() => MoveQuestionDown(questionIndex)"
+                                            disabled="@(questionIndex == _questionnaireContent.Questions.Count - 1)">
+                                        <i class="bi bi-arrow-down"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-danger"
+                                            @onclick="() => RemoveQuestion(questionIndex)"
+                                            disabled="@(_questionnaireContent.Questions.Count <= 1)">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Texte de la question -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Texte de la question</label>
+                                    <InputTextArea class="form-control" @bind-Value="question.Question"
+                                                   rows="2" placeholder="Saisissez votre question..." />
+                                    <ValidationMessage For="@(() => question.Question)" />
+                                </div>
+
+                                <!-- Type de question -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Type de réponse</label>
+                                    <InputSelect class="form-select" @bind-Value="question.Type"
+                                                 @bind-Value:after="() => OnQuestionTypeChanged(questionIndex)">
+                                        <option value="multiple-choice">Choix unique</option>
+                                        <option value="multiple-select">Choix multiple</option>
+                                        <option value="true-false">Vrai/Faux</option>
+                                    </InputSelect>
+                                </div>
+
+                                <!-- Options de réponse -->
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Réponses possibles</label>
+
+                                    @if (question.Type == "true-false")
+                                    {
+                                        <!-- Vrai/Faux simplifié -->
+                                        <div class="d-flex gap-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio"
+                                                       name="tf-@questionIndex" id="tf-true-@questionIndex"
+                                                       checked="@(question.Options[0].IsCorrect)"
+                                                       @onchange="@(() => SetTrueFalseAnswer(questionIndex, true))" />
+                                                <label class="form-check-label" for="tf-true-@questionIndex">
+                                                    Vrai
+                                                </label>
+                                            </div>
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="radio"
+                                                       name="tf-@questionIndex" id="tf-false-@questionIndex"
+                                                       checked="@(question.Options[1].IsCorrect)"
+                                                       @onchange="@(() => SetTrueFalseAnswer(questionIndex, false))" />
+                                                <label class="form-check-label" for="tf-false-@questionIndex">
+                                                    Faux
+                                                </label>
+                                            </div>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <!-- Options multiples -->
+                                        @for (int j = 0; j < question.Options.Count; j++)
+                                        {
+                                            var optionIndex = j;
+                                            var option = question.Options[optionIndex];
+
+                                            <div class="input-group mb-2">
+                                                <div class="input-group-text">
+                                                    @if (question.Type == "multiple-select")
+                                                    {
+                                                        <input class="form-check-input mt-0" type="checkbox"
+                                                               checked="@option.IsCorrect"
+                                                               @onchange="@(e => option.IsCorrect = (bool)e.Value!)" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <input class="form-check-input mt-0" type="radio"
+                                                               name="correct-@questionIndex"
+                                                               checked="@option.IsCorrect"
+                                                               @onchange="@(() => SetSingleCorrectAnswer(questionIndex, optionIndex))" />
+                                                    }
+                                                </div>
+                                                <InputText class="form-control" @bind-Value="option.Text"
+                                                           placeholder="@($"Option {optionIndex + 1}")" />
+                                                <button type="button" class="btn btn-outline-danger"
+                                                        @onclick="() => RemoveOption(questionIndex, optionIndex)"
+                                                        disabled="@(question.Options.Count <= 2)">
+                                                    <i class="bi bi-x"></i>
+                                                </button>
+                                            </div>
+                                        }
+
+                                        @if (question.Options.Count < 6)
+                                        {
+                                            <button type="button" class="btn btn-sm btn-outline-primary mt-2"
+                                                    @onclick="() => AddOption(questionIndex)">
+                                                <i class="bi bi-plus me-1"></i>
+                                                Ajouter une option
+                                            </button>
+                                        }
+                                    }
+                                </div>
+
+                                <!-- Options avancées (repliables) -->
+                                <div class="accordion accordion-flush" id="advanced-@questionIndex">
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header">
+                                            <button class="accordion-button collapsed" type="button"
+                                                    data-bs-toggle="collapse" data-bs-target="#collapse-@questionIndex">
+                                                <i class="bi bi-sliders me-2"></i>
+                                                Options avancées
+                                            </button>
+                                        </h2>
+                                        <div id="collapse-@questionIndex" class="accordion-collapse collapse">
+                                            <div class="accordion-body">
+                                                <div class="mb-3">
+                                                    <label class="form-label">Indice (optionnel)</label>
+                                                    <InputText class="form-control" @bind-Value="question.Hint"
+                                                               placeholder="Donnez un indice pour aider..." />
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label">Explication (optionnel)</label>
+                                                    <InputTextArea class="form-control" @bind-Value="question.Explanation"
+                                                                   rows="2" placeholder="Explication de la réponse..." />
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox class="form-check-input" @bind-Value="question.AllowHint" />
+                                                    <label class="form-check-label">Permettre l'affichage de l'indice</label>
+                                                </div>
+                                                <div class="form-check form-switch">
+                                                    <InputCheckbox class="form-check-input" @bind-Value="question.ShowCorrectAnswer" />
+                                                    <label class="form-check-label">Afficher la bonne réponse après validation</label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        }
+        else
+        {
+            <!-- Aperçu du questionnaire -->
+            <div class="questionnaire-preview">
+                <div class="alert alert-light">
+                    <h6 class="mb-3">
+                        <i class="bi bi-eye me-2"></i>
+                        Aperçu du questionnaire (@_questionnaireContent.Questions.Count question@(_questionnaireContent.Questions.Count > 1 ? "s" : ""))
+                    </h6>
+
+                    @if (_questionnaireContent.Questions.Any())
+                    {
+                        @foreach (var (question, index) in _questionnaireContent.Questions.Select((q, i) => (q, i)))
+                        {
+                            <div class="mb-3 p-3 border rounded">
+                                <div class="fw-bold mb-2">@(index + 1). @question.Question</div>
+                                @foreach (var option in question.Options)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="@(question.Type == "multiple-select" ? "checkbox" : "radio")" disabled />
+                                        <label class="form-check-label">
+                                            @option.Text
+                                            @if (option.IsCorrect)
+                                            {
+                                                <i class="bi bi-check-circle-fill text-success ms-1"></i>
+                                            }
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <em class="text-muted">Aucune question configurée</em>
+                    }
+                </div>
+            </div>
+        }
+
+        <!-- Contrôles -->
+        <div class="block-controls mt-3">
+            <button type="submit" class="btn btn-valid m-2" disabled="@(IsEditing && !editContext.IsModified() || isSaving)">
+                @if (isSaving)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>Enregistrement...</span>
+                }
+                else
+                {
+                    <i class="bi bi-@(IsEditing ? "floppy" : "pencil") me-1"></i>
+                    @(IsEditing ? "Enregistrer" : "Modifier")
+                }
+            </button>
+
+            @if (!IsEditing)
+            {
+                <button type="button" class="btn btn-cancel" @onclick="RequestDelete">
+                    <i class="bi bi-trash me-1"></i>
+                    Supprimer
+                </button>
+            }
+            else
+            {
+                <button type="button" class="btn btn-cancel" @onclick="CancelEdit">
+                    <i class="bi bi-x-lg me-1"></i>
+                    Annuler
+                </button>
+            }
+        </div>
+
+        <!-- Messages de statut -->
+        @if (showSaveSuccess)
+        {
+            <div class="alert alert-success mt-2 p-2 fade-out">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                Questionnaire enregistré avec succès
+            </div>
+        }
+
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="alert alert-danger mt-2 p-2" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                @errorMessage
+                <button type="button" class="btn-close btn-close-sm ms-2" @onclick="ClearError"></button>
+            </div>
+        }
+    </div>
+</EditForm>
+
+@code {
+    [Parameter] public CourBuilder.CoursBlock Block { get; set; } = default!;
+    [Parameter(CaptureUnmatchedValues = true)] public Dictionary<string, object>? AdditionalAttributes { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnBlockChanged { get; set; }
+    [Parameter] public EventCallback<CourBuilder.CoursBlock> OnDeleteRequested { get; set; }
+
+    private bool IsEditing { get; set; } = false;
+    private bool isSaving { get; set; } = false;
+    private bool showSaveSuccess { get; set; } = false;
+    private string? errorMessage;
+    private EditContext? editContext;
+    private QuestionnaireContentModel? _originalContent;
+    private Timer? _successMessageTimer;
+
+    private QuestionnaireContentModel _questionnaireContent { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        LoadQuestionnaireData();
+        InitializeEditContext();
+    }
+
+    private void InitializeEditContext()
+    {
+        editContext = new EditContext(_questionnaireContent);
+    }
+
+    private void LoadQuestionnaireData()
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(Block.Content?.ToString()))
+            {
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+                };
+
+                _questionnaireContent = JsonSerializer.Deserialize<QuestionnaireContentModel>(
+                    Block.Content.ToString(), options) ?? CreateDefaultQuestionnaire();
+            }
+            else
+            {
+                _questionnaireContent = CreateDefaultQuestionnaire();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erreur de désérialisation: {ex.Message}");
+            _questionnaireContent = CreateDefaultQuestionnaire();
+        }
+    }
+
+    private QuestionnaireContentModel CreateDefaultQuestionnaire()
+    {
+        var questionnaire = new QuestionnaireContentModel
+        {
+            Title = Block.Title ?? "Questionnaire",
+            Questions = new List<QuizStructure>()
+        };
+
+        // Ajouter une question par défaut
+        questionnaire.Questions.Add(CreateDefaultQuestion());
+
+        return questionnaire;
+    }
+
+    private QuizStructure CreateDefaultQuestion()
+    {
+        var question = new QuizStructure
+        {
+            Question = "",
+            Type = "multiple-choice",
+            Options = new List<Option>
+            {
+                new Option { Text = "", IsCorrect = false },
+                new Option { Text = "", IsCorrect = false }
+            }
+        };
+        return question;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (IsEditing)
+        {
+            await SaveChanges();
+        }
+        else
+        {
+            await StartEditing();
+        }
+    }
+
+    private async Task StartEditing()
+    {
+        _originalContent = CloneQuestionnaireContent(_questionnaireContent);
+        IsEditing = true;
+        ClearError();
+        StateHasChanged();
+    }
+
+    private QuestionnaireContentModel CloneQuestionnaireContent(QuestionnaireContentModel original)
+    {
+        return new QuestionnaireContentModel
+        {
+            Title = original.Title,
+            Questions = original.Questions.Select(q => new QuizStructure
+            {
+                Question = q.Question,
+                Type = q.Type,
+                AllowHint = q.AllowHint,
+                Hint = q.Hint,
+                ShowCorrectAnswer = q.ShowCorrectAnswer,
+                Explanation = q.Explanation,
+                Options = q.Options.Select(o => new Option
+                {
+                    Text = o.Text,
+                    IsCorrect = o.IsCorrect
+                }).ToList()
+            }).ToList()
+        };
+    }
+
+    private async Task SaveChanges()
+    {
+        try
+        {
+            isSaving = true;
+            ClearError();
+
+            if (!ValidateQuestionnaire())
+            {
+                return;
+            }
+
+            var options = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                WriteIndented = true
+            };
+
+            Block.Title = _questionnaireContent.Title;
+            Block.Content = JsonSerializer.Serialize(_questionnaireContent, options);
+
+            await OnBlockChanged.InvokeAsync(Block);
+
+            _originalContent = null;
+            IsEditing = false;
+            InitializeEditContext();
+            await ShowSuccessMessage();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = $"Erreur lors de la sauvegarde: {ex.Message}";
+        }
+        finally
+        {
+            isSaving = false;
+            StateHasChanged();
+        }
+    }
+
+    private bool ValidateQuestionnaire()
+    {
+        if (!_questionnaireContent.Questions.Any())
+        {
+            errorMessage = "Le questionnaire doit contenir au moins une question";
+            return false;
+        }
+
+        for (int i = 0; i < _questionnaireContent.Questions.Count; i++)
+        {
+            var question = _questionnaireContent.Questions[i];
+
+            if (string.IsNullOrWhiteSpace(question.Question))
+            {
+                errorMessage = $"La question {i + 1} doit avoir un texte";
+                return false;
+            }
+
+            if (!question.Options.Any(o => o.IsCorrect))
+            {
+                errorMessage = $"La question {i + 1} doit avoir au moins une bonne réponse";
+                return false;
+            }
+
+            if (question.Options.Any(o => string.IsNullOrWhiteSpace(o.Text)))
+            {
+                errorMessage = $"Toutes les options de la question {i + 1} doivent avoir un texte";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private async Task CancelEdit()
+    {
+        if (_originalContent != null)
+        {
+            _questionnaireContent = CloneQuestionnaireContent(_originalContent);
+            Block.Title = _originalContent.Title;
+            _originalContent = null;
+        }
+
+        IsEditing = false;
+        ClearError();
+        InitializeEditContext();
+        StateHasChanged();
+    }
+
+    private async Task RequestDelete()
+    {
+        await OnDeleteRequested.InvokeAsync(Block);
+    }
+
+    // Gestion des questions
+    private void AddQuestion()
+    {
+        _questionnaireContent.Questions.Add(CreateDefaultQuestion());
+        editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
+    }
+
+    private void RemoveQuestion(int index)
+    {
+        if (_questionnaireContent.Questions.Count > 1)
+        {
+            _questionnaireContent.Questions.RemoveAt(index);
+            editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
+        }
+    }
+
+    private void MoveQuestionUp(int index)
+    {
+        if (index > 0)
+        {
+            var temp = _questionnaireContent.Questions[index];
+            _questionnaireContent.Questions[index] = _questionnaireContent.Questions[index - 1];
+            _questionnaireContent.Questions[index - 1] = temp;
+            StateHasChanged();
+        }
+    }
+
+    private void MoveQuestionDown(int index)
+    {
+        if (index < _questionnaireContent.Questions.Count - 1)
+        {
+            var temp = _questionnaireContent.Questions[index];
+            _questionnaireContent.Questions[index] = _questionnaireContent.Questions[index + 1];
+            _questionnaireContent.Questions[index + 1] = temp;
+            StateHasChanged();
+        }
+    }
+
+    // Gestion des options
+    private void AddOption(int questionIndex)
+    {
+        var question = _questionnaireContent.Questions[questionIndex];
+        if (question.Options.Count < 6)
+        {
+            question.Options.Add(new Option { Text = "", IsCorrect = false });
+            StateHasChanged();
+        }
+    }
+
+    private void RemoveOption(int questionIndex, int optionIndex)
+    {
+        var question = _questionnaireContent.Questions[questionIndex];
+        if (question.Options.Count > 2)
+        {
+            question.Options.RemoveAt(optionIndex);
+            StateHasChanged();
+        }
+    }
+
+    private void SetSingleCorrectAnswer(int questionIndex, int optionIndex)
+    {
+        var question = _questionnaireContent.Questions[questionIndex];
+        for (int i = 0; i < question.Options.Count; i++)
+        {
+            question.Options[i].IsCorrect = (i == optionIndex);
+        }
+        StateHasChanged();
+    }
+
+    private void SetTrueFalseAnswer(int questionIndex, bool isTrue)
+    {
+        var question = _questionnaireContent.Questions[questionIndex];
+        question.Options[0].IsCorrect = isTrue;
+        question.Options[1].IsCorrect = !isTrue;
+        StateHasChanged();
+    }
+
+    private void OnQuestionTypeChanged(int questionIndex)
+    {
+        var question = _questionnaireContent.Questions[questionIndex];
+
+        if (question.Type == "true-false")
+        {
+            question.Options.Clear();
+            question.Options.Add(new Option { Text = "Vrai", IsCorrect = false });
+            question.Options.Add(new Option { Text = "Faux", IsCorrect = false });
+        }
+        else if (question.Options.Count < 2)
+        {
+            while (question.Options.Count < 2)
+            {
+                question.Options.Add(new Option { Text = "", IsCorrect = false });
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task ShowSuccessMessage()
+    {
+        showSaveSuccess = true;
+        StateHasChanged();
+
+        _successMessageTimer?.Dispose();
+        _successMessageTimer = new Timer(_ => InvokeAsync(() =>
+        {
+            showSaveSuccess = false;
+            StateHasChanged();
+        }), null, TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
+    }
+
+    private void ClearError()
+    {
+        errorMessage = null;
+    }
+
+    public void Dispose()
+    {
+        _successMessageTimer?.Dispose();
+    }
+}

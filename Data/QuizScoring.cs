@@ -4,91 +4,45 @@ namespace Mooc.Data
 {
     public static class QuizScoring
     {
-        // Définition des points par niveau de difficulté
-        public static readonly Dictionary<QuizDifficulty, int> DifficultyPoints = new()
-        {
-            { QuizDifficulty.Débutant, 2 },
-            { QuizDifficulty.Intermédiaire, 4 },
-            { QuizDifficulty.Avancé, 6 },
-            { QuizDifficulty.Expert, 8 }
-        };
+        // **SIMPLIFIÉ** : 1 point par question réussie
+        public const int PointsPerQuiz = 1;
 
         /// <summary>
-        /// Calcule le score d'un quiz basé uniquement sur la difficulté
+        /// Calcule le score d'une question de manière simple : 1 point si correct, 0 sinon
         /// </summary>
-        /// <param name="difficulty">Niveau de difficulté du quiz</param>
-        /// <param name="isCorrect">Si la réponse est correcte</param>
-        /// <param name="timeSpent">Temps passé sur le quiz</param>
-        /// <param name="hintsUsed">Nombre d'indices utilisés</param>
-        /// <param name="attempts">Nombre de tentatives</param>
-        /// <returns>Score calculé</returns>
-        public static QuizScoreResult CalculateScore(
-            QuizDifficulty difficulty,
-            bool isCorrect,
-            TimeSpan timeSpent = default,
-            int hintsUsed = 0,
-            int attempts = 1)
+        public static QuizScoreResult CalculateScore(bool isCorrect)
         {
-            var result = new QuizScoreResult
+            return new QuizScoreResult
             {
-                Difficulty = difficulty,
                 IsCorrect = isCorrect,
-                TimeSpent = timeSpent,
-                HintsUsed = hintsUsed,
-                Attempts = attempts
+                FinalScore = isCorrect ? PointsPerQuiz : 0
             };
-
-            // Points de base selon la difficulté (même si incorrect pour le calcul total)
-            result.BasePoints = DifficultyPoints[difficulty];
-
-            if (!isCorrect)
-            {
-                result.FinalScore = 0; // Aucun point gagné pour une mauvaise réponse
-                result.PerformanceLevel = QuizPerformanceLevel.Average;
-                return result;
-            }
-
-            // Si correct, on donne les points de base
-            result.FinalScore = result.BasePoints;
-
-            return result;
         }
 
         /// <summary>
-        /// Calcule le score total d'un cours
+        /// Calcule le score total d'un cours basé sur les réponses aux questions du questionnaire
         /// </summary>
         public static CourseScoreResult CalculateCourseScore(List<QuizScoreResult> quizResults)
         {
             var result = new CourseScoreResult
             {
                 QuizResults = quizResults,
-                // ✅ CORRECTION : Les points possibles incluent TOUS les quiz (corrects ET incorrects)
-                TotalPossiblePoints = quizResults.Sum(q => DifficultyPoints[q.Difficulty]),
-                // ✅ CORRECTION : Seuls les points effectivement gagnés (FinalScore)
-                TotalEarnedPoints = quizResults.Sum(q => q.FinalScore),
+                TotalEarnedPoints = quizResults.Count(q => q.IsCorrect) * PointsPerQuiz,
+                TotalPossiblePoints = quizResults.Count * PointsPerQuiz,
                 QuizCount = quizResults.Count,
                 CorrectAnswers = quizResults.Count(q => q.IsCorrect)
             };
 
-            // Calcul du pourcentage basé sur les points possibles
+            // Calcul du pourcentage
             result.ScorePercentage = result.TotalPossiblePoints > 0 
                 ? (double)result.TotalEarnedPoints / result.TotalPossiblePoints * 100 
                 : 0;
-
-            // Détermination du niveau global
-            result.OverallLevel = result.ScorePercentage switch
-            {
-                >= 90 => CoursePerformanceLevel.Excellent,
-                >= 75 => CoursePerformanceLevel.Good,
-                >= 60 => CoursePerformanceLevel.Average,
-                _ => CoursePerformanceLevel.NeedsImprovement
-            };
 
             return result;
         }
 
         /// <summary>
-        /// Calcule le score total pour plusieurs cours de manière optimisée
+        /// Calcule le score total pour plusieurs cours
         /// </summary>
         public static SessionScoreResult CalculateSessionScore(List<CourseScoreResult> courseResults)
         {
@@ -106,72 +60,18 @@ namespace Mooc.Data
                 ? (double)result.TotalEarnedPoints / result.TotalPossiblePoints * 100 
                 : 0;
 
-            // Détermination du niveau global de session
-            result.OverallLevel = result.ScorePercentage switch
-            {
-                >= 90 => SessionPerformanceLevel.Excellent,
-                >= 75 => SessionPerformanceLevel.Good,
-                >= 60 => SessionPerformanceLevel.Average,
-                _ => SessionPerformanceLevel.NeedsImprovement
-            };
-
             return result;
         }
-
-        /// <summary>
-        /// Méthode utilitaire pour obtenir rapidement les totaux
-        /// </summary>
-        public static (int earnedPoints, int possiblePoints, double percentage) GetQuickScoreSummary(
-            List<CourseScoreResult> courseResults)
-        {
-            var earnedPoints = courseResults.Sum(c => c.TotalEarnedPoints);
-            var possiblePoints = courseResults.Sum(c => c.TotalPossiblePoints);
-            var percentage = possiblePoints > 0 ? (double)earnedPoints / possiblePoints * 100 : 0;
-            
-            return (earnedPoints, possiblePoints, percentage);
-        }
     }
 
-    // Énumérations pour les niveaux de performance (conservées pour l'affichage)
-    public enum QuizPerformanceLevel
-    {
-        Perfect,
-        Excellent,
-        Good,
-        Average
-    }
-
-    public enum CoursePerformanceLevel
-    {
-        Excellent,
-        Good,
-        Average,
-        NeedsImprovement
-    }
-
-    public enum SessionPerformanceLevel
-    {
-        Excellent,
-        Good,
-        Average,
-        NeedsImprovement
-    }
-
-    // Classe pour stocker le résultat d'un quiz
+    // **SIMPLIFIÉ** : Classe de résultat minimaliste
     public class QuizScoreResult
     {
-        public QuizDifficulty Difficulty { get; set; }
         public bool IsCorrect { get; set; }
-        public int BasePoints { get; set; }
-        public double PerformanceMultiplier { get; set; } = 1.0;
         public int FinalScore { get; set; }
-        public QuizPerformanceLevel PerformanceLevel { get; set; }
-        public TimeSpan TimeSpent { get; set; }
-        public int HintsUsed { get; set; }
-        public int Attempts { get; set; }
     }
 
-    // Classe pour stocker le résultat d'un cours
+    // **SIMPLIFIÉ** : Résultat de cours sans niveaux de performance
     public class CourseScoreResult
     {
         public List<QuizScoreResult> QuizResults { get; set; } = new();
@@ -180,10 +80,9 @@ namespace Mooc.Data
         public double ScorePercentage { get; set; }
         public int QuizCount { get; set; }
         public int CorrectAnswers { get; set; }
-        public CoursePerformanceLevel OverallLevel { get; set; }
     }
 
-    // Nouvelle classe pour les résultats de session
+    // **SIMPLIFIÉ** : Résultat de session
     public class SessionScoreResult
     {
         public List<CourseScoreResult> CourseResults { get; set; } = new();
@@ -192,6 +91,5 @@ namespace Mooc.Data
         public double ScorePercentage { get; set; }
         public int CourseCount { get; set; }
         public int CompletedCourses { get; set; }
-        public SessionPerformanceLevel OverallLevel { get; set; }
     }
 }

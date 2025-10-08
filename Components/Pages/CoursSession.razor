@@ -340,7 +340,7 @@ else
         errorMessageTimer?.Dispose(); // Nouveau
     }
 
-    // **MÉTHODE CORRIGÉE**: Charger les scores des cours avec les vrais totaux
+    // **MÉTHODE CORRIGÉE**: Charger les scores des cours avec le nouveau système de questionnaire
     private async Task LoadCourseScores()
     {
         try
@@ -357,47 +357,44 @@ else
             {
                 try
                 {
-                    // **UTILISER LA NOUVELLE MÉTHODE** pour obtenir les vrais totaux
+                    // Utiliser la nouvelle méthode pour le questionnaire unique
                     var scoreResultWithTotal = await CourseStateService.CalculateCourseScoreWithTotalAsync(cours.Id);
                     
-                    // Créer un CourseScoreResult avec les vrais totaux
                     var scoreResult = new CourseScoreResult
                     {
                         TotalEarnedPoints = scoreResultWithTotal.TotalEarnedPoints,
-                        TotalPossiblePoints = scoreResultWithTotal.TotalPossiblePoints, // **VRAI TOTAL**
-                        ScorePercentage = scoreResultWithTotal.ScorePercentage,         // **VRAI POURCENTAGE**
-                        QuizCount = scoreResultWithTotal.TotalQuizCount,                // **TOTAL QUIZ DISPONIBLES**
+                        TotalPossiblePoints = scoreResultWithTotal.TotalPossiblePoints,
+                        ScorePercentage = scoreResultWithTotal.ScorePercentage,
+                        QuizCount = scoreResultWithTotal.TotalQuizCount,
                         CorrectAnswers = scoreResultWithTotal.CorrectAnswers,
-                        OverallLevel = scoreResultWithTotal.OverallLevel,
                         QuizResults = scoreResultWithTotal.QuizResults
                     };
                     
                     courseScores[cours.Id] = scoreResult;
                     
-                    // **CORRECTION** : Utiliser les vrais totaux pour la session
                     sessionTotalScore += scoreResult.TotalEarnedPoints;
                     sessionMaxScore += scoreResult.TotalPossiblePoints;
                     
-                    Console.WriteLine($"✅ Cours '{cours.Title}': {scoreResult.TotalEarnedPoints}/{scoreResult.TotalPossiblePoints} pts ({scoreResult.ScorePercentage:F1}%) - {scoreResult.QuizCount} quiz totaux - {scoreResult.CorrectAnswers} corrects");
+                    Console.WriteLine($"✅ Cours '{cours.Title}': {scoreResult.TotalEarnedPoints}/{scoreResult.TotalPossiblePoints} pts ({scoreResult.ScorePercentage:F1}%) - {scoreResult.QuizCount} questions");
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine($"❌ Erreur score cours '{cours.Title}': {ex.Message}");
                     
-                    // **AMÉLIORATION** : Même en cas d'erreur, essayer d'obtenir au moins le nombre de quiz
+                    // Fallback : récupérer le nombre de questions
                     try
                     {
-                        var (totalQuizCount, totalPossiblePoints) = await CourseStateService.AnalyzeCourseQuizzesAsync(cours.Id);
+                        var (totalQuestions, totalPossiblePoints) = await CourseStateService.GetQuestionnaireInfoAsync(cours.Id);
                         courseScores[cours.Id] = new CourseScoreResult
                         {
                             TotalEarnedPoints = 0,
                             TotalPossiblePoints = totalPossiblePoints,
                             ScorePercentage = 0,
-                            QuizCount = totalQuizCount,
+                            QuizCount = totalQuestions,
                             CorrectAnswers = 0,
-                            OverallLevel = CoursePerformanceLevel.NeedsImprovement
                         };
                         sessionMaxScore += totalPossiblePoints;
+                        Console.WriteLine($"🔧 Fallback cours '{cours.Title}': 0/{totalPossiblePoints} pts ({totalQuestions} questions)");
                     }
                     catch
                     {
@@ -408,16 +405,15 @@ else
                             ScorePercentage = 0,
                             QuizCount = 0,
                             CorrectAnswers = 0,
-                            OverallLevel = CoursePerformanceLevel.NeedsImprovement
                         };
                     }
                 }
             }
             
-            // Calculer le pourcentage global avec les vrais totaux
+            // Calculer le pourcentage global
             sessionScorePercentage = sessionMaxScore > 0 ? (double)sessionTotalScore / sessionMaxScore * 100 : 0;
             
-            Console.WriteLine($"🏆 Score session CORRIGÉ: {sessionTotalScore}/{sessionMaxScore} pts ({sessionScorePercentage:F1}%)");
+            Console.WriteLine($"🏆 Score session: {sessionTotalScore}/{sessionMaxScore} pts ({sessionScorePercentage:F1}%) - Système questionnaire unique");
         }
         catch (Exception ex)
         {
@@ -538,21 +534,6 @@ else
     {
         return courseScores.ContainsKey(coursId) && 
                (courseScores[coursId].QuizCount > 0 || courseScores[coursId].TotalPossiblePoints > 0);
-    }
-
-    /// <summary>
-    /// Obtient la classe CSS pour le badge de performance d'un cours selon le niveau global
-    /// </summary>
-    private string GetPerformanceBadgeClass(CoursePerformanceLevel level)
-    {
-        return level switch
-        {
-            CoursePerformanceLevel.Excellent => "bg-success",
-            CoursePerformanceLevel.Good => "bg-info",
-            CoursePerformanceLevel.Average => "bg-warning",
-            CoursePerformanceLevel.NeedsImprovement => "bg-danger",
-            _ => "bg-secondary"
-        };
     }
 
     /// <summary>

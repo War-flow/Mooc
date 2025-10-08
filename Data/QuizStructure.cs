@@ -2,15 +2,6 @@
 
 namespace Mooc.Data
 {
-    // Énumération pour les niveaux de difficulté
-    public enum QuizDifficulty
-    {
-        Débutant = 1,
-        Intermédiaire = 2,
-        Avancé = 3,
-        Expert = 4
-    }
-
     public class QuizStructure
     {
         [Required(ErrorMessage = "La question est obligatoire")]
@@ -21,10 +12,6 @@ namespace Mooc.Data
 
         [Required(ErrorMessage = "Le type de quiz est obligatoire")]
         public string? Type { get; set; } = "multiple-choice";
-
-        // Nouvelle propriété pour le niveau de difficulté
-        [Required(ErrorMessage = "Le niveau de difficulté est obligatoire")]
-        public QuizDifficulty Difficulty { get; set; } = QuizDifficulty.Débutant;
 
         public bool ShowProgress { get; set; }
         public bool ShowStats { get; set; }
@@ -42,65 +29,6 @@ namespace Mooc.Data
         // Validation personnalisée pour les options
         [CustomValidation(typeof(QuizStructure), nameof(ValidateOptions))]
         public string? OptionsValidation => string.Empty;
-
-        // Méthode pour obtenir la couleur CSS selon la difficulté
-        public string GetDifficultyClass()
-        {
-            return Difficulty switch
-            {
-                QuizDifficulty.Débutant => "difficulty-beginner",
-                QuizDifficulty.Intermédiaire => "difficulty-intermediate", 
-                QuizDifficulty.Avancé => "difficulty-advanced",
-                QuizDifficulty.Expert => "difficulty-expert",
-                _ => "difficulty-beginner"
-            };
-        }
-
-        // Méthode pour obtenir l'icône selon la difficulté
-        public string GetDifficultyIcon()
-        {
-            return Difficulty switch
-            {
-                QuizDifficulty.Débutant => "bi-star",
-                QuizDifficulty.Intermédiaire => "bi-star-fill",
-                QuizDifficulty.Avancé => "bi-lightning-fill",
-                QuizDifficulty.Expert => "bi-trophy-fill",
-                _ => "bi-star"
-            };
-        }
-
-        // **NOUVELLES MÉTHODES** : Pour l'affichage des points (sans bonus)
-        /// <summary>
-        /// Obtient les points de base selon la difficulté
-        /// </summary>
-        public int GetBasePoints()
-        {
-            return QuizScoring.DifficultyPoints[Difficulty];
-        }
-
-        /// <summary>
-        /// Obtient la classe CSS pour l'affichage des points
-        /// </summary>
-        public string GetPointsClass()
-        {
-            return Difficulty switch
-            {
-                QuizDifficulty.Débutant => "bg-success",
-                QuizDifficulty.Intermédiaire => "bg-info",
-                QuizDifficulty.Avancé => "bg-warning text-dark",
-                QuizDifficulty.Expert => "bg-danger",
-                _ => "bg-secondary"
-            };
-        }
-
-        /// <summary>
-        /// Obtient la description des points possibles (sans bonus)
-        /// </summary>
-        public string GetPointsDescription()
-        {
-            var basePoints = GetBasePoints();
-            return $"{basePoints} points";
-        }
 
         public static ValidationResult? ValidateOptions(string? value, ValidationContext context)
         {
@@ -144,4 +72,3 @@ namespace Mooc.Data
         public QuizStructure QuizData { get; set; } = new();
     }
 }
-

@@ -42,7 +42,6 @@ namespace Mooc.Services
             Console.WriteLine($"🔍 RESULT de CalculateCourseScoreWithTotalAsync - Cours {coursId}:");
             Console.WriteLine($"  - TotalEarnedPoints: {scoreWithTotal.TotalEarnedPoints}");
             Console.WriteLine($"  - TotalPossiblePoints: {scoreWithTotal.TotalPossiblePoints}");
-            Console.WriteLine($"  - TotalQuizCount: {scoreWithTotal.TotalQuizCount}");
             Console.WriteLine($"  - AttemptedQuizCount: {scoreWithTotal.AttemptedQuizCount}");
             
             // **CORRECTION** : Convertir en CourseScoreResult avec les vrais totaux
@@ -51,9 +50,7 @@ namespace Mooc.Services
                 TotalEarnedPoints = scoreWithTotal.TotalEarnedPoints,
                 TotalPossiblePoints = scoreWithTotal.TotalPossiblePoints, // **VRAI TOTAL**
                 ScorePercentage = scoreWithTotal.ScorePercentage,         // **VRAI POURCENTAGE**
-                QuizCount = scoreWithTotal.TotalQuizCount,                // **TOTAL QUIZ DISPONIBLES**
                 CorrectAnswers = scoreWithTotal.CorrectAnswers,
-                OverallLevel = scoreWithTotal.OverallLevel,
                 QuizResults = scoreWithTotal.QuizResults
             };
             
@@ -131,9 +128,7 @@ namespace Mooc.Services
                         TotalEarnedPoints = scoreWithTotal.TotalEarnedPoints,
                         TotalPossiblePoints = scoreWithTotal.TotalPossiblePoints, // **VRAI TOTAL**
                         ScorePercentage = scoreWithTotal.ScorePercentage,         // **VRAI POURCENTAGE**
-                        QuizCount = scoreWithTotal.TotalQuizCount,                // **TOTAL QUIZ DISPONIBLES**
                         CorrectAnswers = scoreWithTotal.CorrectAnswers,
-                        OverallLevel = scoreWithTotal.OverallLevel,
                         QuizResults = scoreWithTotal.QuizResults
                     };
                     
@@ -153,18 +148,17 @@ namespace Mooc.Services
                     try
                     {
                         Console.WriteLine($"🔧 FALLBACK - Analyse directe du cours {courseId}");
-                        var (totalQuizCount, totalPossiblePoints) = await _courseStateService.AnalyzeCourseQuizzesAsync(courseId);
-                        
-                        Console.WriteLine($"🔧 FALLBACK RESULT - Cours {courseId}: {totalQuizCount} quiz, {totalPossiblePoints} points");
+                        var (totalQuestions, totalPossiblePoints) = await _courseStateService.GetQuestionnaireInfoAsync(courseId);
+
+
+                        Console.WriteLine($"🔧 FALLBACK RESULT - Cours {courseId}: {totalPossiblePoints} points");
                         
                         results[courseId] = new CourseScoreResult
                         {
                             TotalEarnedPoints = 0,
                             TotalPossiblePoints = totalPossiblePoints, // **VRAI TOTAL**
                             ScorePercentage = 0,
-                            QuizCount = totalQuizCount,                 // **TOTAL QUIZ DISPONIBLES**
                             CorrectAnswers = 0,
-                            OverallLevel = CoursePerformanceLevel.NeedsImprovement
                         };
                     }
                     catch
@@ -175,9 +169,7 @@ namespace Mooc.Services
                             TotalEarnedPoints = 0,
                             TotalPossiblePoints = 0,
                             ScorePercentage = 0,
-                            QuizCount = 0,
                             CorrectAnswers = 0,
-                            OverallLevel = CoursePerformanceLevel.NeedsImprovement
                         }; // Score vide par défaut
                     }
                 }

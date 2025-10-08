@@ -110,9 +110,7 @@ namespace Mooc.Services
                         EarnedPoints = kvp.Value.TotalEarnedPoints,
                         PossiblePoints = kvp.Value.TotalPossiblePoints, // **TRACE ICI**
                         ScorePercentage = kvp.Value.ScorePercentage,     // **TRACE ICI**
-                        QuizCount = kvp.Value.QuizCount,                 // **TRACE ICI**
                         CorrectAnswers = kvp.Value.CorrectAnswers,
-                        PerformanceLevel = kvp.Value.OverallLevel.ToString()
                     }).ToList()
                 };
 
@@ -158,9 +156,7 @@ namespace Mooc.Services
                     EarnedPoints = kvp.Value.TotalEarnedPoints,
                     PossiblePoints = kvp.Value.TotalPossiblePoints, // **TRACE ICI**
                     ScorePercentage = kvp.Value.ScorePercentage,     // **TRACE ICI**
-                    QuizCount = kvp.Value.QuizCount,                 // **TRACE ICI**
                     CorrectAnswers = kvp.Value.CorrectAnswers,
-                    PerformanceLevel = kvp.Value.OverallLevel.ToString()
                 }).ToList();
 
                 Console.WriteLine($"🔍 FINAL COURSES RESULT:");

@@ -42,7 +42,7 @@ else if (cours == null)
         </button>
     </div>
 }
-else
+else 
 {
     <div class="container mt-4">
         <!-- En-tête du cours amélioré -->
@@ -617,7 +617,7 @@ else
     private Type GetViewerBlockComponent(string type) => type switch
     {
         "texte" => typeof(TextBlockViewer),
-        "quiz" => typeof(QuizBlockViewer),
+        "questionnaire" => typeof(QuestionnaireBlockViewer), // Changé de "quiz"
         _ => typeof(TextBlockViewer)
     };
 
@@ -629,8 +629,8 @@ else
             ["IsReadOnly"] = true
         };
 
-        // Ajouter le CoursId et le callback seulement pour les quiz
-        if (block.Type == "quiz")
+        // Pour les questionnaires
+        if (block.Type == "questionnaire") // Changé de "quiz"
         {
             parameters["CoursId"] = CoursId;
             parameters["OnQuizCompleted"] = EventCallback.Factory.Create<bool>(this, OnQuizCompleted);

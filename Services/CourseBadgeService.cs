@@ -39,6 +39,7 @@ namespace Mooc.Services
 
         /// <summary>
         /// Calcule le score d'un cours directement depuis la base de données
+        /// Adapté pour le nouveau système de questionnaire unique
         /// </summary>
         private async Task<CourseScoreResult> CalculateCourseScoreFromDatabaseAsync(string userId, int coursId)
         {
@@ -68,6 +69,7 @@ namespace Mooc.Services
 
                 var quizResults = new List<QuizScoreResult>();
 
+                // ✅ NOUVEAU : Recherche des interactions de type "questionnaire"
                 foreach (var interaction in interactions.Values)
                 {
                     try
@@ -75,27 +77,15 @@ namespace Mooc.Services
                         using var document = System.Text.Json.JsonDocument.Parse(interaction);
                         var root = document.RootElement;
 
-                        // Vérifier si c'est une interaction de quiz avec scoreResult
+                        // Vérifier si c'est une interaction de questionnaire avec scoreResult
                         if (root.TryGetProperty("type", out var typeElement) &&
-                            typeElement.GetString() == "quiz" &&
+                            typeElement.GetString() == "questionnaire" &&
                             root.TryGetProperty("scoreResult", out var scoreElement))
                         {
-                            var difficulty = QuizDifficulty.Débutant;
-                            if (scoreElement.TryGetProperty("difficulty", out var difficultyElement))
-                            {
-                                Enum.TryParse<QuizDifficulty>(difficultyElement.GetString(), out difficulty);
-                            }
-
                             var isCorrect = false;
                             if (root.TryGetProperty("correct", out var correctElement))
                             {
                                 isCorrect = correctElement.GetBoolean();
-                            }
-
-                            var basePoints = 0;
-                            if (scoreElement.TryGetProperty("basePoints", out var basePointsElement))
-                            {
-                                basePoints = basePointsElement.GetInt32();
                             }
 
                             var finalScore = 0;
@@ -104,47 +94,10 @@ namespace Mooc.Services
                                 finalScore = finalScoreElement.GetInt32();
                             }
 
-                            var performanceLevel = QuizPerformanceLevel.Average;
-                            if (scoreElement.TryGetProperty("performanceLevel", out var perfElement))
-                            {
-                                Enum.TryParse<QuizPerformanceLevel>(perfElement.GetString(), out performanceLevel);
-                            }
-
-                            var performanceMultiplier = 1.0;
-                            if (scoreElement.TryGetProperty("performanceMultiplier", out var multiplierElement))
-                            {
-                                performanceMultiplier = multiplierElement.GetDouble();
-                            }
-
-                            var timeSpent = TimeSpan.Zero;
-                            if (scoreElement.TryGetProperty("timeSpentSeconds", out var timeElement))
-                            {
-                                timeSpent = TimeSpan.FromSeconds(timeElement.GetDouble());
-                            }
-
-                            var hintsUsed = 0;
-                            if (scoreElement.TryGetProperty("hintsUsed", out var hintsElement))
-                            {
-                                hintsUsed = hintsElement.GetInt32();
-                            }
-
-                            var attempts = 1;
-                            if (scoreElement.TryGetProperty("attempts", out var attemptsElement))
-                            {
-                                attempts = attemptsElement.GetInt32();
-                            }
-
                             quizResults.Add(new QuizScoreResult
                             {
-                                Difficulty = difficulty,
                                 IsCorrect = isCorrect,
-                                BasePoints = basePoints,
-                                FinalScore = finalScore,
-                                PerformanceLevel = performanceLevel,
-                                PerformanceMultiplier = performanceMultiplier,
-                                TimeSpent = timeSpent,
-                                HintsUsed = hintsUsed,
-                                Attempts = attempts
+                                FinalScore = finalScore
                             });
                         }
                     }
@@ -154,7 +107,22 @@ namespace Mooc.Services
                     }
                 }
 
-                return QuizScoring.CalculateCourseScore(quizResults);
+                // ✅ NOUVEAU : Utiliser la méthode simplifiée de calcul
+                var courseScoreResult = QuizScoring.CalculateCourseScore(quizResults);
+
+                // Récupérer le nombre total de questions du questionnaire
+                var (totalQuestions, totalPossiblePoints) = await GetQuestionnaireInfoAsync(coursId);
+                
+                // Mettre à jour avec les vraies valeurs totales
+                courseScoreResult.TotalPossiblePoints = totalPossiblePoints;
+                courseScoreResult.QuizCount = totalQuestions;
+                
+                // Recalculer le pourcentage avec les vraies valeurs
+                courseScoreResult.ScorePercentage = totalQuestions > 0 
+                    ? (double)courseScoreResult.TotalEarnedPoints / courseScoreResult.TotalPossiblePoints * 100 
+                    : 0;
+
+                return courseScoreResult;
             }
             catch (Exception ex)
             {
@@ -167,6 +135,64 @@ namespace Mooc.Services
                     CorrectAnswers = 0,
                     ScorePercentage = 0
                 };
+            }
+        }
+
+        /// <summary>
+        /// ✅ NOUVEAU : Compte le nombre de questions dans le bloc questionnaire unique d'un cours
+        /// </summary>
+        private async Task<(int totalQuestions, int totalPossiblePoints)> GetQuestionnaireInfoAsync(int coursId)
+        {
+            try
+            {
+                using var context = await _contextFactory.CreateDbContextAsync();
+
+                var cours = await context.Courses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == coursId);
+
+                if (cours == null || string.IsNullOrEmpty(cours.Content))
+                {
+                    _logger.LogInformation("📊 Cours {CourseId}: Aucun contenu trouvé", coursId);
+                    return (0, 0);
+                }
+
+                var blocks = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(cours.Content);
+                if (blocks == null)
+                {
+                    _logger.LogWarning("📊 Cours {CourseId}: Impossible de désérialiser le contenu", coursId);
+                    return (0, 0);
+                }
+
+                // Chercher le bloc questionnaire unique
+                foreach (var block in blocks)
+                {
+                    if (block.TryGetProperty("Type", out var typeProperty) &&
+                        typeProperty.GetString() == "questionnaire")
+                    {
+                        // Compter les questions dans le questionnaire
+                        if (block.TryGetProperty("Data", out var dataProperty) &&
+                            dataProperty.TryGetProperty("Questions", out var questionsProperty) &&
+                            questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        {
+                            int questionCount = questionsProperty.GetArrayLength();
+                            int totalPoints = questionCount * QuizScoring.PointsPerQuiz; // 1 point par question
+                            
+                            _logger.LogInformation("📊 Cours {CourseId}: {QuestionCount} questions trouvées = {TotalPoints} points possibles", 
+                                coursId, questionCount, totalPoints);
+                            
+                            return (questionCount, totalPoints);
+                        }
+                    }
+                }
+
+                _logger.LogInformation("📊 Cours {CourseId}: Aucun bloc questionnaire trouvé", coursId);
+                return (0, 0);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Erreur lors de l'analyse du questionnaire pour le cours {CourseId}", coursId);
+                return (0, 0);
             }
         }
 
@@ -191,7 +217,7 @@ namespace Mooc.Services
 
                 if (courseScore.QuizCount == 0 || courseScore.TotalPossiblePoints == 0)
                 {
-                    _logger.LogWarning("⚠️ Aucun quiz trouvé ou points possibles = 0 pour le cours {CoursId}", coursId);
+                    _logger.LogWarning("⚠️ Aucune question trouvée ou points possibles = 0 pour le cours {CoursId}", coursId);
                     return null;
                 }
 
@@ -223,14 +249,15 @@ namespace Mooc.Services
 
         /// <summary>
         /// Détermine le type de badge basé sur le score
+        /// ✅ Simplifié pour le nouveau système
         /// </summary>
         private CourseBadgeType DetermineBadgeType(CourseScoreResult courseScore)
         {
-            // Vérifier d'abord le badge Perfect (100% sans aide)
+            // Vérifier d'abord le badge Perfect (100%)
             if (courseScore.ScorePercentage >= PERFECT_THRESHOLD)
             {
-                // Vérifier si tous les quiz ont été réussis sans aide
-                if (IsPerformancePerfect(courseScore))
+                // Dans le nouveau système simplifié, Perfect = 100% de réussite
+                if (courseScore.CorrectAnswers == courseScore.QuizCount)
                 {
                     return CourseBadgeType.Perfect;
                 }
@@ -243,19 +270,8 @@ namespace Mooc.Services
                 >= GOLD_THRESHOLD => CourseBadgeType.Gold,
                 >= SILVER_THRESHOLD => CourseBadgeType.Silver,
                 >= BRONZE_THRESHOLD => CourseBadgeType.Bronze,
-                _ => CourseBadgeType.Bronze // Par sécurité, bien que ce cas ne devrait pas arriver
+                _ => CourseBadgeType.Bronze // Par sécurité
             };
-        }
-
-        /// <summary>
-        /// Vérifie si la performance est parfaite (100% sans aide)
-        /// </summary>
-        private bool IsPerformancePerfect(CourseScoreResult courseScore)
-        {
-            // Logique pour vérifier si aucune aide n'a été utilisée
-            // Pour l'instant, on considère qu'une performance parfaite = 100% de score
-            return courseScore.ScorePercentage >= PERFECT_THRESHOLD &&
-                   courseScore.CorrectAnswers == courseScore.QuizCount;
         }
 
         /// <summary>
@@ -319,11 +335,11 @@ namespace Mooc.Services
         {
             return badgeType switch
             {
-                CourseBadgeType.Bronze => $"Félicitations ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite dans ce cours.",
-                CourseBadgeType.Silver => $"Excellent travail ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite dans ce cours.",
-                CourseBadgeType.Gold => $"Performance remarquable ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite dans ce cours.",
-                CourseBadgeType.Perfect => $"Performance parfaite ! Vous avez obtenu {courseScore.ScorePercentage:F1}% sans aucune aide.",
-                _ => $"Cours terminé avec {courseScore.ScorePercentage:F1}% de réussite."
+                CourseBadgeType.Bronze => $"Félicitations ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite au questionnaire.",
+                CourseBadgeType.Silver => $"Excellent travail ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite au questionnaire.",
+                CourseBadgeType.Gold => $"Performance remarquable ! Vous avez obtenu {courseScore.ScorePercentage:F1}% de réussite au questionnaire.",
+                CourseBadgeType.Perfect => $"Performance parfaite ! Vous avez répondu correctement à toutes les questions du questionnaire.",
+                _ => $"Questionnaire terminé avec {courseScore.ScorePercentage:F1}% de réussite."
             };
         }
 
