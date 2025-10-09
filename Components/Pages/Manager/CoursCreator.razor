@@ -167,7 +167,7 @@
                     {
                         <div class="alert alert-success py-2">
                             <i class="bi bi-check-circle-fill me-2"></i>
-                            <strong>Cours valide</strong> - @realTimeValidationResult.QuizCount quiz détecté(s)
+                            <strong>Cours valide</strong> - @realTimeValidationResult.QuestionnaireCount questionnaire(s) détecté(s)
                             @if (realTimeValidationResult.Warnings.Any())
                             {
                                 <div class="mt-1">
@@ -548,10 +548,14 @@
     {
         // Débounce la validation pour éviter trop d'appels
         validationTimer?.Dispose();
-        validationTimer = new Timer(async _ => 
+        validationTimer = new Timer(_ =>
         {
-            realTimeValidationResult = await ValidateCourseContent();
-            await InvokeAsync(StateHasChanged);
+            // Utiliser InvokeAsync pour garantir le contexte Blazor correct
+            InvokeAsync(async () =>
+            {
+                realTimeValidationResult = await ValidateCourseContent();
+                StateHasChanged();
+            });
         }, null, TimeSpan.FromMilliseconds(500), Timeout.InfiniteTimeSpan);
     }
 

@@ -81,14 +81,14 @@
                                      @onclick="() => HandleOptionClick(questionIndex, optionIndex)">
                                     @if (question.Type == "multiple-select")
                                     {
-                                        <input class="form-check-input" type="checkbox"
+                                        <input class="form-check-valid" type="checkbox"
                                                id="q-@questionIndex-opt-@optionIndex"
                                                disabled="@IsQuestionnaireCompleted"
                                                checked="@isUserAnswer" />
                                     }
                                     else
                                     {
-                                        <input class="form-check-input" type="radio"
+                                        <input class="form-check-valid" type="radio"
                                                name="question-@questionIndex"
                                                id="q-@questionIndex-opt-@optionIndex"
                                                disabled="@IsQuestionnaireCompleted"
@@ -114,34 +114,19 @@
                             }
                         </div>
 
-                        <!-- Indice -->
-                        @if (!IsQuestionnaireCompleted && question.AllowHint && !string.IsNullOrEmpty(question.Hint))
+                        <!-- Affichage de la bonne réponse après validation -->
+                        @if (IsQuestionnaireCompleted && question.ShowCorrectAnswer && !isCorrectlyAnswered)
                         {
-                            <div class="hint-container mt-3">
-                                @if (ShownHints.Contains(questionIndex))
+                            <div class="alert alert-info mt-3">
+                                <i class="bi bi-info-circle me-2"></i>
+                                <strong>Bonne réponse :</strong>
+                                @foreach (var option in question.Options.Where(o => o.IsCorrect))
                                 {
-                                    <div class="alert alert-info">
-                                        <i class="bi bi-lightbulb me-2"></i>
-                                        <strong>Indice :</strong> @question.Hint
+                                    <div class="ms-3">
+                                        <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                        @option.Text
                                     </div>
                                 }
-                                else
-                                {
-                                    <button type="button" class="btn btn-sm btn-outline-info" 
-                                            @onclick="() => ShowHint(questionIndex)">
-                                        <i class="bi bi-lightbulb me-1"></i>
-                                        Afficher l'indice
-                                    </button>
-                                }
-                            </div>
-                        }
-
-                        <!-- Explication après validation -->
-                        @if (IsQuestionnaireCompleted && !string.IsNullOrEmpty(question.Explanation))
-                        {
-                            <div class="alert @(isCorrectlyAnswered ? "alert-success" : "alert-warning") mt-3">
-                                <i class="bi bi-info-circle me-2"></i>
-                                <strong>Explication :</strong> @question.Explanation
                             </div>
                         }
                     </div>
@@ -243,7 +228,6 @@
     private bool IsSubmitting { get; set; } = false;
     private Dictionary<int, List<bool>> UserAnswers { get; set; } = new();
     private Dictionary<int, bool> QuestionResults { get; set; } = new();
-    private HashSet<int> ShownHints { get; set; } = new();
     private int CorrectAnswersCount { get; set; } = 0;
     private double FinalScorePercentage { get; set; } = 0;
 
@@ -436,11 +420,5 @@
             >= 40 => "text-warning",
             _ => "text-danger"
         };
-    }
-
-    private void ShowHint(int questionIndex)
-    {
-        ShownHints.Add(questionIndex);
-        StateHasChanged();
     }
 }

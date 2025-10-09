@@ -117,7 +117,7 @@
                                         <!-- Vrai/Faux simplifié -->
                                         <div class="d-flex gap-3">
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio"
+                                                <input class="form-check-valid" type="radio"
                                                        name="tf-@questionIndex" id="tf-true-@questionIndex"
                                                        checked="@(question.Options[0].IsCorrect)"
                                                        @onchange="@(() => SetTrueFalseAnswer(questionIndex, true))" />
@@ -126,7 +126,7 @@
                                                 </label>
                                             </div>
                                             <div class="form-check">
-                                                <input class="form-check-input" type="radio"
+                                                <input class="form-check-valid" type="radio"
                                                        name="tf-@questionIndex" id="tf-false-@questionIndex"
                                                        checked="@(question.Options[1].IsCorrect)"
                                                        @onchange="@(() => SetTrueFalseAnswer(questionIndex, false))" />
@@ -179,42 +179,7 @@
                                             </button>
                                         }
                                     }
-                                </div>
-
-                                <!-- Options avancées (repliables) -->
-                                <div class="accordion accordion-flush" id="advanced-@questionIndex">
-                                    <div class="accordion-item">
-                                        <h2 class="accordion-header">
-                                            <button class="accordion-button collapsed" type="button"
-                                                    data-bs-toggle="collapse" data-bs-target="#collapse-@questionIndex">
-                                                <i class="bi bi-sliders me-2"></i>
-                                                Options avancées
-                                            </button>
-                                        </h2>
-                                        <div id="collapse-@questionIndex" class="accordion-collapse collapse">
-                                            <div class="accordion-body">
-                                                <div class="mb-3">
-                                                    <label class="form-label">Indice (optionnel)</label>
-                                                    <InputText class="form-control" @bind-Value="question.Hint"
-                                                               placeholder="Donnez un indice pour aider..." />
-                                                </div>
-                                                <div class="mb-3">
-                                                    <label class="form-label">Explication (optionnel)</label>
-                                                    <InputTextArea class="form-control" @bind-Value="question.Explanation"
-                                                                   rows="2" placeholder="Explication de la réponse..." />
-                                                </div>
-                                                <div class="form-check form-switch">
-                                                    <InputCheckbox class="form-check-input" @bind-Value="question.AllowHint" />
-                                                    <label class="form-check-label">Permettre l'affichage de l'indice</label>
-                                                </div>
-                                                <div class="form-check form-switch">
-                                                    <InputCheckbox class="form-check-input" @bind-Value="question.ShowCorrectAnswer" />
-                                                    <label class="form-check-label">Afficher la bonne réponse après validation</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
+                                </div>                           
                             </div>
                         </div>
                     }
@@ -240,7 +205,7 @@
                                 @foreach (var option in question.Options)
                                 {
                                     <div class="form-check">
-                                        <input class="form-check-input" type="@(question.Type == "multiple-select" ? "checkbox" : "radio")" disabled />
+                                        <input class="form-check-valid" type="@(question.Type == "multiple-select" ? "checkbox" : "radio")" disabled />
                                         <label class="form-check-label">
                                             @option.Text
                                             @if (option.IsCorrect)
@@ -424,10 +389,8 @@
             {
                 Question = q.Question,
                 Type = q.Type,
-                AllowHint = q.AllowHint,
                 Hint = q.Hint,
                 ShowCorrectAnswer = q.ShowCorrectAnswer,
-                Explanation = q.Explanation,
                 Options = q.Options.Select(o => new Option
                 {
                     Text = o.Text,
@@ -554,6 +517,7 @@
             var temp = _questionnaireContent.Questions[index];
             _questionnaireContent.Questions[index] = _questionnaireContent.Questions[index - 1];
             _questionnaireContent.Questions[index - 1] = temp;
+            editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
             StateHasChanged();
         }
     }
@@ -565,6 +529,7 @@
             var temp = _questionnaireContent.Questions[index];
             _questionnaireContent.Questions[index] = _questionnaireContent.Questions[index + 1];
             _questionnaireContent.Questions[index + 1] = temp;
+            editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
             StateHasChanged();
         }
     }
@@ -576,6 +541,7 @@
         if (question.Options.Count < 6)
         {
             question.Options.Add(new Option { Text = "", IsCorrect = false });
+            editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
             StateHasChanged();
         }
     }
@@ -586,6 +552,7 @@
         if (question.Options.Count > 2)
         {
             question.Options.RemoveAt(optionIndex);
+            editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
             StateHasChanged();
         }
     }
@@ -597,6 +564,7 @@
         {
             question.Options[i].IsCorrect = (i == optionIndex);
         }
+        editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
         StateHasChanged();
     }
 
@@ -605,6 +573,7 @@
         var question = _questionnaireContent.Questions[questionIndex];
         question.Options[0].IsCorrect = isTrue;
         question.Options[1].IsCorrect = !isTrue;
+        editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
         StateHasChanged();
     }
 
@@ -626,6 +595,7 @@
             }
         }
 
+        editContext?.NotifyFieldChanged(new FieldIdentifier(_questionnaireContent, nameof(_questionnaireContent.Questions)));
         StateHasChanged();
     }
 
