@@ -289,21 +289,101 @@ namespace Mooc.Services
                 // Chercher le bloc questionnaire unique
                 foreach (var block in blocks)
                 {
-                    if (block.TryGetProperty("Type", out var typeProperty) &&
-                        typeProperty.GetString() == "questionnaire")
+                    if (block.TryGetProperty("Type", out var typeProperty))
                     {
-                        // Compter les questions dans le questionnaire
-                        if (block.TryGetProperty("Data", out var dataProperty) &&
-                            dataProperty.TryGetProperty("Questions", out var questionsProperty) &&
-                            questionsProperty.ValueKind == JsonValueKind.Array)
+                        var blockType = typeProperty.GetString()?.ToLowerInvariant();
+                        _logger?.LogInformation("📊 Cours {CourseId}: Bloc trouvé avec type '{BlockType}'", coursId, blockType);
+
+                        if (blockType == "questionnaire" || blockType == "quiz" || blockType == "questions")
                         {
-                            int questionCount = questionsProperty.GetArrayLength();
-                            int totalPoints = questionCount * QuizScoring.PointsPerQuiz; // 1 point par question
+                            JsonElement questionsProperty = default;
+                            bool foundQuestions = false;
+
+                            // **CORRECTION PRINCIPALE** : Les questions sont dans la propriété "Content" (JSON encodé)
+                            if (block.TryGetProperty("Content", out var contentProperty) && 
+                                contentProperty.ValueKind == JsonValueKind.String)
+                            {
+                                try
+                                {
+                                    var contentJson = contentProperty.GetString();
+                                    if (!string.IsNullOrEmpty(contentJson))
+                                    {
+                                        _logger?.LogInformation("📊 Cours {CourseId}: Désérialisation de la propriété Content", coursId);
+                                        
+                                        // Désérialiser le JSON imbriqué
+                                        var contentObject = JsonSerializer.Deserialize<JsonElement>(contentJson);
+                                        
+                                        // Chercher les questions dans le contenu désérialisé
+                                        if (contentObject.TryGetProperty("Questions", out questionsProperty) && 
+                                            questionsProperty.ValueKind == JsonValueKind.Array)
+                                        {
+                                            foundQuestions = true;
+                                            _logger?.LogInformation("📊 Cours {CourseId}: ✅ Questions trouvées dans Content.Questions", coursId);
+                                        }
+                                        else if (contentObject.TryGetProperty("questions", out questionsProperty) && 
+                                                 questionsProperty.ValueKind == JsonValueKind.Array)
+                                        {
+                                            foundQuestions = true;
+                                            _logger?.LogInformation("📊 Cours {CourseId}: ✅ Questions trouvées dans Content.questions", coursId);
+                                        }
+                                    }
+                                }
+                                catch (JsonException ex)
+                                {
+                                    _logger?.LogError(ex, "❌ Erreur lors de la désérialisation de Content pour le cours {CourseId}", coursId);
+                                }
+                            }
                             
-                            _logger?.LogInformation("📊 Cours {CourseId}: {QuestionCount} questions trouvées = {TotalPoints} points possibles", 
-                                coursId, questionCount, totalPoints);
-                            
-                            return (questionCount, totalPoints);
+                            // **FALLBACK** : Essayer les autres méthodes (pour rétrocompatibilité)
+                            if (!foundQuestions)
+                            {
+                                // Chercher directement dans le bloc
+                                if (block.TryGetProperty("Questions", out questionsProperty) && 
+                                    questionsProperty.ValueKind == JsonValueKind.Array)
+                                {
+                                    foundQuestions = true;
+                                    _logger?.LogInformation("📊 Cours {CourseId}: Questions trouvées directement dans le bloc", coursId);
+                                }
+                                else if (block.TryGetProperty("questions", out questionsProperty) && 
+                                         questionsProperty.ValueKind == JsonValueKind.Array)
+                                {
+                                    foundQuestions = true;
+                                    _logger?.LogInformation("📊 Cours {CourseId}: Questions trouvées (minuscules) directement dans le bloc", coursId);
+                                }
+                                // Chercher dans "Data"
+                                else if (block.TryGetProperty("Data", out var dataProperty))
+                                {
+                                    _logger?.LogInformation("📊 Cours {CourseId}: Recherche dans la propriété 'Data'", coursId);
+                                    
+                                    if (dataProperty.TryGetProperty("Questions", out questionsProperty) && 
+                                        questionsProperty.ValueKind == JsonValueKind.Array)
+                                    {
+                                        foundQuestions = true;
+                                        _logger?.LogInformation("📊 Cours {CourseId}: Questions trouvées dans Data.Questions", coursId);
+                                    }
+                                    else if (dataProperty.TryGetProperty("questions", out questionsProperty) && 
+                                             questionsProperty.ValueKind == JsonValueKind.Array)
+                                    {
+                                        foundQuestions = true;
+                                        _logger?.LogInformation("📊 Cours {CourseId}: Questions trouvées dans Data.questions", coursId);
+                                    }
+                                }
+                            }
+
+                            if (foundQuestions)
+                            {
+                                int questionCount = questionsProperty.GetArrayLength();
+                                int totalPoints = questionCount * QuizScoring.PointsPerQuiz; // 1 point par question
+                                
+                                _logger?.LogInformation("📊 Cours {CourseId}: ✅ {QuestionCount} questions trouvées = {TotalPoints} points possibles", 
+                                    coursId, questionCount, totalPoints);
+                                
+                                return (questionCount, totalPoints);
+                            }
+                            else
+                            {
+                                _logger?.LogWarning("📊 Cours {CourseId}: ❌ Bloc questionnaire trouvé mais aucune propriété de questions détectée", coursId);
+                            }
                         }
                     }
                 }

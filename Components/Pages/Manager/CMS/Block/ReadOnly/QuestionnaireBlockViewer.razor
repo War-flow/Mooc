@@ -170,33 +170,25 @@
                                 <div class="row text-center">
                                     <div class="col-md-4">
                                         <div class="result-stat">
-                                            <div class="stat-value text-primary">@CorrectAnswersCount</div>
-                                            <div class="stat-label">Bonnes réponses</div>
+                                            <div class="stat-value text-info">@CorrectAnswersCount</div>
+                                            <div class="stat-label-valide">Bonnes réponses</div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="result-stat">
                                             <div class="stat-value text-info">@QuestionnaireContent.Questions.Count</div>
-                                            <div class="stat-label">Questions totales</div>
+                                            <div class="stat-label-valide">Questions totales</div>
                                         </div>
                                     </div>
                                     <div class="col-md-4">
                                         <div class="result-stat">
-                                            <div class="stat-value @GetScoreColorClass()">
+                                            <div class="stat-value text-info">
                                                 @FinalScorePercentage.ToString("F0")%
                                             </div>
-                                            <div class="stat-label">Score final</div>
+                                            <div class="stat-label-valide">Score final</div>
                                         </div>
                                     </div>
                                 </div>
-
-                                @if (CoursId > 0)
-                                {
-                                    <div class="alert alert-info mt-3 mb-0">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        Votre score de <strong>@CorrectAnswersCount point@(CorrectAnswersCount > 1 ? "s" : "")</strong> a été enregistré.
-                                    </div>
-                                }
                             </div>
                         </div>
                     }
@@ -409,16 +401,5 @@
             return "incorrect";
         
         return "";
-    }
-
-    private string GetScoreColorClass()
-    {
-        return FinalScorePercentage switch
-        {
-            >= 80 => "text-success",
-            >= 60 => "text-info",
-            >= 40 => "text-warning",
-            _ => "text-danger"
-        };
     }
 }

@@ -106,7 +106,6 @@
 /* ========================= */
 /* TITRE ET QUESTION */
 /* ========================= */
-
 .quiz-title {
     margin-bottom: 1.5rem;
     color: #ff9800;
@@ -671,6 +670,13 @@
     font-weight: 500;
 }
 
+.stat-label-valide {
+    font-size: 0.9em;
+    color: #000000;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+}
 /* === ANIMATIONS === */
 @keyframes correctPulse {
     0% {
