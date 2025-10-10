@@ -58,33 +58,42 @@ namespace Mooc.Services
         {
             try
             {
-                using var context = await _contextFactory.CreateDbContextAsync();
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] DÉBUT - Vérification génération automatique pour User: {UserId}, Session: {SessionId}", userId, sessionId);
 
+                using var context = await _contextFactory.CreateDbContextAsync();
+                    
                 // Utiliser le service d'éligibilité pour vérifier tous les critères
                 var eligibilityResult = await _eligibilityService.CheckCertificateEligibilityAsync(userId, sessionId);
 
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Résultat éligibilité - Complétée: {IsCompleted}, Score: {Score}%, MinScore: {HasMinScore}, Éligible: {IsEligible}, Existe: {HasCert}", 
+                    eligibilityResult.IsSessionCompleted, 
+                    eligibilityResult.SessionScorePercentage.ToString("F1"), 
+                    eligibilityResult.HasMinimumScore, 
+                    eligibilityResult.IsEligible, 
+                    eligibilityResult.HasExistingCertificate);
+
                 if (eligibilityResult.HasExistingCertificate)
                 {
-                    _logger.LogInformation("Certificat déjà existant pour l'utilisateur {UserId} et la session {SessionId}", userId, sessionId);
+                    _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Certificat déjà existant pour l'utilisateur {UserId} et la session {SessionId}", userId, sessionId);
                     return;
                 }
 
                 if (!eligibilityResult.IsSessionCompleted)
                 {
-                    _logger.LogInformation("Session {SessionId} non complétée pour l'utilisateur {UserId}", sessionId, userId);
+                    _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Session {SessionId} non complétée pour l'utilisateur {UserId}", sessionId, userId);
                     return;
                 }
 
                 if (!eligibilityResult.HasMinimumScore)
                 {
                     _logger.LogInformation(
-                        "🚫 Score insuffisant pour la génération du certificat - Session {SessionId}, Utilisateur {UserId}: {Score}% < 70%",
+                        "🎓 [CERTIFICAT-AUTO] 🚫 Score insuffisant pour la génération du certificat - Session {SessionId}, Utilisateur {UserId}: {Score}% < 70%",
                         sessionId, userId, eligibilityResult.SessionScorePercentage.ToString("F1"));
                     return;
                 }
 
                 _logger.LogInformation(
-                    "✅ Score suffisant pour la génération du certificat - Session {SessionId}, Utilisateur {UserId}: {Score}% >= 70%",
+                    "🎓 [CERTIFICAT-AUTO] ✅ Conditions remplies pour la génération - Session {SessionId}, Utilisateur {UserId}: {Score}% >= 70%",
                     sessionId, userId, eligibilityResult.SessionScorePercentage.ToString("F1"));
 
                 // Récupérer les informations de la session
@@ -93,12 +102,15 @@ namespace Mooc.Services
 
                 if (session == null)
                 {
-                    _logger.LogError("Session {SessionId} non trouvée", sessionId);
+                    _logger.LogError("🎓 [CERTIFICAT-AUTO] ❌ Session {SessionId} non trouvée", sessionId);
                     return;
                 }
 
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Session trouvée: {SessionTitle}", session.Title);
+
                 // Générer un numéro de certificat unique
                 var certificateNumber = await GenerateUniqueCertificateNumberAsync(context);
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Numéro de certificat généré: {CertificateNumber}", certificateNumber);
 
                 // Créer le certificat en base de données
                 var certificate = new Certificate
@@ -113,18 +125,20 @@ namespace Mooc.Services
                 };
 
                 context.Certificates.Add(certificate);
-                await context.SaveChangesAsync();
+                var changesSaved = await context.SaveChangesAsync();
 
                 _logger.LogInformation(
-                    "🎉 Certificat généré automatiquement pour l'utilisateur {UserId} et la session {SessionId}. Numéro: {CertificateNumber} - Score: {Score}%",
-                    userId, sessionId, certificateNumber, eligibilityResult.SessionScorePercentage.ToString("F1"));
+                    "🎓 [CERTIFICAT-AUTO] 🎉 Certificat généré et sauvegardé ({Changes} changements) - User: {UserId}, Session: {SessionId}, Numéro: {CertificateNumber}, Score: {Score}%",
+                    changesSaved, userId, sessionId, certificateNumber, eligibilityResult.SessionScorePercentage.ToString("F1"));
 
                 // Optionnel : Générer le fichier PDF immédiatement
                 await GenerateCertificateFileAsync(certificate);
+
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] FIN - Traitement réussi");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erreur lors de la génération automatique de certificat pour l'utilisateur {UserId} et la session {SessionId}", userId, sessionId);
+                _logger.LogError(ex, "🎓 [CERTIFICAT-AUTO] ❌ ERREUR lors de la génération automatique de certificat pour l'utilisateur {UserId} et la session {SessionId}", userId, sessionId);
             }
         }
 
@@ -151,6 +165,8 @@ namespace Mooc.Services
         {
             try
             {
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] Génération du fichier PDF pour le certificat {CertificateNumber}", certificate.CertificateNumber);
+
                 // Générer le fichier PDF du certificat
                 var pdfData = await _certificateService.GenerateCertificateAsync(
                     certificate.SessionId,
@@ -173,11 +189,11 @@ namespace Mooc.Services
                     await context.SaveChangesAsync();
                 }
 
-                _logger.LogInformation("Fichier certificat généré: {FilePath}", filePath);
+                _logger.LogInformation("🎓 [CERTIFICAT-AUTO] ✅ Fichier certificat généré: {FilePath}", filePath);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Erreur lors de la génération du fichier certificat pour {CertificateNumber}", certificate.CertificateNumber);
+                _logger.LogError(ex, "🎓 [CERTIFICAT-AUTO] ❌ Erreur lors de la génération du fichier certificat pour {CertificateNumber}", certificate.CertificateNumber);
             }
         }
     }

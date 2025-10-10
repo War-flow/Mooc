@@ -14,7 +14,7 @@ namespace Mooc.Services
         public string? UserId { get; set; }
         public int LastAccessedBlock { get; set; }
         public HashSet<int> CompletedBlocks { get; set; } = new();
-        public Dictionary<int, string> BlockInteractions { get; set; } = new();
+        public Dictionary<string, string> BlockInteractions { get; set; } = new();
         public DateTime LastAccessed { get; set; }
         public bool IsCompleted { get; set; }
         public int CorrectAnswers { get; set; } = 0;
@@ -31,6 +31,8 @@ namespace Mooc.Services
         private readonly ILogger<CourseStateService>? _logger;
         private readonly ICertificateNotificationService _certificateNotificationService;
         private readonly ICourseBadgeService? _courseBadgeService;
+        // ✅ AJOUT : Service automatique de certificat
+        private readonly IAutomaticCertificateService? _automaticCertificateService;
 
         public CourseStateService(
             IDbContextFactory<ApplicationDbContext> contextFactory,
@@ -38,8 +40,9 @@ namespace Mooc.Services
             AuthenticationStateProvider authenticationStateProvider,
             ICertificateEligibilityService eligibilityService,
             ICourseValidationService courseValidationService,
-            ICertificateNotificationService certificateNotificationService,
-            ILogger<CourseStateService>? logger = null)
+            ICertificateNotificationService certificateNotificationService, 
+            ILogger<CourseStateService>? logger = null,
+            IAutomaticCertificateService? automaticCertificateService = null) // ✅ AJOUT
         {
             _contextFactory = contextFactory;
             _userManager = userManager;
@@ -48,6 +51,7 @@ namespace Mooc.Services
             _courseValidationService = courseValidationService;
             _certificateNotificationService = certificateNotificationService;
             _logger = logger;
+            _automaticCertificateService = automaticCertificateService; // ✅ AJOUT
         }
 
         public void SetCourseBadgeService(ICourseBadgeService courseBadgeService)
@@ -183,7 +187,7 @@ namespace Mooc.Services
 
                 var jsonData = JsonSerializer.Serialize(interactionData, jsonOptions);
 
-                progress.BlockInteractions[blockIndex] = jsonData;
+                progress.BlockInteractions[blockIndex.ToString()] = jsonData;
                 progress.LastAccessedBlock = blockIndex;
                 progress.LastAccessed = DateTime.UtcNow;
 
@@ -204,7 +208,7 @@ namespace Mooc.Services
         {
             var progress = await GetOrCreateProgressAsync(coursId, userId);
 
-            if (progress.BlockInteractions.TryGetValue(blockIndex, out var data))
+            if (progress.BlockInteractions.TryGetValue(blockIndex.ToString(), out var data))
             {
                 try
                 {
@@ -220,17 +224,19 @@ namespace Mooc.Services
         }
 
         /// <summary>
-        /// **SIMPLIFIÉ** : Enregistre le résultat d'une question du questionnaire (1 point si correct, 0 sinon)
+        /// **CORRIGÉ** : Enregistre le résultat d'une question du questionnaire avec l'index de la question
         /// </summary>
         public async Task SaveQuizResultAsync(
             int coursId,
             int blockIndex,
+            int questionIndex, // ✅ AJOUT : Index de la question
             bool isCorrect,
             string? userId = null)
         {
             try
             {
-                _logger?.LogInformation("🎯 Sauvegarde réponse questionnaire - CoursId: {CourseId}, Block: {BlockIndex}", coursId, blockIndex);
+                _logger?.LogInformation("🎯 Sauvegarde réponse questionnaire - CoursId: {CourseId}, Block: {BlockIndex}, Question: {QuestionIndex}", 
+                    coursId, blockIndex, questionIndex);
 
                 var scoreResult = QuizScoring.CalculateScore(isCorrect);
 
@@ -238,9 +244,10 @@ namespace Mooc.Services
 
                 var quizInteraction = new
                 {
-                    type = "questionnaire",  // ⚠️ Changement ici
+                    type = "questionnaire",
                     completed = true,
                     correct = isCorrect,
+                    questionIndex = questionIndex, // ✅ AJOUT : Stocker l'index de la question
                     timestamp = DateTime.UtcNow.ToString("O"),
                     scoreResult = new
                     {
@@ -249,13 +256,37 @@ namespace Mooc.Services
                     }
                 };
 
-                await SaveBlockInteractionAsync(coursId, blockIndex, quizInteraction, userId);
+                // ✅ CORRECTION MAJEURE : Utiliser une clé unique combinant blockIndex et questionIndex
+                // Cela évite d'écraser les réponses précédentes
+                var interactionKey = $"{blockIndex}_q{questionIndex}";
+                
+                var progress = await GetOrCreateProgressAsync(coursId, userId);
+
+                var jsonOptions = new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                };
+
+                var jsonData = JsonSerializer.Serialize(quizInteraction, jsonOptions);
+
+                // ✅ Utiliser une clé unique pour chaque question
+                progress.BlockInteractions[interactionKey] = jsonData;
+                progress.LastAccessedBlock = blockIndex;
+                progress.LastAccessed = DateTime.UtcNow;
+
+                _logger?.LogInformation("📝 Sauvegarde interaction avec clé: {InteractionKey}", interactionKey);
+
+                await SaveProgressAsync(progress);
 
                 _logger?.LogInformation("✅ Réponse questionnaire sauvegardée avec succès");
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "❌ Erreur dans SaveQuizResultAsync pour le cours {CourseId}, bloc {BlockIndex}", coursId, blockIndex);
+                _logger?.LogError(ex, "❌ Erreur dans SaveQuizResultAsync pour le cours {CourseId}, bloc {BlockIndex}, question {QuestionIndex}", 
+                    coursId, blockIndex, questionIndex);
                 throw;
             }
         }
@@ -412,8 +443,15 @@ namespace Mooc.Services
             _logger?.LogInformation("📊 Analyse cours {CourseId}: {TotalQuestions} questions trouvées", 
                 coursId, totalQuestions);
 
+            // ✅ CORRECTION : Filtrer les interactions de type questionnaire
+            var questionnaireInteractions = progress.BlockInteractions
+                .Where(kvp => kvp.Key.ToString().Contains("_q")) // Clés au format "blockIndex_qQuestionIndex"
+                .ToList();
+
+            _logger?.LogInformation("📝 {InteractionCount} interactions de questionnaire trouvées", questionnaireInteractions.Count);
+
             // Récupérer les réponses depuis les interactions
-            foreach (var interaction in progress.BlockInteractions)
+            foreach (var interaction in questionnaireInteractions)
             {
                 try
                 {
@@ -435,11 +473,15 @@ namespace Mooc.Services
                         }
 
                         quizResults.Add(scoreResult);
+                        
+                        _logger?.LogInformation("📝 Question {Key} trouvée: Correct={IsCorrect}, Score={Score}", 
+                            interaction.Key, scoreResult.IsCorrect, scoreResult.FinalScore);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogError(ex, "Erreur lors du parsing du score pour le cours {CourseId}", coursId);
+                    _logger?.LogError(ex, "Erreur lors du parsing du score pour la clé {Key} du cours {CourseId}", 
+                        interaction.Key, coursId);
                 }
             }
 
@@ -447,17 +489,17 @@ namespace Mooc.Services
 
             var courseScoreResult = QuizScoring.CalculateCourseScore(quizResults);
             
-            // Utiliser le vrai nombre total de questions
+            // Utiliser les valeurs du questionnaire
             courseScoreResult.TotalPossiblePoints = totalPossiblePoints;
             courseScoreResult.QuizCount = totalQuestions;
             
-            // Recalculer le pourcentage
-            courseScoreResult.ScorePercentage = totalQuestions > 0 
-                ? (double)courseScoreResult.TotalEarnedPoints / courseScoreResult.TotalPossiblePoints * 100 
+            // Recalculer le pourcentage avec les bonnes valeurs
+            courseScoreResult.ScorePercentage = totalPossiblePoints > 0 
+                ? (double)courseScoreResult.TotalEarnedPoints / totalPossiblePoints * 100 
                 : 0;
 
             _logger?.LogInformation("🎯 Score final cours {CourseId}: {EarnedPoints}/{TotalPoints} pts ({Percentage:F1}%)", 
-                coursId, courseScoreResult.TotalEarnedPoints, courseScoreResult.TotalPossiblePoints, courseScoreResult.ScorePercentage);
+                coursId, courseScoreResult.TotalEarnedPoints, totalPossiblePoints, courseScoreResult.ScorePercentage);
 
             return courseScoreResult;
         }
@@ -468,14 +510,16 @@ namespace Mooc.Services
         public async Task<CourseScoreResultWithTotal> CalculateCourseScoreWithTotalAsync(int coursId, string? userId = null)
         {
             var currentScoreResult = await CalculateCourseScoreAsync(coursId, userId);
-            var (totalQuestions, _) = await GetQuestionnaireInfoAsync(coursId);
+            var (totalQuestions, totalPossiblePoints) = await GetQuestionnaireInfoAsync(coursId);
             
             return new CourseScoreResultWithTotal
             {
-                TotalEarnedPoints = currentScoreResult.TotalEarnedPoints,
-                TotalPossiblePoints = currentScoreResult.TotalPossiblePoints,
-                ScorePercentage = currentScoreResult.ScorePercentage,
-                QuizCount = currentScoreResult.QuizCount,
+                TotalEarnedPoints = currentScoreResult.TotalEarnedPoints,   
+                TotalPossiblePoints = totalPossiblePoints, // ✅ Utiliser totalPossiblePoints du questionnaire
+                ScorePercentage = totalPossiblePoints > 0 
+                    ? (double)currentScoreResult.TotalEarnedPoints / totalPossiblePoints * 100 
+                    : 0,
+                QuizCount = totalQuestions, // ✅ Nombre total de questions
                 TotalQuizCount = totalQuestions,
                 CorrectAnswers = currentScoreResult.CorrectAnswers,
                 QuizResults = currentScoreResult.QuizResults,
@@ -511,11 +555,11 @@ namespace Mooc.Services
                         UserId = progress.UserId,
                         LastAccessedBlock = progress.LastAccessedBlock,
                         CompletedBlocks = JsonSerializer.Deserialize<HashSet<int>>(progress.CompletedBlocks ?? "[]") ?? new HashSet<int>(),
-                        BlockInteractions = JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<int, string>(),
+                        BlockInteractions = JsonSerializer.Deserialize<Dictionary<string, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<string, string>(),
                         LastAccessed = progress.LastAccessed,
                         IsCompleted = progress.IsCompleted,
                         CorrectAnswers = CalculateCorrectAnswersFromInteractions(
-                            JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<int, string>()
+                            JsonSerializer.Deserialize<Dictionary<string, string>>(progress.BlockInteractions ?? "{}") ?? new Dictionary<string, string>()
                         )
                     };
                 }
@@ -531,14 +575,14 @@ namespace Mooc.Services
                 UserId = userId,
                 LastAccessedBlock = 0,
                 CompletedBlocks = new HashSet<int>(),
-                BlockInteractions = new Dictionary<int, string>(),
+                BlockInteractions = new Dictionary<string, string>(),
                 LastAccessed = DateTime.UtcNow,
                 IsCompleted = false,
                 CorrectAnswers = 0
             };
         }
 
-        private int CalculateCorrectAnswersFromInteractions(Dictionary<int, string> interactions)
+        private int CalculateCorrectAnswersFromInteractions(Dictionary<string, string> interactions)
         {
             int correctCount = 0;
 
@@ -647,20 +691,139 @@ namespace Mooc.Services
         {
             try
             {
-                if (_eligibilityService != null && _certificateNotificationService != null)
+                _logger?.LogInformation("🎓 [COURS-STATE] DÉBUT vérification certificat - User: {UserId}, Cours: {CoursId}", userId, coursId);
+
+                // ✅ CORRECTION PRINCIPALE : Utiliser le service automatique si disponible
+                if (_automaticCertificateService != null)
                 {
-                    // Remplacer NotifyCertificateAsync par NotifySessionCompletedAsync
-                    var eligibilityResult = await _eligibilityService.CheckCertificateEligibilityAsync(userId, coursId);
-                    if (eligibilityResult.IsEligible)
+                    // 🔧 Récupérer le sessionId depuis le coursId
+                    using var context = await _contextFactory.CreateDbContextAsync();
+                    var cours = await context.Courses
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.Id == coursId);
+
+                    if (cours == null)
                     {
-                        await _certificateNotificationService.NotifySessionCompletedAsync(userId, coursId);
-                        _logger?.LogInformation("🎓 Certificat généré et notification envoyée pour l'utilisateur {UserId}, cours {CoursId}", userId, coursId);
+                        _logger?.LogWarning("⚠️ [COURS-STATE] Cours {CoursId} introuvable pour la génération de certificat", coursId);
+                        return;
+                    }
+
+                    var autoSessionId = cours.SessionId; // Renommé pour éviter le conflit
+
+                    _logger?.LogInformation("🔍 [COURS-STATE] Appel du service automatique de certificat - Session: {SessionId}", autoSessionId);
+
+                    // ✅ APPEL DU SERVICE AUTOMATIQUE
+                    await _automaticCertificateService.CheckAndGenerateCertificateAsync(userId, autoSessionId);
+
+                    _logger?.LogInformation("🎓 [COURS-STATE] FIN vérification certificat via service automatique");
+                    return;
+                }
+
+                // ⚠️ FALLBACK : Si le service automatique n'est pas disponible, utiliser l'ancienne méthode
+                _logger?.LogWarning("⚠️ [COURS-STATE] Service automatique non disponible, utilisation de la méthode de secours");
+
+                if (_eligibilityService == null)
+                {
+                    _logger?.LogWarning("⚠️ [COURS-STATE] Service d'éligibilité non disponible pour la génération automatique de certificat");
+                    return;
+                }
+
+                // 🔧 Récupérer le sessionId depuis le coursId
+                using var fallbackContext = await _contextFactory.CreateDbContextAsync();
+                var fallbackCours = await fallbackContext.Courses
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(c => c.Id == coursId);
+
+                if (fallbackCours == null)
+                {
+                    _logger?.LogWarning("⚠️ [COURS-STATE] Cours {CoursId} introuvable pour la génération de certificat", coursId);
+                    return;
+                }
+
+                var fallbackSessionId = fallbackCours.SessionId; // Renommé pour éviter le conflit
+
+                _logger?.LogInformation("🔍 [COURS-STATE] Session trouvée: {SessionId} pour le cours {CoursId}", fallbackSessionId, coursId);
+
+                // ✅ Vérifier l'éligibilité
+                var eligibilityResult = await _eligibilityService.CheckCertificateEligibilityAsync(userId, fallbackSessionId);
+
+                _logger?.LogInformation(
+                    "📊 [COURS-STATE] Éligibilité - Complétée: {IsCompleted}, Score: {Score}%, MinScore: {HasMinScore}, CertExiste: {HasCert}",
+                    eligibilityResult.IsSessionCompleted,
+                    eligibilityResult.SessionScorePercentage.ToString("F1"),
+                    eligibilityResult.HasMinimumScore,
+                    eligibilityResult.HasExistingCertificate);
+
+                if (eligibilityResult.HasExistingCertificate)
+                {
+                    _logger?.LogInformation("ℹ️ [COURS-STATE] Certificat déjà existant pour la session {SessionId}", fallbackSessionId);
+                    return;
+                }
+
+                if (!eligibilityResult.IsSessionCompleted)
+                {
+                    _logger?.LogInformation("ℹ️ [COURS-STATE] Session {SessionId} pas encore complétée pour l'utilisateur {UserId}", fallbackSessionId, userId);
+                    return;
+                }
+
+                if (!eligibilityResult.HasMinimumScore)
+                {
+                    _logger?.LogInformation(
+                        "ℹ️ [COURS-STATE] Score insuffisant pour la session {SessionId}: {Score}% < 70%",
+                        fallbackSessionId,
+                        eligibilityResult.SessionScorePercentage.ToString("F1"));
+                    return;
+                }
+
+                _logger?.LogInformation(
+                    "🎉 [COURS-STATE] CONDITIONS REMPLIES pour la génération - Session: {SessionId}, Score: {Score}%",
+                    fallbackSessionId,
+                    eligibilityResult.SessionScorePercentage.ToString("F1"));
+
+                var (certificate, wasCreated) = await _eligibilityService.EnsureCertificateExistsAsync(userId, fallbackSessionId);
+
+                if (wasCreated && certificate != null)
+                {
+                    _logger?.LogInformation(
+                        "🎓 [COURS-STATE] ✅ CERTIFICAT CRÉÉ - Numéro: {CertificateNumber}, Session: {SessionId}, User: {UserId}",
+                        certificate.CertificateNumber,
+                        fallbackSessionId,
+                        userId);
+
+                    if (_certificateNotificationService != null)
+                    {
+                        try
+                        {
+                            await _certificateNotificationService.NotifySessionCompletedAsync(userId, fallbackSessionId);
+                            _logger?.LogInformation("📧 [COURS-STATE] Notification envoyée à l'utilisateur {UserId}", userId);
+                        }
+                        catch (Exception notifEx)
+                        {
+                            _logger?.LogError(notifEx, "❌ [COURS-STATE] Erreur lors de l'envoi de notification pour {UserId}", userId);
+                        }
                     }
                 }
+                else if (certificate != null && !wasCreated)
+                {
+                    _logger?.LogInformation(
+                        "ℹ️ [COURS-STATE] Certificat déjà créé précédemment - Numéro: {CertificateNumber}",
+                        certificate.CertificateNumber);
+                }
+                else
+                {
+                    _logger?.LogWarning(
+                        "⚠️ [COURS-STATE] Échec de création du certificat malgré les conditions remplies - Session: {SessionId}, User: {UserId}",
+                        fallbackSessionId,
+                        userId);
+                }
+
+                _logger?.LogInformation("🎓 [COURS-STATE] FIN vérification certificat");
             }
             catch (Exception ex)
             {
-                _logger?.LogError(ex, "❌ Erreur lors de la génération automatique du certificat pour l'utilisateur {UserId}, cours {CoursId}", userId, coursId);
+                _logger?.LogError(ex, 
+                    "❌ [COURS-STATE] ERREUR lors de la vérification/génération du certificat pour l'utilisateur {UserId}, cours {CoursId}", 
+                    userId, coursId);
             }
         }
 

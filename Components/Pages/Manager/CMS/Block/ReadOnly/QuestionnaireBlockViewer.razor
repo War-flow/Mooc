@@ -305,7 +305,9 @@
                         await CourseStateService.SaveQuizResultAsync(
                             CoursId,
                             Block.Order,
-                            true // Question correcte = 1 point
+                            i, // Ajout de l'index de la question comme 3ème paramètre
+                            true, // isCorrect
+                            null // Explication ou commentaire, si non utilisé
                         );
                         Console.WriteLine($"✅ Point enregistré pour question {i + 1}");
                     }

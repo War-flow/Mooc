@@ -576,7 +576,7 @@ else
                 correct = isCorrect,
                 timestamp = DateTime.UtcNow
             };
-            courseProgress.BlockInteractions[CurrentBlockIndex] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
+            courseProgress.BlockInteractions[CurrentBlockIndex.ToString()] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
 
             await CourseStateService.SaveProgressAsync(courseProgress);
         }

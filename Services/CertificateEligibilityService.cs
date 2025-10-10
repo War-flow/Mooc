@@ -12,6 +12,11 @@ namespace Mooc.Services
         Task<bool> IsSessionCompletedByUserAsync(string userId, int sessionId);
         Task<double> CalculateSessionScorePercentageAsync(string userId, int sessionId);
         Task<bool> HasExistingCertificateAsync(string userId, int sessionId);
+        
+        /// <summary>
+        /// Vérifie l'existence du certificat et le crée si les conditions sont remplies (score >= 70%)
+        /// </summary>
+        Task<(Certificate? certificate, bool wasCreated)> EnsureCertificateExistsAsync(string userId, int sessionId);
     }
 
     /// <summary>
@@ -96,7 +101,7 @@ namespace Mooc.Services
                     return false;
                 }
 
-                // Vérifier que tous les cours obligatoires sont complétés
+                // Vérifier que tous les cours obligatoires sont complétées
                 var completedRequiredCourses = await context.CourseProgresses
                     .Where(cp => cp.UserId == userId &&
                                 requiredCourses.Contains(cp.CoursId) &&
@@ -189,6 +194,104 @@ namespace Mooc.Services
         }
 
         /// <summary>
+        /// Vérifie l'existence du certificat et le crée si les conditions sont remplies
+        /// </summary>
+        /// <param name="userId">Identifiant de l'utilisateur</param>
+        /// <param name="sessionId">Identifiant de la session</param>
+        /// <returns>Un tuple contenant (certificat existant ou créé, a été créé maintenant)</returns>
+        public async Task<(Certificate? certificate, bool wasCreated)> EnsureCertificateExistsAsync(string userId, int sessionId)
+        {
+            try
+            {
+                _logger.LogInformation("🔍 Vérification/Création certificat - Session {SessionId}, User {UserId}", sessionId, userId);
+
+                using var context = await _contextFactory.CreateDbContextAsync();
+
+                // 1. Vérifier si un certificat existe déjà
+                var existingCertificate = await context.Certificates
+                    .FirstOrDefaultAsync(c => c.UserId == userId && c.SessionId == sessionId);
+
+                if (existingCertificate != null)
+                {
+                    _logger.LogInformation("✅ Certificat déjà existant - Numéro: {CertificateNumber}", existingCertificate.CertificateNumber);
+                    return (existingCertificate, false);
+                }
+
+                // 2. Vérifier l'éligibilité
+                var eligibilityResult = await CheckCertificateEligibilityAsync(userId, sessionId);
+
+                if (!eligibilityResult.IsEligible)
+                {
+                    var reason = !eligibilityResult.IsSessionCompleted 
+                        ? "Session non complétée" 
+                        : $"Score insuffisant ({eligibilityResult.SessionScorePercentage:F1}% < 70%)";
+                    
+                    _logger.LogWarning("🚫 Certificat non créé - {Reason}", reason);
+                    return (null, false);
+                }
+
+                // 3. Récupérer les informations de la session
+                var session = await context.Sessions.FindAsync(sessionId);
+                if (session == null)
+                {
+                    _logger.LogError("❌ Session {SessionId} introuvable", sessionId);
+                    return (null, false);
+                }
+
+                // 4. Générer un numéro de certificat unique
+                var certificateNumber = await GenerateUniqueCertificateNumberAsync(context);
+
+                // 5. Créer le nouveau certificat
+                var newCertificate = new Certificate
+                {
+                    Title = $"Certificat de réussite - {session.Title}",
+                    UserId = userId,
+                    SessionId = sessionId,
+                    DateGenerated = DateTime.UtcNow,
+                    DateDelivered = DateTime.UtcNow,
+                    Status = "Generated",
+                    CertificateNumber = certificateNumber
+                };
+
+                context.Certificates.Add(newCertificate);
+                await context.SaveChangesAsync();
+
+                _logger.LogInformation(
+                    "🎉 Certificat créé avec succès - Numéro: {CertificateNumber}, Score: {Score}%",
+                    certificateNumber,
+                    eligibilityResult.SessionScorePercentage.ToString("F1"));
+
+                return (newCertificate, true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ Erreur lors de la vérification/création du certificat pour la session {SessionId}, utilisateur {UserId}", sessionId, userId);
+                return (null, false);
+            }
+        }
+
+        /// <summary>
+        /// Génère un numéro de certificat unique
+        /// </summary>
+        private async Task<string> GenerateUniqueCertificateNumberAsync(ApplicationDbContext context)
+        {
+            string certificateNumber;
+            bool exists;
+
+            do
+            {
+                var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                var random = Random.Shared.Next(1000, 9999);
+                certificateNumber = $"CERT-{timestamp}-{random}";
+
+                exists = await context.Certificates
+                    .AnyAsync(c => c.CertificateNumber == certificateNumber);
+            } while (exists);
+
+            return certificateNumber;
+        }
+
+        /// <summary>
         /// Calcule le score d'un cours spécifique (logique simplifiée pour éviter les dépendances)
         /// </summary>
         private async Task<CourseScoreResult> CalculateCourseScoreAsync(int courseId, string userId)
@@ -203,28 +306,49 @@ namespace Mooc.Services
 
                 if (progress == null || string.IsNullOrEmpty(progress.BlockInteractions))
                 {
+                    _logger.LogInformation("📊 Aucune interaction trouvée pour le cours {CourseId}, utilisateur {UserId}", courseId, userId);
                     return new CourseScoreResult();
                 }
 
-                var interactions = System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions) 
-                    ?? new Dictionary<int, string>();
+                // ✅ CORRECTION : Désérialiser avec des clés string au lieu d'int
+                var interactions = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(progress.BlockInteractions) 
+                    ?? new Dictionary<string, string>();
+
+                _logger.LogInformation("📊 {InteractionCount} interactions trouvées pour le cours {CourseId}", interactions.Count, courseId);
 
                 var totalEarnedPoints = 0;
                 var totalPossiblePoints = 0;
                 var correctAnswers = 0;
 
-                foreach (var interaction in interactions.Values)
+                // ✅ Filtrer uniquement les interactions de questionnaire (clés contenant "_q")
+                var quizInteractions = interactions.Where(kvp => kvp.Key.Contains("_q"));
+                
+                _logger.LogInformation("📊 {QuizCount} interactions de questionnaire trouvées", quizInteractions.Count());
+
+                foreach (var interaction in quizInteractions)
                 {
                     try
                     {
-                        using var document = System.Text.Json.JsonDocument.Parse(interaction);
+                        using var document = System.Text.Json.JsonDocument.Parse(interaction.Value);
                         var root = document.RootElement;
 
                         if (root.TryGetProperty("scoreResult", out var scoreElement))
                         {
-                            var basePoints = scoreElement.GetProperty("basePoints").GetInt32();
-                            var finalScore = scoreElement.GetProperty("finalScore").GetInt32();
-                            var isCorrect = root.GetProperty("correct").GetBoolean();
+                            // ✅ Gérer les différents formats de score
+                            int basePoints = 1; // Par défaut 1 point
+                            int finalScore = 0;
+                            
+                            if (scoreElement.TryGetProperty("basePoints", out var basePointsElement))
+                            {
+                                basePoints = basePointsElement.GetInt32();
+                            }
+                            
+                            if (scoreElement.TryGetProperty("finalScore", out var finalScoreElement))
+                            {
+                                finalScore = finalScoreElement.GetInt32();
+                            }
+
+                            var isCorrect = root.TryGetProperty("correct", out var correctProp) && correctProp.GetBoolean();
 
                             totalPossiblePoints += basePoints;
                             totalEarnedPoints += finalScore;
@@ -233,20 +357,34 @@ namespace Mooc.Services
                             {
                                 correctAnswers++;
                             }
+
+                            _logger.LogInformation(
+                                "📝 Question {Key}: Correct={IsCorrect}, Points={FinalScore}/{BasePoints}", 
+                                interaction.Key, isCorrect, finalScore, basePoints);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("⚠️ Pas de scoreResult pour l'interaction {Key}", interaction.Key);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Erreur lors du parsing d'une interaction pour le cours {CourseId}", courseId);
+                        _logger.LogWarning(ex, "Erreur lors du parsing de l'interaction {Key} pour le cours {CourseId}", interaction.Key, courseId);
                     }
                 }
+
+                var scorePercentage = totalPossiblePoints > 0 ? (double)totalEarnedPoints / totalPossiblePoints * 100 : 0;
+
+                _logger.LogInformation(
+                    "📊 Score cours {CourseId}: {EarnedPoints}/{PossiblePoints} pts = {Percentage}%", 
+                    courseId, totalEarnedPoints, totalPossiblePoints, scorePercentage.ToString("F1"));
 
                 return new CourseScoreResult
                 {
                     TotalEarnedPoints = totalEarnedPoints,
                     TotalPossiblePoints = totalPossiblePoints,
                     CorrectAnswers = correctAnswers,
-                    ScorePercentage = totalPossiblePoints > 0 ? (double)totalEarnedPoints / totalPossiblePoints * 100 : 0
+                    ScorePercentage = scorePercentage
                 };
             }
             catch (Exception ex)
