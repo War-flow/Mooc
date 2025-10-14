@@ -40,9 +40,10 @@ namespace Mooc.Services
             AuthenticationStateProvider authenticationStateProvider,
             ICertificateEligibilityService eligibilityService,
             ICourseValidationService courseValidationService,
-            ICertificateNotificationService certificateNotificationService, 
+            ICertificateNotificationService certificateNotificationService,
             ILogger<CourseStateService>? logger = null,
-            IAutomaticCertificateService? automaticCertificateService = null) // ✅ AJOUT
+            IAutomaticCertificateService? automaticCertificateService = null,
+            ICourseBadgeService? courseBadgeService = null) // ✅ AJOUT : Injection du service de badges
         {
             _contextFactory = contextFactory;
             _userManager = userManager;
@@ -51,14 +52,8 @@ namespace Mooc.Services
             _courseValidationService = courseValidationService;
             _certificateNotificationService = certificateNotificationService;
             _logger = logger;
-            _automaticCertificateService = automaticCertificateService; // ✅ AJOUT
-        }
-
-        public void SetCourseBadgeService(ICourseBadgeService courseBadgeService)
-        {
-            var fieldInfo = typeof(CourseStateService).GetField("_courseBadgeService", 
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            fieldInfo?.SetValue(this, courseBadgeService);
+            _automaticCertificateService = automaticCertificateService;
+            _courseBadgeService = courseBadgeService; // ✅ AJOUT : Initialiser le service
         }
 
         public async Task<CourseProgress> GetOrCreateProgressAsync(int coursId, string? userId = null)

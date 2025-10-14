@@ -13,6 +13,9 @@ namespace Mooc.Services
         Task<CourseBadge?> GetCourseBadgeAsync(string userId, int coursId);
         Task<bool> HasCourseBadgeAsync(string userId, int coursId);
         Task<List<CourseBadge>> GetCourseBadgesForSessionAsync(string userId, int sessionId);
+        
+        // ✅ NOUVELLE MÉTHODE : Vérification et création automatique des badges manquants
+        Task<List<CourseBadge>> CheckAndCreateMissingBadgesAsync(string userId);
     }
 
     public class CourseBadgeService : ICourseBadgeService
@@ -64,17 +67,25 @@ namespace Mooc.Services
                     };
                 }
 
-                var interactions = System.Text.Json.JsonSerializer.Deserialize<Dictionary<int, string>>(progress.BlockInteractions)
-                                   ?? new Dictionary<int, string>();
+                // ✅ CORRECTION : Les clés sont des strings, pas des int
+                var interactions = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(progress.BlockInteractions)
+                           ?? new Dictionary<string, string>();
 
                 var quizResults = new List<QuizScoreResult>();
 
+                // ✅ CORRECTION : Filtrer uniquement les interactions de questionnaire
+                var questionnaireInteractions = interactions
+                    .Where(kvp => kvp.Key.Contains("_q")) // Clés au format "blockIndex_qQuestionIndex"
+                    .ToList();
+
+                _logger.LogInformation("📝 {InteractionCount} interactions de questionnaire trouvées", questionnaireInteractions.Count);
+
                 // ✅ NOUVEAU : Recherche des interactions de type "questionnaire"
-                foreach (var interaction in interactions.Values)
+                foreach (var interaction in questionnaireInteractions)
                 {
                     try
                     {
-                        using var document = System.Text.Json.JsonDocument.Parse(interaction);
+                        using var document = System.Text.Json.JsonDocument.Parse(interaction.Value);
                         var root = document.RootElement;
 
                         // Vérifier si c'est une interaction de questionnaire avec scoreResult
@@ -99,11 +110,15 @@ namespace Mooc.Services
                                 IsCorrect = isCorrect,
                                 FinalScore = finalScore
                             });
+
+                            _logger.LogInformation("📝 Question {Key} trouvée: Correct={IsCorrect}, Score={Score}", 
+                                interaction.Key, isCorrect, finalScore);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Erreur lors du parsing d'une interaction pour le cours {CoursId}", coursId);
+                        _logger.LogWarning(ex, "Erreur lors du parsing d'une interaction pour la clé {Key} du cours {CoursId}", 
+                            interaction.Key, coursId);
                     }
                 }
 
@@ -122,6 +137,9 @@ namespace Mooc.Services
                     ? (double)courseScoreResult.TotalEarnedPoints / courseScoreResult.TotalPossiblePoints * 100 
                     : 0;
 
+                _logger.LogInformation("🎯 Score final cours {CourseId}: {EarnedPoints}/{TotalPoints} pts ({Percentage:F1}%)", 
+                    coursId, courseScoreResult.TotalEarnedPoints, totalPossiblePoints, courseScoreResult.ScorePercentage);
+
                 return courseScoreResult;
             }
             catch (Exception ex)
@@ -139,7 +157,8 @@ namespace Mooc.Services
         }
 
         /// <summary>
-        /// ✅ NOUVEAU : Compte le nombre de questions dans le bloc questionnaire unique d'un cours
+        /// ✅ CORRIGÉ : Compte le nombre de questions dans le bloc questionnaire unique d'un cours
+        /// Version synchronisée avec CourseStateService
         /// </summary>
         private async Task<(int totalQuestions, int totalPossiblePoints)> GetQuestionnaireInfoAsync(int coursId)
         {
@@ -167,21 +186,101 @@ namespace Mooc.Services
                 // Chercher le bloc questionnaire unique
                 foreach (var block in blocks)
                 {
-                    if (block.TryGetProperty("Type", out var typeProperty) &&
-                        typeProperty.GetString() == "questionnaire")
+                    if (block.TryGetProperty("Type", out var typeProperty))
                     {
-                        // Compter les questions dans le questionnaire
-                        if (block.TryGetProperty("Data", out var dataProperty) &&
-                            dataProperty.TryGetProperty("Questions", out var questionsProperty) &&
-                            questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                        var blockType = typeProperty.GetString()?.ToLowerInvariant();
+                        _logger.LogInformation("📊 Cours {CourseId}: Bloc trouvé avec type '{BlockType}'", coursId, blockType);
+
+                        if (blockType == "questionnaire" || blockType == "quiz" || blockType == "questions")
                         {
-                            int questionCount = questionsProperty.GetArrayLength();
-                            int totalPoints = questionCount * QuizScoring.PointsPerQuiz; // 1 point par question
+                            System.Text.Json.JsonElement questionsProperty = default;
+                            bool foundQuestions = false;
+
+                            // **CORRECTION PRINCIPALE** : Les questions sont dans la propriété "Content" (JSON encodé)
+                            if (block.TryGetProperty("Content", out var contentProperty) && 
+                                contentProperty.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                try
+                                {
+                                    var contentJson = contentProperty.GetString();
+                                    if (!string.IsNullOrEmpty(contentJson))
+                                    {
+                                        _logger.LogInformation("📊 Cours {CourseId}: Désérialisation de la propriété Content", coursId);
+                                        
+                                        // Désérialiser le JSON imbriqué
+                                        var contentObject = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(contentJson);
+                                        
+                                        // Chercher les questions dans le contenu désérialisé
+                                        if (contentObject.TryGetProperty("Questions", out questionsProperty) && 
+                                            questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                        {
+                                            foundQuestions = true;
+                                            _logger.LogInformation("📊 Cours {CourseId}: ✅ Questions trouvées dans Content.Questions", coursId);
+                                        }
+                                        else if (contentObject.TryGetProperty("questions", out questionsProperty) && 
+                                                 questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                        {
+                                            foundQuestions = true;
+                                            _logger.LogInformation("📊 Cours {CourseId}: ✅ Questions trouvées dans Content.questions", coursId);
+                                        }
+                                    }
+                                }
+                                catch (System.Text.Json.JsonException ex)
+                                {
+                                    _logger.LogError(ex, "❌ Erreur lors de la désérialisation de Content pour le cours {CourseId}", coursId);
+                                }
+                            }
                             
-                            _logger.LogInformation("📊 Cours {CourseId}: {QuestionCount} questions trouvées = {TotalPoints} points possibles", 
-                                coursId, questionCount, totalPoints);
-                            
-                            return (questionCount, totalPoints);
+                            // **FALLBACK** : Essayer les autres méthodes (pour rétrocompatibilité)
+                            if (!foundQuestions)
+                            {
+                                // Chercher directement dans le bloc
+                                if (block.TryGetProperty("Questions", out questionsProperty) && 
+                                    questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                {
+                                    foundQuestions = true;
+                                    _logger.LogInformation("📊 Cours {CourseId}: Questions trouvées directement dans le bloc", coursId);
+                                }
+                                else if (block.TryGetProperty("questions", out questionsProperty) && 
+                                         questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                {
+                                    foundQuestions = true;
+                                    _logger.LogInformation("📊 Cours {CourseId}: Questions trouvées (minuscules) directement dans le bloc", coursId);
+                                }
+                                // Chercher dans "Data"
+                                else if (block.TryGetProperty("Data", out var dataProperty))
+                                {
+                                    _logger.LogInformation("📊 Cours {CourseId}: Recherche dans la propriété 'Data'", coursId);
+                                    
+                                    if (dataProperty.TryGetProperty("Questions", out questionsProperty) && 
+                                        questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                    {
+                                        foundQuestions = true;
+                                        _logger.LogInformation("📊 Cours {CourseId}: Questions trouvées dans Data.Questions", coursId);
+                                    }
+                                    else if (dataProperty.TryGetProperty("questions", out questionsProperty) && 
+                                             questionsProperty.ValueKind == System.Text.Json.JsonValueKind.Array)
+                                    {
+                                        foundQuestions = true;
+                                        _logger.LogInformation("📊 Cours {CourseId}: Questions trouvées dans Data.questions", coursId);
+                                    }
+                                }
+                            }
+
+                            if (foundQuestions)
+                            {
+                                int questionCount = questionsProperty.GetArrayLength();
+                                int totalPoints = questionCount * QuizScoring.PointsPerQuiz; // 1 point par question
+                                
+                                _logger.LogInformation("📊 Cours {CourseId}: ✅ {QuestionCount} questions trouvées = {TotalPoints} points possibles", 
+                                    coursId, questionCount, totalPoints);
+                                
+                                return (questionCount, totalPoints);
+                            }
+                            else
+                            {
+                                _logger.LogWarning("📊 Cours {CourseId}: ❌ Bloc questionnaire trouvé mais aucune propriété de questions détectée", coursId);
+                            }
                         }
                     }
                 }
@@ -395,6 +494,97 @@ namespace Mooc.Services
                 .Where(cb => cb.UserId == userId && cb.Cours.SessionId == sessionId)
                 .OrderByDescending(cb => cb.EarnedDate)
                 .ToListAsync();
+        }
+
+        /// <summary>
+        /// Vérifie et crée automatiquement les badges manquants pour un utilisateur
+        /// </summary>
+        public async Task<List<CourseBadge>> CheckAndCreateMissingBadgesAsync(string userId)
+        {
+            var createdBadges = new List<CourseBadge>();
+
+            try
+            {
+                _logger.LogInformation("🔍 [BADGE-CHECK] Début vérification badges manquants - UserId: {UserId}", userId);
+
+                using var context = await _contextFactory.CreateDbContextAsync();
+
+                // 1. Récupérer tous les cours complétés par l'utilisateur
+                var completedCourses = await context.CourseProgresses
+                    .AsNoTracking()
+                    .Include(cp => cp.Cours)
+                    .Where(cp => cp.UserId == userId && cp.IsCompleted)
+                    .Select(cp => new { cp.CoursId, cp.Cours.Title })
+                    .ToListAsync();
+
+                _logger.LogInformation("📊 [BADGE-CHECK] {Count} cours complétés trouvés", completedCourses.Count);
+
+                if (!completedCourses.Any())
+                {
+                    _logger.LogInformation("ℹ️ [BADGE-CHECK] Aucun cours complété pour cet utilisateur");
+                    return createdBadges;
+                }
+
+                // 2. Récupérer tous les badges existants pour cet utilisateur
+                var existingBadges = await context.CourseBadges
+                    .AsNoTracking()
+                    .Where(cb => cb.UserId == userId)
+                    .Select(cb => cb.CoursId)
+                    .ToHashSetAsync();
+
+                _logger.LogInformation("🏆 [BADGE-CHECK] {Count} badges déjà existants", existingBadges.Count);
+
+                // 3. Identifier les cours complétés sans badge
+                var coursesWithoutBadge = completedCourses
+                    .Where(c => !existingBadges.Contains(c.CoursId))
+                    .ToList();
+
+                if (!coursesWithoutBadge.Any())
+                {
+                    _logger.LogInformation("✅ [BADGE-CHECK] Tous les badges sont déjà créés");
+                    return createdBadges;
+                }
+
+                _logger.LogInformation("⚠️ [BADGE-CHECK] {Count} cours sans badge détectés", coursesWithoutBadge.Count);
+
+                // 4. Créer les badges manquants
+                foreach (var course in coursesWithoutBadge)
+                {
+                    try
+                    {
+                        _logger.LogInformation("🎯 [BADGE-CHECK] Évaluation cours {CoursId} - {Title}", 
+                            course.CoursId, course.Title);
+
+                        var badge = await EvaluateAndAwardBadgeAsync(userId, course.CoursId);
+
+                        if (badge != null)
+                        {
+                            createdBadges.Add(badge);
+                            _logger.LogInformation("✅ [BADGE-CHECK] Badge {BadgeType} créé pour le cours {CoursId}", 
+                                badge.BadgeType, course.CoursId);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("⚠️ [BADGE-CHECK] Aucun badge créé pour le cours {CoursId} (score insuffisant?)", 
+                                course.CoursId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "❌ [BADGE-CHECK] Erreur création badge pour cours {CoursId}", course.CoursId);
+                        // Continuer avec les autres cours
+                    }
+                }
+
+                _logger.LogInformation("🎉 [BADGE-CHECK] Vérification terminée - {Count} badges créés", createdBadges.Count);
+
+                return createdBadges;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "❌ [BADGE-CHECK] Erreur lors de la vérification des badges manquants pour {UserId}", userId);
+                return createdBadges;
+            }
         }
     }
 }

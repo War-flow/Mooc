@@ -67,13 +67,6 @@ namespace Mooc
                     logger
                 );
                 
-                // Injecter le CourseBadgeService après création pour éviter la dépendance circulaire
-                var courseBadgeService = serviceProvider.GetService<ICourseBadgeService>();
-                if (courseBadgeService != null)
-                {
-                    courseStateService.SetCourseBadgeService(courseBadgeService);
-                }
-                
                 return courseStateService;
             });
 

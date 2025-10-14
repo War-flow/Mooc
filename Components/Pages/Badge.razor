@@ -13,6 +13,7 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ISessionCompletionService SessionCompletionService
 @inject ILogger<Certification> _logger
+@inject ICourseBadgeService CourseBadgeService
 @attribute [Authorize]
 @attribute [StreamRendering]
 
@@ -133,6 +134,7 @@
     private int completedSessionsCount = 0;
     private double overallProgressPercentage = 0;
     private string? currentUserId;
+    private bool isCheckingBadges = false; // ✅ AJOUT : Indicateur de vérification en cours
     
     // Variable pour contrôler l'affichage des badges de test
     private bool showTestBadges = true; // Mettre à false en production
@@ -140,7 +142,49 @@
     protected override async Task OnInitializedAsync()
     {
         await GetCurrentUserId();
+        
+        // ✅ AJOUT : Vérifier et créer les badges manquants AVANT de charger les statistiques
+        if (!string.IsNullOrEmpty(currentUserId))
+        {
+            await CheckAndCreateMissingBadgesAsync();
+        }
+        
         await LoadBadgeStatistics();
+    }
+
+    // ✅ NOUVELLE MÉTHODE : Vérification automatique des badges
+    private async Task CheckAndCreateMissingBadgesAsync()
+    {
+        if (string.IsNullOrEmpty(currentUserId))
+            return;
+
+        try
+        {
+            isCheckingBadges = true;
+            StateHasChanged();
+
+            _logger?.LogInformation("🔍 Vérification des badges manquants pour l'utilisateur {UserId}", currentUserId);
+
+            var createdBadges = await CourseBadgeService.CheckAndCreateMissingBadgesAsync(currentUserId);
+
+            if (createdBadges.Any())
+            {
+                _logger?.LogInformation("🎉 {Count} badges créés automatiquement", createdBadges.Count);
+                
+                // Afficher une notification discrète
+                await JSRuntime.InvokeVoidAsync("console.log", 
+                    $"✅ {createdBadges.Count} nouveau(x) badge(s) attribué(s)");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "❌ Erreur lors de la vérification des badges manquants");
+        }
+        finally
+        {
+            isCheckingBadges = false;
+            StateHasChanged();
+        }
     }
 
     private void ToggleTestBadges()
