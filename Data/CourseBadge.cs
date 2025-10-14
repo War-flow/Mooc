@@ -1,10 +1,10 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Mooc.Data
 {
     /// <summary>
-    /// Badge attribu� pour un cours sp�cifique bas� sur les performances
+    /// Badge attribué pour un cours spécifique basé sur les performances
     /// </summary>
     public class CourseBadge
     {
@@ -17,11 +17,18 @@ namespace Mooc.Data
         [ForeignKey(nameof(UserId))]
         public ApplicationUser User { get; set; } = null!;
 
-        [Required]
-        public int CoursId { get; set; }
+        // ✅ MODIFICATION : Nullable pour permettre l'orphelinement
+        public int? CoursId { get; set; }
 
         [ForeignKey(nameof(CoursId))]
-        public Cours Cours { get; set; } = null!;
+        public Cours? Cours { get; set; }
+
+        // ✅ NOUVEAU : Propriétés d'archivage
+        [StringLength(200)]
+        public string? ArchivedCoursTitle { get; set; }
+
+        [StringLength(200)]
+        public string? ArchivedSessionTitle { get; set; }
 
         /// <summary>
         /// Type de badge obtenu
@@ -46,7 +53,7 @@ namespace Mooc.Data
         public int TotalPointsPossible { get; set; }
 
         /// <summary>
-        /// Nombre de bonnes r�ponses
+        /// Nombre de bonnes réponses
         /// </summary>
         public int CorrectAnswers { get; set; }
 
@@ -61,7 +68,7 @@ namespace Mooc.Data
         public DateTime EarnedDate { get; set; } = DateTime.UtcNow;
 
         /// <summary>
-        /// Titre personnalis� du badge
+        /// Titre personnalisé du badge
         /// </summary>
         [StringLength(200)]
         public string? CustomTitle { get; set; }
@@ -71,31 +78,46 @@ namespace Mooc.Data
         /// </summary>
         [StringLength(500)]
         public string? Description { get; set; }
+
+        // ✅ CORRECTION : Propriétés calculées avec getter (au lieu de champs)
+        /// <summary>
+        /// Titre du cours pour l'affichage (utilise le titre archivé si le cours est supprimé)
+        /// </summary>
+        [NotMapped]
+        public string DisplayCoursTitle => 
+            Cours?.Title ?? ArchivedCoursTitle ?? "Cours supprimé";
+
+        /// <summary>
+        /// Titre de la session pour l'affichage (utilise le titre archivé si la session est supprimée)
+        /// </summary>
+        [NotMapped]
+        public string DisplaySessionTitle => 
+            Cours?.Session?.Title ?? ArchivedSessionTitle ?? "Session supprimée";
     }
 
     /// <summary>
-    /// Types de badges de cours disponibles
+    /// Types de badges disponibles selon les performances
     /// </summary>
     public enum CourseBadgeType
     {
         /// <summary>
-        /// Badge Bronze : 70-79% de r�ussite
+        /// Badge Bronze : 70-79% de réussite
         /// </summary>
-        Bronze = 1,
+        Bronze,
 
         /// <summary>
-        /// Badge Argent : 80-89% de r�ussite
+        /// Badge Argent : 80-89% de réussite
         /// </summary>
-        Silver = 2,
+        Silver,
 
         /// <summary>
-        /// Badge Or : 90-100% de r�ussite
+        /// Badge Or : 90-99% de réussite
         /// </summary>
-        Gold = 3,
+        Gold,
 
         /// <summary>
-        /// Badge Perfectionniste
+        /// Badge Perfectionniste : 100% de réussite
         /// </summary>
-        Perfect = 4
+        Perfect
     }
 }

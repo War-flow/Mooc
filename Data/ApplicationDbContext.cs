@@ -1,18 +1,18 @@
 ﻿using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Mooc.Data.Converters;
-using Microsoft.EntityFrameworkCore.Storage.ValueConversion; // ⭐ AJOUTÉ
-
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 namespace Mooc.Data
 {
-    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : IdentityDbContext<ApplicationUser>(options)
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) 
+        : IdentityDbContext<ApplicationUser>(options)
     {
         public DbSet<Session> Sessions { get; set; } = null!;
         public DbSet<Cours> Courses { get; set; } = null!;
         public DbSet<CourseProgress> CourseProgresses { get; set; } = null!;
         public DbSet<Certificate> Certificates { get; set; } = null!;
-        public DbSet<PreRegistration> PreRegistrations { get; set; } = null!; // NOUVEAU
+        public DbSet<PreRegistration> PreRegistrations { get; set; } = null!;
         public DbSet<EnrollmentHistory> EnrollmentHistories { get; set; } = null!;
         public DbSet<CourseBadge> CourseBadges { get; set; } = null!;
 
@@ -20,7 +20,7 @@ namespace Mooc.Data
         {
             base.OnModelCreating(builder);
 
-            // ⭐ NOUVEAU : Configuration globale pour convertir automatiquement les DateTime en UTC
+            // ⭐ Configuration globale pour convertir automatiquement les DateTime en UTC
             foreach (var entityType in builder.Model.GetEntityTypes())
             {
                 foreach (var property in entityType.GetProperties())
@@ -52,7 +52,6 @@ namespace Mooc.Data
                       .HasColumnType("varchar")
                       .HasMaxLength(300);
                       
-                // ⭐ CORRECTION : Utiliser timestamp avec time zone pour les dates
                 entity.Property(e => e.StartDate)
                       .HasColumnType("timestamp with time zone");
                       
@@ -98,7 +97,8 @@ namespace Mooc.Data
                               j.ToTable("SessionEnrollments");
                               j.HasIndex("UserId");
                               j.HasIndex("SessionId");
-                          });
+                          }
+                      );
             });
 
             // Configuration de Cours
@@ -116,27 +116,28 @@ namespace Mooc.Data
                       .HasMaxLength(300);
 
                 entity.Property(e => e.Content)
-                        .HasColumnType("text");
+                      .HasColumnType("text");
 
                 entity.Property(e => e.Order)
-                        .HasColumnType("int")
-                        .HasDefaultValue(1);
+                      .HasColumnType("int")
+                      .HasDefaultValue(1);
 
                 entity.Property(e => e.IsPublished)
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
+                      .HasColumnType("boolean")
+                      .HasDefaultValue(false);
 
                 entity.Property(e => e.CreatedAt)
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                      .HasColumnType("timestamp with time zone")
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.Property(e => e.UpdatedAt)
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+                      .HasColumnType("timestamp with time zone")
+                      .HasDefaultValueSql("CURRENT_TIMESTAMP");
 
                 entity.HasOne(c => c.Session)
                       .WithMany(s => s.Courses)
-                      .HasForeignKey(c => c.SessionId);
+                      .HasForeignKey(c => c.SessionId)
+                      .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configuration de CourseProgress
@@ -169,7 +170,7 @@ namespace Mooc.Data
                 entity.Property(e => e.UserId)
                       .IsRequired()
                       .HasColumnType("varchar")
-                      .HasMaxLength(450); // Taille standard pour les ID d'Identity
+                      .HasMaxLength(450);
 
                 entity.Property(e => e.SessionId)
                       .IsRequired()
@@ -212,11 +213,9 @@ namespace Mooc.Data
                       .IsUnique()
                       .HasDatabaseName("IX_PreRegistrations_UserId_SessionId");
 
-                // Index sur SessionId pour les requêtes
                 entity.HasIndex(pr => pr.SessionId)
                       .HasDatabaseName("IX_PreRegistrations_SessionId");
 
-                // Index sur Status pour les requêtes filtrées
                 entity.HasIndex(pr => pr.Status)
                       .HasDatabaseName("IX_PreRegistrations_Status");
             });
@@ -230,7 +229,6 @@ namespace Mooc.Data
                 entity.HasIndex(e => e.Date)
                       .HasDatabaseName("IX_EnrollmentHistory_Date");
 
-                // ⭐ NOUVEAU : Configuration explicite pour les propriétés DateTime
                 entity.Property(e => e.Date)
                       .HasColumnType("timestamp with time zone")
                       .HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -242,7 +240,7 @@ namespace Mooc.Data
                       .HasColumnType("timestamp with time zone");
             });
 
-            // Configuration pour CourseBadge
+            // ✅ MODIFICATION : Configuration pour CourseBadge avec SetNull
             builder.Entity<CourseBadge>(entity =>
             {
                 entity.HasKey(cb => cb.Id);
@@ -252,10 +250,11 @@ namespace Mooc.Data
                       .HasForeignKey(cb => cb.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
 
+                // ⭐ MODIFICATION : SetNull au lieu de Cascade pour préserver les badges
                 entity.HasOne(cb => cb.Cours)
                       .WithMany()
                       .HasForeignKey(cb => cb.CoursId)
-                      .OnDelete(DeleteBehavior.Cascade);
+                      .OnDelete(DeleteBehavior.SetNull);
 
                 // Index unique pour éviter les doublons
                 entity.HasIndex(cb => new { cb.UserId, cb.CoursId })
@@ -264,10 +263,46 @@ namespace Mooc.Data
 
                 entity.Property(cb => cb.ScorePercentage)
                       .HasPrecision(5, 2);
+
+                entity.Property(cb => cb.EarnedDate)
+                      .HasColumnType("timestamp with time zone");
+            });
+
+            // ✅ MODIFICATION : Configuration pour Certificate avec SetNull
+            builder.Entity<Certificate>(entity =>
+            {
+                entity.HasKey(c => c.Id);
+
+                entity.HasOne(c => c.User)
+                      .WithMany()
+                      .HasForeignKey(c => c.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+
+                // ⭐ MODIFICATION : SetNull au lieu de Cascade pour préserver les certificats
+                entity.HasOne(c => c.Session)
+                      .WithMany()
+                      .HasForeignKey(c => c.SessionId)
+                      .OnDelete(DeleteBehavior.SetNull);
+
+                entity.Property(c => c.DateGenerated)
+                      .HasColumnType("timestamp with time zone");
+
+                entity.Property(c => c.DateDelivered)
+                      .HasColumnType("timestamp with time zone");
+
+                entity.Property(c => c.ArchivedSessionStartDate)
+                      .HasColumnType("timestamp with time zone");
+
+                entity.Property(c => c.ArchivedSessionEndDate)
+                      .HasColumnType("timestamp with time zone");
+
+                entity.HasIndex(c => c.CertificateNumber)
+                      .IsUnique()
+                      .HasDatabaseName("IX_Certificate_CertificateNumber");
             });
         }
 
-        // ⭐ NOUVEAU : Configuration supplémentaire pour les conventions PostgreSQL
+        // ⭐ Configuration supplémentaire pour les conventions PostgreSQL
         protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
         {
             // Convertir automatiquement tous les DateTime en UTC

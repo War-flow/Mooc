@@ -57,29 +57,6 @@
 
 <div class="container mt-4">
 
-    <!-- Section Filtres -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body">
-                    <h6 class="card-title">
-                        <i class="bi bi-graph-up me-2"></i>
-                        Progression globale
-                    </h6>
-                    <div class="progress mb-2" style="height: 10px;">
-                        <div class="progress-bar bg-gradient-primary"
-                             role="progressbar"
-                             style="width: @overallProgressPercentage%"
-                             aria-valuenow="@overallProgressPercentage"
-                             aria-valuemin="0"
-                             aria-valuemax="100">
-                        </div>
-                    </div>
-                    <small class="text-muted">@overallProgressPercentage.ToString("F0")% de vos formations terminées</small>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <!-- Composant CardBadge réutilisable -->
     <CardBadge OnBadgeAction="HandleBadgeAction" />
@@ -134,16 +111,14 @@
     private int completedSessionsCount = 0;
     private double overallProgressPercentage = 0;
     private string? currentUserId;
-    private bool isCheckingBadges = false; // ✅ AJOUT : Indicateur de vérification en cours
+    private bool isCheckingBadges = false;
     
-    // Variable pour contrôler l'affichage des badges de test
-    private bool showTestBadges = true; // Mettre à false en production
+    private bool showTestBadges = true;
 
     protected override async Task OnInitializedAsync()
     {
         await GetCurrentUserId();
         
-        // ✅ AJOUT : Vérifier et créer les badges manquants AVANT de charger les statistiques
         if (!string.IsNullOrEmpty(currentUserId))
         {
             await CheckAndCreateMissingBadgesAsync();
@@ -152,7 +127,6 @@
         await LoadBadgeStatistics();
     }
 
-    // ✅ NOUVELLE MÉTHODE : Vérification automatique des badges
     private async Task CheckAndCreateMissingBadgesAsync()
     {
         if (string.IsNullOrEmpty(currentUserId))
@@ -170,10 +144,6 @@
             if (createdBadges.Any())
             {
                 _logger?.LogInformation("🎉 {Count} badges créés automatiquement", createdBadges.Count);
-                
-                // Afficher une notification discrète
-                await JSRuntime.InvokeVoidAsync("console.log", 
-                    $"✅ {createdBadges.Count} nouveau(x) badge(s) attribué(s)");
             }
         }
         catch (Exception ex)
@@ -203,6 +173,7 @@
         }
     }
 
+    // ✅ CORRECTION : Méthode modifiée pour inclure les sessions archivées
     private async Task LoadBadgeStatistics()
     {
         if (string.IsNullOrEmpty(currentUserId))
@@ -212,42 +183,67 @@
         {
             using var context = await DbContextFactory.CreateDbContextAsync();
 
-            // Compter les certificats
+            // ✅ Compter TOUS les certificats (sessions actives ET archivées)
             certificatesCount = await context.Certificates
                 .Where(c => c.UserId == currentUserId)
                 .CountAsync();
 
-            // Compter les badges de cours
-            var courseBadgesCount = await context.CourseBadges
+            // ✅ Compter TOUS les badges
+            totalBadgesCount = await context.CourseBadges
                 .Where(cb => cb.UserId == currentUserId)
                 .CountAsync();
 
-            // Compter les sessions terminées
+            // ✅ MODIFICATION : Récupérer les sessions inscrites ET les certificats archivés
             var user = await context.Users
                 .Include(u => u.EnrolledSessions)
                 .FirstOrDefaultAsync(u => u.Id == currentUserId);
 
-            if (user?.EnrolledSessions != null)
+            if (user != null)
             {
-                var enrolledSessionIds = user.EnrolledSessions.Select(s => s.Id).ToList();
-                var sessionCompletionService = SessionCompletionService;
-                var completionInfos = await sessionCompletionService.GetUserSessionsCompletionInfoAsync(currentUserId);
+                // Sessions actuellement inscrites
+                var enrolledSessionIds = user.EnrolledSessions?.Select(s => s.Id).ToList() ?? new List<int>();
+                
+                // ✅ NOUVEAU : Ajouter les sessions des certificats archivés (SessionId peut être null)
+                var archivedSessionsWithCertificates = await context.Certificates
+                    .Where(c => c.UserId == currentUserId && c.SessionId == null)
+                    .Select(c => new { 
+                        Title = c.ArchivedSessionTitle ?? "Session archivée",
+                        IsCompleted = true // Les certificats archivés sont forcément complétés
+                    })
+                    .ToListAsync();
 
-                completedSessionsCount = completionInfos.Count(c => c.Value.IsCompleted);
-
-                // Calculer le pourcentage de progression global
+                // Calculer les sessions complétées pour les sessions actives
+                var activeCompletedCount = 0;
                 if (enrolledSessionIds.Any())
                 {
-                    overallProgressPercentage = (double)completedSessionsCount / enrolledSessionIds.Count * 100;
+                    var sessionCompletionService = SessionCompletionService;
+                    var completionInfos = await sessionCompletionService.GetUserSessionsCompletionInfoAsync(currentUserId);
+                    activeCompletedCount = completionInfos.Count(c => c.Value.IsCompleted);
                 }
-            }
 
-            // Total des badges = nombre de cours terminés uniquement
-            totalBadgesCount = completedSessionsCount;
+                // ✅ TOTAL = sessions actives complétées + certificats archivés
+                completedSessionsCount = activeCompletedCount + archivedSessionsWithCertificates.Count;
+
+                // ✅ Calculer le pourcentage de progression global
+                var totalSessions = enrolledSessionIds.Count + archivedSessionsWithCertificates.Count;
+                if (totalSessions > 0)
+                {
+                    overallProgressPercentage = (double)completedSessionsCount / totalSessions * 100;
+                }
+                
+                _logger?.LogInformation(
+                    "📊 Statistiques - Sessions actives: {Active}, Archivées: {Archived}, Total complétées: {Completed}, Badges: {Badges}, Certificats: {Certs}",
+                    enrolledSessionIds.Count,
+                    archivedSessionsWithCertificates.Count,
+                    completedSessionsCount,
+                    totalBadgesCount,
+                    certificatesCount
+                );
+            }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Erreur lors du chargement des statistiques : {ex.Message}");
+            _logger?.LogError(ex, "Erreur lors du chargement des statistiques");
         }
     }
 
@@ -282,4 +278,12 @@
             await JSRuntime.InvokeVoidAsync("alert", "Erreur lors du téléchargement du certificat. Veuillez réessayer.");
         }
     }
+
+    private bool AucuneCertification => totalBadgesCount <= 0 && !isCheckingBadges;
+
+    public async ValueTask DisposeAsync()
+    {
+        // Cleanup si nécessaire
+    }
 }
+

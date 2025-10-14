@@ -169,7 +169,7 @@ namespace Mooc.Services
 
                 // Générer le fichier PDF du certificat
                 var pdfData = await _certificateService.GenerateCertificateAsync(
-                    certificate.SessionId,
+                    certificate.SessionId.Value,
                     certificate.UserId,
                     CertificateType.Pdf);
 

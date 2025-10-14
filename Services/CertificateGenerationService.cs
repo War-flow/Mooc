@@ -15,6 +15,9 @@ namespace Mooc.Services
         Task<byte[]> GenerateCertificateAsync(int sessionId, string userId, CertificateType type = CertificateType.Pdf);
         Task<byte[]> GenerateWordCertificateAsync(int sessionId, string userId);
         Task<string> GenerateHtmlCertificateAsync(int sessionId, string userId);
+        
+        // ✅ NOUVELLE MÉTHODE : Pour les certificats archivés
+        Task<byte[]> GenerateArchivedCertificateAsync(int certificateId, CertificateType type = CertificateType.Pdf);
     }
 
     public enum CertificateType
@@ -102,16 +105,64 @@ namespace Mooc.Services
             }
         }
 
-        private async Task<byte[]> GeneratePdfCertificateAsync(int sessionId, string userId)
+        // ✅ NOUVELLE MÉTHODE : Générer un certificat depuis les données archivées
+        public async Task<byte[]> GenerateArchivedCertificateAsync(int certificateId, CertificateType type = CertificateType.Pdf)
         {
             try
             {
-                var htmlContent = await GenerateHtmlCertificateAsync(sessionId, userId);
+                using var context = await _contextFactory.CreateDbContextAsync();
                 
+                var certificate = await context.Certificates
+                    .Include(c => c.User)
+                    .FirstOrDefaultAsync(c => c.Id == certificateId);
+
+                if (certificate == null)
+                    throw new InvalidOperationException($"Certificat {certificateId} introuvable");
+
+                if (certificate.User == null)
+                    throw new InvalidOperationException($"Utilisateur du certificat {certificateId} introuvable");
+
+                // ✅ Créer les données du certificat depuis les informations archivées
+                var certificateData = new CertificateData
+                {
+                    FullName = $"{certificate.User.FirstName} {certificate.User.LastName}",
+                    SessionTitle = certificate.ArchivedSessionTitle ?? certificate.Title,
+                    DeliveryDate = certificate.DateDelivered.ToString(_options.DateFormat, new System.Globalization.CultureInfo(_options.CultureInfo)),
+                    CertificateNumber = certificate.CertificateNumber,
+                    CompletedCourses = 0, // Non disponible pour les certificats archivés
+                    TotalRequiredCourses = 0, // Non disponible pour les certificats archivés
+                    SessionStartDate = certificate.ArchivedSessionStartDate ?? DateTime.Now,
+                    SessionEndDate = certificate.ArchivedSessionEndDate ?? DateTime.Now
+                };
+
+                // ✅ Générer selon le type demandé
+                switch (type)
+                {
+                    case CertificateType.Word:
+                        return CreateWordCertificate(certificateData);
+                    case CertificateType.Html:
+                        var html = await CreateHtmlCertificateFromTemplate(certificateData);
+                        return System.Text.Encoding.UTF8.GetBytes(html);
+                    case CertificateType.Pdf:
+                    default:
+                        var htmlContent = await CreateHtmlCertificateFromTemplate(certificateData);
+                        return await ConvertHtmlToPdfAsync(htmlContent);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la génération du certificat archivé {CertificateId}", certificateId);
+                throw new InvalidOperationException("Erreur lors de la génération du certificat archivé", ex);
+            }
+        }
+
+        // ✅ EXTRACTION : Méthode privée pour la conversion PDF
+        private async Task<byte[]> ConvertHtmlToPdfAsync(string htmlContent)
+        {
+            try
+            {
                 using var pdfStream = new MemoryStream();
                 var converterProperties = new ConverterProperties();
-                
-                // Configuration pour améliorer la qualité du PDF
                 converterProperties.SetFontProvider(new DefaultFontProvider(true, true, true));
                 
                 HtmlConverter.ConvertToPdf(htmlContent, pdfStream, converterProperties);
@@ -122,6 +173,20 @@ namespace Mooc.Services
             {
                 _logger.LogError(ex, "Erreur lors de la conversion HTML vers PDF");
                 throw new InvalidOperationException("Impossible de convertir le document en PDF", ex);
+            }
+        }
+
+        private async Task<byte[]> GeneratePdfCertificateAsync(int sessionId, string userId)
+        {
+            try
+            {
+                var htmlContent = await GenerateHtmlCertificateAsync(sessionId, userId);
+                return await ConvertHtmlToPdfAsync(htmlContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la génération du certificat PDF");
+                throw;
             }
         }
 
@@ -138,14 +203,14 @@ namespace Mooc.Services
                 }
 
                 var templateContent = await File.ReadAllTextAsync(templatePath);
-                
-                // Générer l'URL complète du logo ou encoder en Base64
                 var logoUrl = await GetLogoDataUrl();
-
-                // Générer l'URL complète de la médaille ou encoder en Base64
                 var medalUrl = await GetMedalDataUrl();
 
-                // Remplacer les placeholders par les vraies valeurs
+                // ✅ MODIFICATION : Affichage conditionnel des cours complétés
+                var coursesInfo = data.TotalRequiredCourses > 0 
+                    ? $"Cours complétés : {data.CompletedCourses} sur {data.TotalRequiredCourses}" 
+                    : "Formation complétée avec succès";
+
                 var replacements = new Dictionary<string, string>
                 {
                     {"{{MainTitle}}", "CERTIFICAT"},
@@ -156,6 +221,7 @@ namespace Mooc.Services
                     {"{{CompletionText}}", "pour avoir terminé avec succès son parcours de formation"},
                     {"{{SessionTitle}}", data.SessionTitle},
                     {"{{FormationPeriod}}", $"Formation dispensée du {data.SessionStartDate:dd MMMM yyyy} au {data.SessionEndDate:dd MMMM yyyy}"},
+                    {"{{CoursesInfo}}", coursesInfo}, // ✅ NOUVEAU placeholder
                     {"{{DeliveryText}}", $"Délivré le {data.DeliveryDate}"},
                     {"{{OrganizationText}}", $"par {_options.OrganizationName}"},
                     {"{{CertificateNumberText}}", $"Certificat n° {data.CertificateNumber}"},
@@ -267,6 +333,58 @@ namespace Mooc.Services
             {
                 _logger.LogError(ex, "Erreur inattendue lors de la génération du certificat Word pour la session {SessionId} et l'utilisateur {UserId}", sessionId, userId);
                 throw new InvalidOperationException("Erreur lors de la génération du certificat", ex);
+            }
+        }
+
+        private async Task<byte[]> GeneratePdfFromExistingData(Certificate certificate)
+        {
+            try
+            {
+                // Remplacez certificate.FullName par $"{certificate.User.FirstName} {certificate.User.LastName}"
+                var htmlContent = $@"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8'>
+    <style>
+        @page {{ size: A4 landscape; margin: 2cm; }}
+        body {{ font-family: 'Times New Roman', serif; margin: 0; padding: 40px; text-align: center; }}
+        .certificate {{ border: 3px solid #2c3e50; padding: 60px; background: white; }}
+        .title {{ font-size: 28px; font-weight: bold; margin-bottom: 30px; color: #2c3e50; }}
+        .content {{ font-size: 16px; line-height: 1.6; color: #555; }}
+        .name {{ font-size: 24px; font-weight: bold; color: #e74c3c; margin: 20px 0; }}
+    </style>
+</head>
+<body>
+    <div class='certificate'>
+        <div class='title'>CERTIFICAT DE FORMATION</div>
+        <div class='content'>
+            <p>Il est certifié que</p>
+            <div class='name'>{certificate.User.FirstName} {certificate.User.LastName}</div>
+            <p>a suivi avec succès la formation</p>
+            <p><strong>{certificate.Title}</strong></p>
+            <p>Délivré le {certificate.DateDelivered}</p>
+            <p>par {_options.OrganizationName}</p>
+            <p><small>Certificat n° {certificate.CertificateNumber}</small></p>
+        </div>
+    </div>
+</body>
+</html>";
+
+                using var pdfStream = new MemoryStream();
+                var converterProperties = new ConverterProperties();
+                
+                // Configuration pour améliorer la qualité du PDF
+                converterProperties.SetFontProvider(new DefaultFontProvider(true, true, true));
+                
+                HtmlConverter.ConvertToPdf(htmlContent, pdfStream, converterProperties);
+                
+                return pdfStream.ToArray();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Erreur lors de la conversion HTML vers PDF pour les données existantes du certificat");
+                throw new InvalidOperationException("Impossible de convertir le document en PDF", ex);
             }
         }
 

@@ -93,6 +93,9 @@ namespace Mooc
             // Ajouter cette ligne dans la configuration des services
             builder.Services.AddScoped<ICourseBadgeService, CourseBadgeService>();
 
+            // Archivage de badges et certificats :
+            builder.Services.AddScoped<IArchiveService, ArchiveService>();
+
             // Configuration de la base de données
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
             builder.Services.AddDbContextFactory<ApplicationDbContext>(options =>

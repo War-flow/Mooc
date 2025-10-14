@@ -52,9 +52,8 @@
 
                                     <!-- Module/Cours -->
                                     <div class="badge-center-course">
-                                        @badge.CoursTitle
+                                        @badge.DisplayCoursTitle
                                     </div>
-
 
                                     <!-- Date d'obtention -->
                                     <div class="badge-center-date">
@@ -201,11 +200,13 @@
                     Session = courseBadge.Cours?.Session,
                     SessionId = courseBadge.Cours?.SessionId ?? 0,
                     CoursId = courseBadge.CoursId,
-                    CoursTitle = courseBadge.Cours?.Title ?? "Cours",
+                    // ✅ CORRECTION : Utiliser DisplayCoursTitle
+                    CoursTitle = courseBadge.DisplayCoursTitle,
                     PointsEarned = courseBadge.PointsEarned,
                     TotalPointsPossible = courseBadge.TotalPointsPossible,
                     CourseBadgeType = courseBadge.BadgeType,
-                    ScorePercentage = courseBadge.ScorePercentage
+                    ScorePercentage = courseBadge.ScorePercentage,
+                    ArchivedCoursTitle = courseBadge.ArchivedCoursTitle 
                 });
             }
 
@@ -260,6 +261,7 @@
         };
     }
 
+    // ✅ AMÉLIORATION OPTIONNELLE : Simplifier UserBadge
     public class UserBadge
     {
         public string Title { get; set; } = string.Empty;
@@ -273,5 +275,13 @@
         public int TotalPointsPossible { get; set; }
         public CourseBadgeType? CourseBadgeType { get; set; }
         public double ScorePercentage { get; set; }
+        public string? ArchivedCoursTitle { get; set; }
+
+        // ✅ Cette propriété fonctionne maintenant correctement
+        public string DisplayCoursTitle => 
+            !string.IsNullOrEmpty(CoursTitle) ? CoursTitle : "Cours supprimé";
+
+        public string DisplaySessionTitle => 
+            Session?.Title ?? ArchivedCoursTitle ?? "Session supprimée";
     }
 }

@@ -14,6 +14,7 @@
 @inject FileUploadService FileUploadService
 @inject ILogger<SessionManager> Logger
 @inject IJSRuntime JSRuntime
+@inject IArchiveService ArchiveService
 @attribute [Authorize(Policy = "GestionFormation")]
 @attribute [StreamRendering]
 
@@ -817,36 +818,99 @@
         showDeleteConfirmation = true;
     }
 
-    private async Task ConfirmDeleteSession()
+    private async Task<bool> CanDeleteSession(int sessionId)
+{
+    try
     {
-        try
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        
+        // Vérifier les utilisateurs inscrits
+        var hasEnrolledUsers = await context.Sessions
+            .Where(s => s.Id == sessionId)
+            .AnyAsync(s => s.EnrolledUsers.Any());
+        
+        if (hasEnrolledUsers)
         {
-            using var context = await DbContextFactory.CreateDbContextAsync();
-            var session = await context.Sessions.FindAsync(currentSessionId);
+            errorMessage = "Impossible de supprimer cette session : des utilisateurs sont inscrits.";
+            return false;
+        }
+        
+        // ✅ NOUVEAU : Vérifier les certificats délivrés
+        var hasCertificates = await context.Certificates
+            .AnyAsync(c => c.SessionId == sessionId);
+        
+        if (hasCertificates)
+        {
+            errorMessage = "Impossible de supprimer cette session : des certificats ont été délivrés.";
+            return false;
+        }
+        
+        // ✅ NOUVEAU : Vérifier les badges attribués
+        var hasBadges = await context.CourseBadges
+            .Include(cb => cb.Cours)
+            .AnyAsync(cb => cb.Cours != null && cb.Cours.SessionId == sessionId);
+        
+        if (hasBadges)
+        {
+            errorMessage = "Impossible de supprimer cette session : des badges ont été attribués.";
+            return false;
+        }
+        
+        return true;
+    }
+    catch (Exception ex)
+    {
+        Logger?.LogError(ex, "Erreur lors de la vérification de suppression pour la session {SessionId}", sessionId);
+        return false;
+    }
+}
 
-            if (session != null)
+private async Task ConfirmDeleteSession()
+{
+    try
+    {
+        // ✅ ÉTAPE 1 : Archiver les données AVANT suppression
+        Logger?.LogInformation("🗂️ Archivage des données de la session {SessionId}", currentSessionId);
+        await ArchiveService.ArchiveSessionDataAsync(currentSessionId);
+
+        using var context = await DbContextFactory.CreateDbContextAsync();
+        var session = await context.Sessions.FindAsync(currentSessionId);
+
+        if (session != null)
+        {
+            // ✅ ÉTAPE 2 : Supprimer l'image si elle existe
+            if (!string.IsNullOrEmpty(session.Image) && session.Image.StartsWith("/uploads/"))
             {
-                if (!string.IsNullOrEmpty(session.Image) && session.Image.StartsWith("/uploads/"))
-                {
-                    FileUploadService.DeleteFile(session.Image);
-                }
-
-                context.Sessions.Remove(session);
-                await context.SaveChangesAsync();
-
-                // **OPTIMISÉ** : Recharger seulement si nécessaire
-                await LoadSessionsOptimized();
-                ClearError();
+                FileUploadService.DeleteFile(session.Image);
             }
 
-            showDeleteConfirmation = false;
+            // ✅ ÉTAPE 3 : Supprimer la session
+            // Les certificats et badges sont maintenant orphelins avec données archivées
+            context.Sessions.Remove(session);
+            await context.SaveChangesAsync();
+
+            Logger?.LogInformation("✅ Session {SessionId} supprimée avec succès", currentSessionId);
+
+            await LoadSessionsOptimized();
+            ClearError();
         }
-        catch (Exception ex)
-        {
-            errorMessage = $"Erreur lors de la suppression : {ex.Message}";
-            showDeleteConfirmation = false;
-        }
+
+        showDeleteConfirmation = false;
     }
+    catch (DbUpdateException ex)
+    {
+        // Si la suppression échoue malgré tout
+        errorMessage = "Erreur lors de la suppression de la session. Les données utilisateur ont été préservées.";
+        Logger?.LogError(ex, "❌ Erreur de contrainte lors de la suppression de la session {SessionId}", currentSessionId);
+        showDeleteConfirmation = false;
+    }
+    catch (Exception ex)
+    {
+        errorMessage = $"Erreur lors de la suppression : {ex.Message}";
+        Logger?.LogError(ex, "❌ Erreur lors de la suppression de la session {SessionId}", currentSessionId);
+        showDeleteConfirmation = false;
+    }
+}
 
     private async Task HandleValidSubmit()
     {

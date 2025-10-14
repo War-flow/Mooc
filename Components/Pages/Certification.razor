@@ -122,27 +122,37 @@
                                             <td class="px-4 py-3">
                                                 <span class="badge bg-primary rounded-pill">@cert.Id</span>
                                             </td>
+                                            <!-- Modifier l'affichage pour utiliser DisplaySessionTitle -->
                                             <td class="px-4 py-3">
                                                 <div class="d-flex align-items-center">
                                                     <div class="certification-icon me-3">
                                                         <i class="bi bi-file-earmark-pdf-fill text-danger fs-4"></i>
                                                     </div>
-                                                    <div>
-                                                        <h6 class="mb-1 fw-semibold">@cert.Session.Title</h6>
-                                                        <small class="text-muted">Certificat n° @cert.CertificateNumber</small>
-                                                    </div>
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3 d-none d-lg-table-cell">
                                                 <div>
-                                                    <span class="d-block fw-medium">@cert.Session.Title</span>
-                                                    <small class="text-muted">@cert.Session.StartDate.ToString("dd MMM yyyy") - @cert.Session.EndDate.ToString("dd MMM yyyy")</small>
+                                                    <span class="d-block fw-medium">@cert.DisplaySessionTitle</span>
+                                                    @if (cert.ArchivedSessionStartDate.HasValue && cert.ArchivedSessionEndDate.HasValue)
+                                                    {
+                                                        <small class="text-muted">
+                                                            @cert.ArchivedSessionStartDate.Value.ToString("dd MMM yyyy") - 
+                                                            @cert.ArchivedSessionEndDate.Value.ToString("dd MMM yyyy")
+                                                        </small>
+                                                    }
+                                                    else if (cert.Session != null)
+                                                    {
+                                                        <small class="text-muted">
+                                                            @cert.Session.StartDate.ToString("dd MMM yyyy") - 
+                                                            @cert.Session.EndDate.ToString("dd MMM yyyy")
+                                                        </small>
+                                                    }
                                                 </div>
                                             </td>
                                             <td class="px-4 py-3">
                                                 <div class="d-flex gap-2">
                                                     <button class="btn btn-success btn-sm d-flex align-items-center" 
-                                                            @onclick="() => DownloadCertificate(cert.SessionId, CertificateType.Pdf)"
+                                                            @onclick="() => DownloadCertificate(cert.Id, CertificateType.Pdf)"
                                                             disabled="@isDownloading">
                                                         @if (isDownloading)
                                                         {
@@ -326,7 +336,8 @@
         _ => filter
     };
 
-    private async Task DownloadCertificate(int sessionId, CertificateType type)
+    // ✅ CORRECTION : Passer le certificateId au lieu du sessionId
+    private async Task DownloadCertificate(int certificateId, CertificateType type)
     {
         if (isDownloading) return;
 
@@ -343,39 +354,69 @@
                 return;
             }
 
-            var certificateData = await CertificateService.GenerateCertificateAsync(sessionId, user.Id, type);
-            
-            var fileName = $"Certificat_{sessionId}_{DateTime.Now:yyyyMMdd}";
-            var contentType = type == CertificateType.Pdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-            var fileExtension = type == CertificateType.Pdf ? ".pdf" : ".docx";
-            
-            if (jsModule != null)
+            // ✅ NOUVEAU : Récupérer le certificat pour obtenir les bonnes informations
+            using var context = await DbContextFactory.CreateDbContextAsync();
+            var certificate = await context.Certificates
+                .Include(c => c.Session)
+                .FirstOrDefaultAsync(c => c.Id == certificateId && c.UserId == user.Id);
+
+            if (certificate == null)
             {
-                await jsModule.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+                _logger?.LogWarning("Certificat {CertificateId} introuvable pour l'utilisateur {UserId}", certificateId, user.Id);
+                await JSRuntime.InvokeVoidAsync("alert", "Certificat introuvable.");
+                return;
+            }
+
+            // ✅ Vérifier si on a une session ou des données archivées
+            int? sessionId = certificate.SessionId;
+            
+            if (!sessionId.HasValue)
+            {
+                // ✅ Session archivée : utiliser une nouvelle méthode de génération
+                _logger?.LogInformation("Génération de certificat archivé {CertificateId}", certificateId);
+                var certificateData = await CertificateService.GenerateArchivedCertificateAsync(certificateId, type);
+                
+                await DownloadCertificateData(certificateData, certificate.ArchivedSessionTitle ?? "Formation", type);
             }
             else
             {
-                await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+                // ✅ Session active : méthode normale
+                var certificateData = await CertificateService.GenerateCertificateAsync(sessionId.Value, user.Id, type);
+                
+                await DownloadCertificateData(certificateData, certificate.Session?.Title ?? "Formation", type);
             }
         }
         catch (JSException jsEx)
         {
             _logger?.LogError(jsEx, "Erreur JavaScript lors du téléchargement: {Message}", jsEx.Message);
-            
-            // Affichage d'un message à l'utilisateur
             await JSRuntime.InvokeVoidAsync("alert", $"Erreur lors du téléchargement: {jsEx.Message}");
         }
         catch (Exception ex)
         {
-            _logger?.LogError(ex, "Erreur lors du téléchargement du certificat {SessionId}", sessionId);
-            
-            // Affichage d'un message à l'utilisateur
+            _logger?.LogError(ex, "Erreur lors du téléchargement du certificat {CertificateId}", certificateId);
             await JSRuntime.InvokeVoidAsync("alert", "Erreur lors du téléchargement du certificat. Veuillez réessayer.");
         }
         finally
         {
             isDownloading = false;
             StateHasChanged();
+        }
+    }
+
+    // ✅ NOUVELLE MÉTHODE : Helper pour télécharger les données du certificat
+    private async Task DownloadCertificateData(byte[] certificateData, string sessionTitle, CertificateType type)
+    {
+        var fileName = $"Certificat_{sessionTitle.Replace(" ", "_")}_{DateTime.Now:yyyyMMdd}";
+        var contentType = type == CertificateType.Pdf ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        var fileExtension = type == CertificateType.Pdf ? ".pdf" : ".docx";
+        
+        if (jsModule != null)
+        {
+            await jsModule.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
+        }
+        else
+        {
+            await JSRuntime.InvokeVoidAsync("downloadFile", certificateData, $"{fileName}{fileExtension}", contentType);
         }
     }
 
