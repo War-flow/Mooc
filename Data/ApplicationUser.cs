@@ -28,5 +28,8 @@ namespace Mooc.Data
 
         // **Navigation property pour les sessions auxquelles l'utilisateur est inscrit**
         public virtual ICollection<Session> EnrolledSessions { get; set; } = new List<Session>();
+
+        [PersonalData]
+        public bool ShowInTrombinoscope { get; set; } = false;
     }
 }

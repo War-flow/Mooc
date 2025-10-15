@@ -8,6 +8,7 @@
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IdentityUserAccessor UserAccessor
 @inject IdentityRedirectManager RedirectManager
+@inject NavigationManager Navigation
 
 <PageTitle>Profil</PageTitle>
 
@@ -19,16 +20,38 @@
         <EditForm Model="Input" FormName="profile" OnValidSubmit="OnValidSubmitAsync" method="post">
             <DataAnnotationsValidator />
             <ValidationSummary class="text-danger" role="alert" />
+            
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.FirstName" id="firstName" class="form-control" placeholder="Votre prénom" />
                 <label for="firstName" class="form-label">Prénom</label>
                 <ValidationMessage For="() => Input.FirstName" class="text-danger" />
             </div>
+            
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.LastName" id="lastName" class="form-control" placeholder="Votre nom" />
                 <label for="lastName" class="form-label">Nom</label>
                 <ValidationMessage For="() => Input.LastName" class="text-danger" />
             </div>
+            
+            <div class="mb-3">
+                <div class="form-check">
+                    <InputCheckbox @bind-Value="Input.ShowInTrombinoscope" id="showInTrombinoscope" class="form-check-valid" />
+                    <label for="showInTrombinoscope" class="form-check-label">
+                        Affichage de mon profil sur le trombinoscope
+                    </label>
+                </div>
+                <small class="text-muted">
+                    @if (Input.ShowInTrombinoscope)
+                    {
+                        <span class="text-success">✓ Votre profil sera visible sur le trombinoscope</span>
+                    }
+                    else
+                    {
+                        <span class="text-warning">✗ Votre profil ne sera pas visible sur le trombinoscope</span>
+                    }
+                </small>
+            </div>
+            
             <button type="submit" class="w-100 btn btn-lg btn-primary">Valider</button>
         </EditForm>
     </div>
@@ -51,18 +74,39 @@
         username = await UserManager.GetUserNameAsync(user);
         phoneNumber = await UserManager.GetPhoneNumberAsync(user);
 
-        Input.PhoneNumber ??= phoneNumber;
-        Input.FirstName ??= user.FirstName;
-        Input.LastName ??= user.LastName;
+        // Initialiser UNIQUEMENT si Input est vide (premier chargement)
+        if (string.IsNullOrEmpty(Input.FirstName))
+        {
+            Input.PhoneNumber = phoneNumber;
+            Input.FirstName = user.FirstName;
+            Input.LastName = user.LastName;
+            Input.ShowInTrombinoscope = user.ShowInTrombinoscope;
+        }
     }
 
     private async Task OnValidSubmitAsync()
     {
-        bool needRefresh = false;
+        // ⭐ SOLUTION : Recharger l'utilisateur pour éviter les conflits de tracking
+        var currentUser = await UserManager.FindByIdAsync(user.Id);
+        if (currentUser == null)
+        {
+            RedirectManager.RedirectToCurrentPageWithStatus("Erreur : utilisateur introuvable.", HttpContext);
+            return;
+        }
 
+        bool needRefresh = false;
+        
+        // Validate phone number
+        if (Input.PhoneNumber != null && !new PhoneAttribute().IsValid(Input.PhoneNumber))
+        {
+            RedirectManager.RedirectToCurrentPageWithStatus("Erreur : numéro de téléphone invalide.", HttpContext);
+            return;
+        }
+
+        // Update phone
         if (Input.PhoneNumber != phoneNumber)
         {
-            var setPhoneResult = await UserManager.SetPhoneNumberAsync(user, Input.PhoneNumber);
+            var setPhoneResult = await UserManager.SetPhoneNumberAsync(currentUser, Input.PhoneNumber);
             if (!setPhoneResult.Succeeded)
             {
                 RedirectManager.RedirectToCurrentPageWithStatus("Erreur : échec de définition du numéro de téléphone.", HttpContext);
@@ -70,32 +114,40 @@
             }
             needRefresh = true;
         }
-        
-        if (Input.PhoneNumber != null && !new PhoneAttribute().IsValid(Input.PhoneNumber))
-        {
-            RedirectManager.RedirectToCurrentPageWithStatus("Erreur : numéro de téléphone invalide.", HttpContext);
-            return;
-        }
 
-        if (Input.FirstName != user.FirstName || Input.LastName != user.LastName)
+        // Update personal information
+        bool hasChanges = Input.FirstName != currentUser.FirstName || 
+                         Input.LastName != currentUser.LastName || 
+                         Input.ShowInTrombinoscope != currentUser.ShowInTrombinoscope;
+
+        if (hasChanges)
         {
-            user.FirstName = Input.FirstName!;
-            user.LastName = Input.LastName!;
-            var updateResult = await UserManager.UpdateAsync(user);
+            currentUser.FirstName = Input.FirstName!;
+            currentUser.LastName = Input.LastName!;
+            currentUser.ShowInTrombinoscope = Input.ShowInTrombinoscope;
+            
+            var updateResult = await UserManager.UpdateAsync(currentUser);
+            
             if (!updateResult.Succeeded)
             {
-                RedirectManager.RedirectToCurrentPageWithStatus("Erreur : échec de la mise à jour des informations personnelles.", HttpContext);
+                var errorMessages = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                RedirectManager.RedirectToCurrentPageWithStatus($"Erreur : {errorMessages}", HttpContext);
                 return;
             }
+            
             needRefresh = true;
         }
         
         if (needRefresh)
         {
-            await SignInManager.RefreshSignInAsync(user);
+            await SignInManager.RefreshSignInAsync(currentUser);
         }
         
-        RedirectManager.RedirectToCurrentPageWithStatus("Votre profil a été mis à jour", HttpContext);
+        var message = Input.ShowInTrombinoscope 
+            ? "Votre profil a été mis à jour. Vous apparaissez maintenant sur le trombinoscope." 
+            : "Votre profil a été mis à jour. Vous n'apparaissez plus sur le trombinoscope.";
+            
+        RedirectManager.RedirectToCurrentPageWithStatus(message, HttpContext);
     }
 
     private sealed class InputModel
@@ -115,5 +167,8 @@
         [RegularExpression(@"^[a-zA-ZÀ-ÿ\s\-']+$", ErrorMessage = "Le nom ne peut contenir que des lettres, espaces, tirets et apostrophes")]
         [Display(Name = "Nom")]
         public string? LastName { get; set; }
+
+        [Display(Name = "Affichage sur le trombinoscope")]
+        public bool ShowInTrombinoscope { get; set; }
     }
 }

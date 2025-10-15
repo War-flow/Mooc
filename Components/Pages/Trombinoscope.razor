@@ -120,15 +120,26 @@
     }
 
     private async Task LoadTeamMembers()
-    {
+    {       
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
+        
+        // DEBUG: Afficher tous les utilisateurs et leur statut
+        var allUsers = await dbContext.Users.ToListAsync();
+        Console.WriteLine($"=== TOTAL USERS: {allUsers.Count} ===");
+        foreach (var u in allUsers)
+        {
+            Console.WriteLine($"User: {u.Email} | ShowInTrombinoscope: {u.ShowInTrombinoscope}");
+        }
         
         // Récupérer les utilisateurs avec leurs rôles en une seule requête
         var usersWithRoles = await dbContext.Users
+            .Where(u => u.ShowInTrombinoscope == true) // EXPLICIT comparison
             .Join(dbContext.UserRoles, u => u.Id, ur => ur.UserId, (u, ur) => new { User = u, ur.RoleId })
             .Join(dbContext.Roles, x => x.RoleId, r => r.Id, (x, r) => new { x.User, RoleName = r.Name })
             .Where(x => x.RoleName == "Admin" || x.RoleName == "Formateur")
             .ToListAsync();
+
+        Console.WriteLine($"=== FILTERED USERS WITH ROLES: {usersWithRoles.Count} ===");
 
         teamMembers = new List<ApplicationUser>();
         userRoles.Clear();
@@ -144,6 +155,7 @@
             var roles = userGroup.Select(x => x.RoleName).ToList();
 
             teamMembers.Add(user);
+            Console.WriteLine($"Adding to trombinoscope: {user.Email} | Roles: {string.Join(", ", roles)}");
 
             // Prioriser Admin sur Formateur si l'utilisateur a les deux rôles
             if (roles.Contains("Admin"))
@@ -160,6 +172,7 @@
 
         // Mettre à jour la liste filtrée
         filteredMembers = teamMembers.ToList();
+        Console.WriteLine($"=== FINAL COUNT: {filteredMembers.Count} ===");
     }
 
     private string GetUserRole(ApplicationUser user)

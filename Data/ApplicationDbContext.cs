@@ -20,6 +20,15 @@ namespace Mooc.Data
         {
             base.OnModelCreating(builder);
 
+            // Configuration pour ApplicationUser
+            builder.Entity<ApplicationUser>(entity =>
+            {
+                entity.Property(e => e.ShowInTrombinoscope)
+                      .HasColumnName("ShowInTrombinoscope")  // Force le nom exact
+                      .HasColumnType("boolean")
+                      .HasDefaultValue(false);
+            });
+
             // ⭐ Configuration globale pour convertir automatiquement les DateTime en UTC
             foreach (var entityType in builder.Model.GetEntityTypes())
             {

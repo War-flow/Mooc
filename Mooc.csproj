@@ -35,7 +35,6 @@
 
   <ItemGroup>
     <Folder Include="Data\Migrations\" />
-    <Folder Include="Migrations\" />
     <Folder Include="wwwroot\certificates\" />
     <Folder Include="wwwroot\uploads\audio\" />
     <Folder Include="wwwroot\uploads\files\" />
