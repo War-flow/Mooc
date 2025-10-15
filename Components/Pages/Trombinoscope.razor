@@ -8,6 +8,7 @@
 @inject UserManager<ApplicationUser> UserManagerService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @attribute [StreamRendering]
 
 <PageTitle>Trombinoscope</PageTitle>
@@ -32,6 +33,30 @@
 </div>
 
 <div class="container mt-4">
+    @* Notification pour l'utilisateur connecté *@
+    @if (currentUser != null && shouldShowNotification)
+    {
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Comment apparaître sur le trombinoscope ?</strong>
+            <ul class="mb-0 mt-2">
+                @if (!currentUser.ShowInTrombinoscope)
+                {
+                    <li>Activez l'affichage de votre profil dans <a href="/Account/Manage" class="alert-link">vos paramètres</a></li>
+                }
+                @if (completedSessionsCount == 0)
+                {
+                    <li>Complétez au moins une session de formation</li>
+                }
+                @if (isStudent)
+                {
+                    <li>Seuls les formateurs et administrateurs apparaissent sur le trombinoscope</li>
+                }
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    }
+
     @if (teamMembers != null)
     {
         @if (teamMembers.Any())
@@ -114,10 +139,47 @@
     private string selectedFilter = "All";
     private int adminCount = 0;
     private int formateurCount = 0;
+    
+    // Nouvelles propriétés pour la notification
+    private ApplicationUser? currentUser;
+    private bool shouldShowNotification = false;
+    private int completedSessionsCount = 0;
+    private bool isStudent = false;
 
     protected override async Task OnInitializedAsync()
     {
+        await LoadCurrentUser();
         await LoadTeamMembers();
+    }
+
+    private async Task LoadCurrentUser()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            currentUser = await UserManagerService.GetUserAsync(user);
+            
+            if (currentUser != null)
+            {
+                using var dbContext = await DbContextFactory.CreateDbContextAsync();
+                
+                // Vérifier le nombre de sessions complétées
+                completedSessionsCount = await dbContext.Sessions
+                    .Where(s => s.EnrolledUsers.Any(u => u.Id == currentUser.Id) && s.EndDate < DateTime.UtcNow)
+                    .CountAsync();
+                
+                // Vérifier si l'utilisateur est un formateur ou admin
+                var roles = await UserManagerService.GetRolesAsync(currentUser);
+                isStudent = !roles.Contains("Admin") && !roles.Contains("Formateur");
+                
+                // Déterminer si la notification doit être affichée
+                shouldShowNotification = !currentUser.ShowInTrombinoscope || 
+                                        completedSessionsCount == 0 || 
+                                        isStudent;
+            }
+        }
     }
 
     private async Task LoadTeamMembers()
@@ -132,15 +194,16 @@
             Console.WriteLine($"User: {u.Email} | ShowInTrombinoscope: {u.ShowInTrombinoscope}");
         }
         
-        // Récupérer les utilisateurs avec leurs rôles en une seule requête
+        // Récupérer les utilisateurs avec leurs rôles ET qui ont complété au moins une session
         var usersWithRoles = await dbContext.Users
-            .Where(u => u.ShowInTrombinoscope == true) // EXPLICIT comparison
+            .Where(u => u.ShowInTrombinoscope == true) // L'utilisateur a autorisé l'affichage
+            .Where(u => u.EnrolledSessions.Any(s => s.EndDate < DateTime.UtcNow)) // Au moins une session terminée
             .Join(dbContext.UserRoles, u => u.Id, ur => ur.UserId, (u, ur) => new { User = u, ur.RoleId })
             .Join(dbContext.Roles, x => x.RoleId, r => r.Id, (x, r) => new { x.User, RoleName = r.Name })
             .Where(x => x.RoleName == "Admin" || x.RoleName == "Formateur")
             .ToListAsync();
 
-        Console.WriteLine($"=== FILTERED USERS WITH ROLES: {usersWithRoles.Count} ===");
+        Console.WriteLine($"=== FILTERED USERS WITH ROLES AND COMPLETED SESSIONS: {usersWithRoles.Count} ===");
 
         teamMembers = new List<ApplicationUser>();
         userRoles.Clear();

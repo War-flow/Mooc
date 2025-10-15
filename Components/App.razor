@@ -42,12 +42,12 @@
 <body>
     <Router AppAssembly="typeof(Program).Assembly">
         <Found Context="routeData">
-            <RouteView RouteData="routeData" DefaultLayout="typeof(Components.Layout.MainLayout)" />
+            <RouteView RouteData="routeData" DefaultLayout="@typeof(Components.Layout.MainLayout)" />
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
         <NotFound>
             <PageTitle>Non trouvé</PageTitle>
-            <LayoutView Layout="typeof(Components.Layout.MainLayout)">
+            <LayoutView Layout="@typeof(Components.Layout.MainLayout)">
                 <div class="container mt-4">
                     <div class="alert alert-info" role="alert">
                         <h4 class="alert-heading">
