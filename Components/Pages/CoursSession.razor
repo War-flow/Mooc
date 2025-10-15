@@ -3,6 +3,7 @@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Authorization
 @using Mooc.Data
+@using Mooc.Components.Layout
 @using Microsoft.EntityFrameworkCore
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Components.Forms
@@ -261,6 +262,7 @@ else
         </div>
     </div>
 }
+<Footer />
 
 @code {
     [Parameter] public int SessionId { get; set; }

@@ -1,0 +1,98 @@
+<footer class="page-footer footer-waves @AdditionalCssClass">
+    <div class="container-fluid">
+        <div class="footer-content">
+            <div class="row justify-content-center"> <!-- **AJOUTÉ** : justify-content-center -->
+                <!-- Section À propos -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-section">
+                        <h3 class="footer-title">@AboutTitle</h3>
+                        <p style="color: rgba(255, 255, 255, 0.9); font-size: 0.95rem; line-height: 1.6;">
+                            @AboutDescription
+                        </p>
+                        @if (ShowSocialLinks)
+                        {
+                            <div class="social-links mt-3">
+                                <a href="@FacebookUrl" class="social-link" title="Facebook" aria-label="Facebook">
+                                    <i class="bi bi-facebook"></i>
+                                </a>
+                                <a href="@InstagramUrl" class="social-link" title="Instagram" aria-label="Instagram">
+                                    <i class="bi bi-instagram"></i>
+                                </a>
+                                <a href="@NotreSite" class="social-link" title="Notre site" aria-label="Notre site">
+                                    <i class="bi bi-globe"></i>
+                                </a>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Section Liens rapides -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-section">
+                        <h3 class="footer-title">Liens rapides</h3>
+                        <ul class="footer-links">
+                            <li><a href="/"><i class="bi bi-house"></i> Accueil</a></li>
+                            <li><a href="/mes-sessions"><i class="bi bi-calendar3"></i> Mes Formations</a></li>
+                            <li><a href="/trombinoscope"><i class="bi bi-people"></i> Trombinoscope</a></li>
+                            <li><a href="/FAQ"><i class="bi bi-patch-question"></i> FAQ</a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Section Contact -->
+                <div class="col-lg-4 col-md-6">
+                    <div class="footer-section">
+                        <h3 class="footer-title">Contact</h3>
+                        <ul class="contact-info">
+                            <li>
+                                <i class="bi bi-geo-alt-fill"></i>
+                                <span>@((MarkupString)Address)</span>
+                            </li>
+                            <li>
+                                <i class="bi bi-envelope-fill"></i>
+                                <a href="mailto:@Email">@Email</a>
+                            </li>
+                            <li>
+                                <i class="bi bi-telephone-fill"></i>
+                                <a href="tel:@PhoneNumber.Replace(" ", "")">@PhoneNumber</a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barre de copyright -->
+        <div class="footer-bottom">
+            <div class="footer-bottom-content">
+                <div class="copyright">
+                    © @DateTime.Now.Year @CompanyName. Tous droits réservés. Fait avec <i class="bi bi-heart-fill"></i>
+                </div>
+                <div class="footer-bottom-links">
+                    <a href="/mentions-legales">Mentions légales</a>
+                    <a href="/confidentialite">Politique de confidentialité</a>
+                    <a href="/cookies">Cookies</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+@code {
+    // Paramètres de personnalisation
+    [Parameter] public string AdditionalCssClass { get; set; } = string.Empty;
+    [Parameter] public string AboutTitle { get; set; } = "À propos de POINT COM";
+    [Parameter] public string AboutDescription { get; set; } = "Plateforme de formation professionnelle dédiée à l'excellence pédagogique et à l'accompagnement personnalisé.";
+    [Parameter] public string CompanyName { get; set; } = "POINT COM";
+    
+    // Contact
+    [Parameter] public string Address { get; set; } = "77 Rue René Jadfard<br>97300 Cayenne, Guyane Française";
+    [Parameter] public string Email { get; set; } = "contact@cfa-pcom.fr";
+    [Parameter] public string PhoneNumber { get; set; } = "0594 31 37 24";
+    
+    // Social Media
+    [Parameter] public bool ShowSocialLinks { get; set; } = true;
+    [Parameter] public string FacebookUrl { get; set; } = "https://www.facebook.com/association.pointcom/?ref=tn_tnmn";
+    [Parameter] public string InstagramUrl { get; set; } = "https://www.instagram.com/point_com_/";
+    [Parameter] public string NotreSite { get; set; } = "https://www.pointcom-guyane.fr/";
+}

@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Mooc.Data
+@using Mooc.Components.Layout
 @using Microsoft.EntityFrameworkCore
 @using Mooc.Services
 @using Mooc.Components.Shared
@@ -374,7 +375,7 @@
         </div>
     </div>
 }
-
+<Footer />
 <NotificationToast @ref="notificationToast" />
 
 @code {

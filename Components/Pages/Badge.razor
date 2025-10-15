@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Authorization
 @using Mooc.Data
 @using Mooc.Services
+@using Mooc.Components.Layout
 @using Microsoft.EntityFrameworkCore
 @inject UserManager<ApplicationUser> UserManagerService
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
@@ -104,6 +105,7 @@
         </div>
     }
 </div>
+<Footer />
 @code {
     private string selectedFilter = "all";
     private int totalBadgesCount = 0;

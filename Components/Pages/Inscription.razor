@@ -4,6 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
 @using Mooc.Data
+@using Mooc.Components.Layout
 @using Microsoft.EntityFrameworkCore
 @using Mooc.Services
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
@@ -321,7 +322,7 @@ else
         </a>
     </div>
 }
-
+<Footer />
 @code {
     [Parameter] public int SessionId { get; set; }
 

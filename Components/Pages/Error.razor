@@ -2,6 +2,7 @@
 @page "/Error/{StatusCode:int?}"
 @using System.Diagnostics
 @using System.Net
+*@using Mooc.Components.Layout
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.Authorization
 @using Mooc.Services
@@ -118,7 +119,7 @@ else
         </div>
     </div>
 }
-
+<Footer />
 @code {
     // Paramètres existants pour page d'erreur directe
     [Parameter] public int? StatusCode { get; set; }
