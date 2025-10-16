@@ -1,0 +1,213 @@
+﻿@page "/cookies"
+
+<PageTitle>Politique de cookies</PageTitle>
+
+<!-- En-tête moderne -->
+<div class="page-header header-waves">
+    <div class="container">
+        <h1 class="page-title">
+            <i class="bi bi-cookie header-icon"></i>
+            Politique de cookies
+        </h1>
+        <p class="page-subtitle">Dernière mise à jour : <strong>16 octobre 2025</strong></p>
+    </div>
+</div>
+
+<div class="container cookies-container">
+    <!-- Section Introduction -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-primary">
+                <i class="bi bi-info-circle"></i>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Qu'est-ce qu'un cookie -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-info">
+                <i class="bi bi-question-circle"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">1. Qu'est-ce qu'un cookie ?</h2>
+                <p>Un cookie est un petit fichier texte placé sur votre appareil (ordinateur, tablette, smartphone) par le site que vous visitez. Les cookies nous aident à faire fonctionner le site correctement et à améliorer votre expérience utilisateur.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Cookies utilisés -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-success">
+                <i class="bi bi-list-check"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">2. Cookies utilisés sur cette plateforme</h2>
+                <div class="alert alert-info cookies-note">
+                    <i class="bi bi-shield-check me-2"></i>
+                    <strong>Important :</strong> Nous utilisons uniquement les <strong>cookies strictement nécessaires</strong> au fonctionnement de la plateforme. Nous ne déposons pas de cookies publicitaires ni de cookies de suivi à des fins marketing.
+                </div>
+
+                <div class="table-responsive cookies-table-container">
+                    <table class="table cookies-table">
+                        <caption class="cookies-table-caption">Liste indicative des cookies techniques</caption>
+                        <thead>
+                            <tr>
+                                <th scope="col"><i class="bi bi-tag me-2"></i>Nom du cookie</th>
+                                <th scope="col"><i class="bi bi-bullseye me-2"></i>Finalité</th>
+                                <th scope="col"><i class="bi bi-diagram-3 me-2"></i>Type</th>
+                                <th scope="col"><i class="bi bi-clock me-2"></i>Durée</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code class="cookie-name">session_id</code></td>
+                                <td>Maintenir la session de connexion de l'utilisateur (authentification).</td>
+                                <td><span class="badge bg-primary">Technique — nécessaire</span></td>
+                                <td>2 heures avec renouvellement automatique</td>
+                            </tr>
+                            <tr>
+                                <td><code class="cookie-name">csrftoken / XSRF-TOKEN</code></td>
+                                <td>Protection contre les attaques CSRF lors des formulaires.</td>
+                                <td><span class="badge bg-primary">Technique — nécessaire</span></td>
+                                <td>Quelques heures à 1 jour (selon configuration)</td>
+                            </tr>
+                            <tr>
+                                <td><code class="cookie-name">.AspNetCore.Identity.Application</code></td>
+                                <td>Maintenir la session de connexion de l'utilisateur (authentification).</td>
+                                <td><span class="badge bg-primary">Technique — nécessaire</span></td>
+                                <td>2 heures (renouvelable automatiquement)</td>
+                            </tr>
+                            <tr>
+                                <td><code class="cookie-name">__RequestVerificationToken</code></td>
+                                <td>Protection contre les attaques CSRF lors des formulaires.</td>
+                                <td><span class="badge bg-primary">Technique — nécessaire</span></td>
+                                <td>Durée de la session</td>
+                            </tr>
+                            <tr>
+                                <td><code class="cookie-name">.AspNetCore.Blazor.Server</code></td>
+                                <td>Maintenir la connexion temps réel SignalR pour Blazor Server.</td>
+                                <td><span class="badge bg-primary">Technique — nécessaire</span></td>
+                                <td>Durée de la session active</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-warning cookies-note mt-3">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <strong>Remarque :</strong> les noms et durées exacts des cookies peuvent varier selon les choix techniques (framework, back-end). Veillez à adapter cette liste aux cookies effectivement déposés par votre plateforme.
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Base légale -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-warning">
+                <i class="bi bi-shield-lock"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">3. Base légale et consentement</h2>
+                <p>Conformément au RGPD et à la directive ePrivacy, les cookies strictement nécessaires au fonctionnement du site peuvent être déposés sans obtenir le consentement préalable de l'utilisateur, car ils sont nécessaires pour fournir le service demandé (ex. connexion, sécurité des sessions).</p>
+                <p>Nous n'utilisons pas de cookies de profilage, d'analyse non-anonymisée, ni de cookies publicitaires. Si vous décidez ultérieurement d'intégrer des outils d'analyse ou publicitaires, nous mettrons en place un bandeau de consentement conforme et n'activerons ces cookies qu'après obtention d'un consentement explicite.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Durée de conservation -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-secondary">
+                <i class="bi bi-hourglass-split"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">4. Durée de conservation</h2>
+                <p>Les cookies techniques sont conservés pour la durée strictement nécessaire à leur finalité (par ex. cookie de session supprimé à la fermeture du navigateur, ou cookies de préférence conservés quelques mois). Les durées exactes sont précisées dans le tableau ci‑dessus et doivent être ajustées selon votre implémentation.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Gestion des cookies -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-danger">
+                <i class="bi bi-gear"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">5. Comment gérer ou supprimer les cookies</h2>
+                <p>Vous pouvez supprimer ou bloquer les cookies via les paramètres de votre navigateur. Cependant, le blocage ou la suppression des cookies techniques peut empêcher certaines fonctionnalités essentielles de la plateforme (connexion, suivi de progression des cours).</p>
+                <div class="browser-links">
+                    <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener" class="browser-link">
+                        <i class="bi bi-browser-chrome"></i>
+                        <span>Chrome — gérer les cookies</span>
+                        <i class="bi bi-box-arrow-up-right ms-auto"></i>
+                    </a>
+                    <a href="https://support.mozilla.org/fr/kb/cookies-informations-sites-enregistrent" target="_blank" rel="noopener" class="browser-link">
+                        <i class="bi bi-browser-firefox"></i>
+                        <span>Firefox — gérer les cookies</span>
+                        <i class="bi bi-box-arrow-up-right ms-auto"></i>
+                    </a>
+                    <a href="https://support.microsoft.com/" target="_blank" rel="noopener" class="browser-link">
+                        <i class="bi bi-browser-edge"></i>
+                        <span>Edge — gérer les cookies</span>
+                        <i class="bi bi-box-arrow-up-right ms-auto"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Sécurité -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-success">
+                <i class="bi bi-shield-check"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">6. Sécurité</h2>
+                <p>Nous mettons en œuvre des mesures techniques et organisationnelles appropriées pour protéger les informations stockées et transmises via les cookies (par ex. cookies marqués "HttpOnly" et utilisation du protocole HTTPS).</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Liens -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-info">
+                <i class="bi bi-link-45deg"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">7. Liens vers d'autres documents</h2>
+                <p>Pour plus d'informations, consultez notre <a href="/confidentialite" class="cookies-link">Politique de confidentialité</a> et nos <a href="/mentions-legales" class="cookies-link">Mention légales</a>.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Section Contact -->
+    <section class="cookies-section fade-in">
+        <div class="section-card">
+            <div class="section-icon bg-primary">
+                <i class="bi bi-envelope"></i>
+            </div>
+            <div class="section-content">
+                <h2 class="section-title">8. Contact</h2>
+                <p>Pour toute question concernant cette politique, vous pouvez nous contacter à : 
+                    <a href="mailto:contact@cfa-pcom.fr" class="cookies-link">
+                        <i class="bi bi-envelope-fill me-1"></i>contact@cfa-pcom.fr
+                    </a>
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer de la page -->
+    <footer class="cookies-footer fade-in">
+        <div class="cookies-disclaimer">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            Ce document est fourni à titre indicatif. Il est recommandé de le faire relire par votre conseiller juridique pour s'assurer de la conformité complète à la réglementation applicable dans votre pays.
+        </div>
+    </footer>
+</div>

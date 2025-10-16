@@ -1,0 +1,390 @@
+/* === STYLES POUR LA PAGE COOKIES === */
+
+.cookies-container {
+    padding: 2rem 0;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Sections */
+.cookies-section {
+    margin-bottom: 2rem;
+    opacity: 0;
+    animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.cookies-section:nth-child(1) { animation-delay: 0.1s; }
+.cookies-section:nth-child(2) { animation-delay: 0.2s; }
+.cookies-section:nth-child(3) { animation-delay: 0.3s; }
+.cookies-section:nth-child(4) { animation-delay: 0.4s; }
+.cookies-section:nth-child(5) { animation-delay: 0.5s; }
+.cookies-section:nth-child(6) { animation-delay: 0.6s; }
+.cookies-section:nth-child(7) { animation-delay: 0.7s; }
+.cookies-section:nth-child(8) { animation-delay: 0.8s; }
+.cookies-section:nth-child(9) { animation-delay: 0.9s; }
+
+/* Cartes de section */
+.section-card {
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Icônes de section */
+.section-icon {
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.75rem;
+    color: white;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.section-icon.bg-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.section-icon.bg-info {
+    background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+}
+
+.section-icon.bg-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+}
+
+.section-icon.bg-warning {
+    background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
+}
+
+.section-icon.bg-danger {
+    background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+}
+
+.section-icon.bg-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+}
+
+/* Contenu de section */
+.section-content {
+    flex: 1;
+}
+
+.section-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #2d3748;
+    margin-bottom: 1rem;
+    line-height: 1.3;
+}
+
+.section-content p {
+    color: #4a5568;
+    line-height: 1.7;
+    margin-bottom: 1rem;
+}
+
+.section-content p:last-child {
+    margin-bottom: 0;
+}
+
+/* Notes et alertes */
+.cookies-note {
+    border-radius: 10px;
+    padding: 1.25rem;
+    border: none;
+    border-left: 4px solid currentColor;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+
+.cookies-note.alert-info {
+    background: rgba(23, 162, 184, 0.1);
+    border-color: #17a2b8;
+    color: #0c5460;
+}
+
+.cookies-note.alert-warning {
+    background: rgba(255, 193, 7, 0.1);
+    border-color: #ffc107;
+    color: #856404;
+}
+
+/* Tableau des cookies */
+.cookies-table-container {
+    margin: 1.5rem 0;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.cookies-table {
+    margin-bottom: 0;
+    background: white;
+}
+
+.cookies-table-caption {
+    padding: 1rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    font-weight: 700;
+    color: #2d3748;
+    text-align: left;
+    caption-side: top;
+    font-size: 1.1rem;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.cookies-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.cookies-table thead th {
+    border: none;
+    padding: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 0.875rem;
+}
+
+.cookies-table tbody tr {
+    transition: all 0.2s ease;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.cookies-table tbody tr:hover {
+    background: rgba(102, 126, 234, 0.05);
+    transform: translateX(3px);
+}
+
+.cookies-table tbody tr:last-child {
+    border-bottom: none;
+}
+
+.cookies-table td {
+    padding: 1rem;
+    vertical-align: middle;
+    color: #4a5568;
+}
+
+.cookie-name {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.cookies-table .badge {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border-radius: 20px;
+}
+
+/* Liens vers les navigateurs */
+.browser-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.browser-link {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 10px;
+    text-decoration: none;
+    color: #2d3748;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.browser-link:hover {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transform: translateX(5px);
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    border-color: #667eea;
+}
+
+.browser-link i:first-child {
+    font-size: 1.5rem;
+}
+
+.browser-link span {
+    flex: 1;
+}
+
+/* Liens personnalisés */
+.cookies-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.cookies-link:hover {
+    color: #764ba2;
+    text-decoration: underline;
+}
+
+/* Footer de la page cookies */
+.cookies-footer {
+    margin-top: 3rem;
+    padding: 2rem;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+}
+
+.cookies-disclaimer {
+    background: rgba(255, 193, 7, 0.1);
+    border: 2px solid #ffc107;
+    border-radius: 10px;
+    padding: 1.5rem;
+    color: #856404;
+    font-weight: 500;
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    line-height: 1.6;
+}
+
+.cookies-actions .btn {
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 50px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.cookies-actions .btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+}
+
+/* Animations */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .cookies-container {
+        padding: 1rem;
+    }
+
+    .section-card {
+        flex-direction: column;
+        padding: 1.5rem;
+    }
+
+    .section-icon {
+        width: 50px;
+        height: 50px;
+        font-size: 1.5rem;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+    }
+
+    .cookies-table-container {
+        font-size: 0.875rem;
+    }
+
+    .cookies-table thead th,
+    .cookies-table td {
+        padding: 0.75rem 0.5rem;
+    }
+
+    /* Masquer certaines colonnes sur mobile */
+    .cookies-table thead th:nth-child(3),
+    .cookies-table td:nth-child(3) {
+        display: none;
+    }
+
+    .browser-link {
+        padding: 0.875rem 1rem;
+        font-size: 0.9rem;
+    }
+
+    .cookies-disclaimer {
+        flex-direction: column;
+        text-align: center;
+        font-size: 0.9rem;
+        padding: 1rem;
+    }
+
+    .cookies-actions .btn {
+        width: 100%;
+        font-size: 1rem;
+        padding: 0.875rem 1.5rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .section-title {
+        font-size: 1.25rem;
+    }
+
+    .cookies-table {
+        font-size: 0.8rem;
+    }
+
+    .cookie-name {
+        font-size: 0.75rem;
+    }
+}
+
+/* Préférences de mouvement réduit */
+@media (prefers-reduced-motion: reduce) {
+    .cookies-section,
+    .section-card,
+    .browser-link {
+        animation: none;
+        transition: none;
+    }
+
+    .section-card:hover,
+    .browser-link:hover {
+        transform: none;
+    }
+}
