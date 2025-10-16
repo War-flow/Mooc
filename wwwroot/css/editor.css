@@ -125,7 +125,7 @@
     .rich-editor-content h6 {
         margin-top: 0.5rem;
         margin-bottom: 0.5rem;
-        font-weight: bold;
+        font-weight: normal; /* Changé de 'bold' à 'normal' */
     }
 
     .rich-editor-content h1 {
@@ -303,4 +303,54 @@
         .editor-toolbar.sticky + .rich-editor-content {
             margin-top: 70px; /* Compenser la hauteur de la barre fixe */
         }
+}
+
+/* Définir une taille de police cohérente pour le format normal */
+.rich-editor-content,
+.rich-editor-content div,
+.rich-editor-content p {
+    font-size: 0.75rem; /* 12px - même taille que h6 */
+}
+
+/* Appliquer la même taille en mode lecture */
+.text-message,
+.text-message div,
+.text-message p {
+    font-size: 0.75rem; /* 12px - cohérent avec h6 */
+}
+
+/* S'assurer que les titres restent distincts en mode lecture */
+.text-message h1,
+.text-message h2,
+.text-message h3,
+.text-message h4,
+.text-message h5,
+.text-message h6 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.5rem;
+    font-weight: normal; /* Changé de 'bold' à 'normal' */
+}
+
+.text-message h1 {
+    font-size: 1.5rem; /* 24px */
+}
+
+.text-message h2 {
+    font-size: 1.25rem; /* 20px */
+}
+
+.text-message h3 {
+    font-size: 1.125rem; /* 18px */
+}
+
+.text-message h4 {
+    font-size: 1rem; /* 16px */
+}
+
+.text-message h5 {
+    font-size: 0.875rem; /* 14px */
+}
+
+.text-message h6 {
+    font-size: 0.75rem; /* 12px */
 }

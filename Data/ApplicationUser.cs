@@ -31,5 +31,6 @@ namespace Mooc.Data
 
         [PersonalData]
         public bool ShowInTrombinoscope { get; set; } = false;
+
     }
 }

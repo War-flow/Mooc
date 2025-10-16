@@ -9,6 +9,7 @@
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ILogger<Trombinoscope> Logger
 @attribute [StreamRendering]
 
 <PageTitle>Trombinoscope</PageTitle>
@@ -20,7 +21,7 @@
             <div class="col">
                 <i class="bi bi-people-fill header-icon morphing"></i>
                 <h1 class="page-title">Trombinoscope</h1>
-                <p class="page-subtitle">Découvrez notre équipe pédagogique</p>
+                <p class="page-subtitle">Découvrez notre communauté d'apprentissage</p>
                 <div class="header-stats">
                     <span class="stat-badge bouncing">
                         <i class="bi bi-people-fill me-2"></i>
@@ -33,6 +34,32 @@
 </div>
 
 <div class="container mt-4">
+    @* DEBUG INFO *@
+    @if (showDebugInfo)
+    {
+        <div class="alert alert-warning">
+            <h5>🔍 DEBUG INFO</h5>
+            <ul>
+                <li><strong>Total utilisateurs:</strong> @totalUsersCount</li>
+                <li><strong>Utilisateurs avec ShowInTrombinoscope=true:</strong> @usersWithShowTrombinoscopeCount</li>
+                <li><strong>Utilisateurs avec sessions complétées:</strong> @usersWithCompletedSessionsCount</li>
+                <li><strong>Utilisateurs finaux (Admin/Formateur):</strong> @(teamMembers?.Count ?? 0)</li>
+                <li><strong>Date/Heure actuelle (UTC):</strong> @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")</li>
+            </ul>
+            @if (currentUser != null)
+            {
+                <hr />
+                <h6>👤 Utilisateur connecté: @currentUser.Email</h6>
+                <ul>
+                    <li><strong>ShowInTrombinoscope:</strong> @currentUser.ShowInTrombinoscope</li>
+                    <li><strong>Sessions complétées:</strong> @completedSessionsCount</li>
+                    <li><strong>Est étudiant:</strong> @isStudent</li>
+                    <li><strong>Rôles:</strong> @string.Join(", ", currentUserRoles)</li>
+                </ul>
+            }
+        </div>
+    }
+
     @* Notification pour l'utilisateur connecté *@
     @if (currentUser != null && shouldShowNotification)
     {
@@ -87,7 +114,6 @@
                                     <i class="bi bi-envelope"></i>
                                     <span>@member.Email</span>
                                 </a>
-
                             </div>
 
                             <div class="member-specialties">
@@ -115,8 +141,8 @@
                 <div class="empty-state-icon">
                     <i class="bi bi-people"></i>
                 </div>
-                <h3 class="empty-state-title">En constructrution</h3>
-                <p class="empty-state-text">Aucun membres</p>
+                <h3 class="empty-state-title">En construction</h3>
+                <p class="empty-state-text">Aucun membre ne correspond aux critères d'affichage</p>
             </div>
         }
     }
@@ -132,6 +158,7 @@
     }
 </div>
 <Footer />
+
 @code {
     private List<ApplicationUser>? teamMembers;
     private List<ApplicationUser> filteredMembers = new();
@@ -145,6 +172,13 @@
     private bool shouldShowNotification = false;
     private int completedSessionsCount = 0;
     private bool isStudent = false;
+    private List<string> currentUserRoles = new();
+    
+    // Propriétés de débogage
+    private bool showDebugInfo = false;
+    private int totalUsersCount = 0;
+    private int usersWithShowTrombinoscopeCount = 0;
+    private int usersWithCompletedSessionsCount = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -163,21 +197,31 @@
             
             if (currentUser != null)
             {
+                Logger.LogInformation($"[TROMBINOSCOPE] Utilisateur connecté: {currentUser.Email}");
+                
                 using var dbContext = await DbContextFactory.CreateDbContextAsync();
                 
-                // Vérifier le nombre de sessions complétées
+                var now = DateTime.UtcNow;
+                
+                // Vérifier le nombre de sessions complétées ou actives
                 completedSessionsCount = await dbContext.Sessions
-                    .Where(s => s.EnrolledUsers.Any(u => u.Id == currentUser.Id) && s.EndDate < DateTime.UtcNow)
+                    .Where(s => s.EnrolledUsers.Any(u => u.Id == currentUser.Id) 
+                             && (s.EndDate < now || s.IsActive))
                     .CountAsync();
                 
-                // Vérifier si l'utilisateur est un formateur ou admin
-                var roles = await UserManagerService.GetRolesAsync(currentUser);
-                isStudent = !roles.Contains("Admin") && !roles.Contains("Formateur");
+                Logger.LogInformation($"[TROMBINOSCOPE] Sessions actives ou complétées: {completedSessionsCount}");
+                
+                // Vérifier les rôles de l'utilisateur
+                currentUserRoles = (await UserManagerService.GetRolesAsync(currentUser)).ToList();
+                isStudent = currentUserRoles.Count == 0; // Utilisateur sans rôle
+                
+                Logger.LogInformation($"[TROMBINOSCOPE] Rôles: {string.Join(", ", currentUserRoles)} | Sans rôle: {isStudent}");
                 
                 // Déterminer si la notification doit être affichée
-                shouldShowNotification = !currentUser.ShowInTrombinoscope || 
-                                        completedSessionsCount == 0 || 
-                                        isStudent;
+                // La notification s'affiche si l'utilisateur n'apparaît pas encore sur le trombinoscope
+                shouldShowNotification = !currentUser.ShowInTrombinoscope || completedSessionsCount == 0;
+                
+                Logger.LogInformation($"[TROMBINOSCOPE] ShowInTrombinoscope: {currentUser.ShowInTrombinoscope} | Afficher notification: {shouldShowNotification}");
             }
         }
     }
@@ -186,31 +230,63 @@
     {       
         using var dbContext = await DbContextFactory.CreateDbContextAsync();
         
-        // DEBUG: Afficher tous les utilisateurs et leur statut
-        var allUsers = await dbContext.Users.ToListAsync();
-        Console.WriteLine($"=== TOTAL USERS: {allUsers.Count} ===");
-        foreach (var u in allUsers)
-        {
-            Console.WriteLine($"User: {u.Email} | ShowInTrombinoscope: {u.ShowInTrombinoscope}");
-        }
+        totalUsersCount = await dbContext.Users.CountAsync();
+        Logger.LogInformation($"[TROMBINOSCOPE] === TOTAL USERS: {totalUsersCount} ===");
         
-        // Récupérer les utilisateurs avec leurs rôles ET qui ont complété au moins une session
-        var usersWithRoles = await dbContext.Users
-            .Where(u => u.ShowInTrombinoscope == true) // L'utilisateur a autorisé l'affichage
-            .Where(u => u.EnrolledSessions.Any(s => s.EndDate < DateTime.UtcNow)) // Au moins une session terminée
-            .Join(dbContext.UserRoles, u => u.Id, ur => ur.UserId, (u, ur) => new { User = u, ur.RoleId })
-            .Join(dbContext.Roles, x => x.RoleId, r => r.Id, (x, r) => new { x.User, RoleName = r.Name })
-            .Where(x => x.RoleName == "Admin" || x.RoleName == "Formateur")
-            .ToListAsync();
+        usersWithShowTrombinoscopeCount = await dbContext.Users
+            .Where(u => u.ShowInTrombinoscope)
+            .CountAsync();
+        Logger.LogInformation($"[TROMBINOSCOPE] Utilisateurs avec ShowInTrombinoscope=true: {usersWithShowTrombinoscopeCount}");
+        
+        var now = DateTime.UtcNow;
+        Logger.LogInformation($"[TROMBINOSCOPE] === Current DateTime (UTC): {now:yyyy-MM-dd HH:mm:ss} ===");
+        
+        // Compter les utilisateurs avec au moins une session (terminée OU active)
+        usersWithCompletedSessionsCount = await dbContext.Users
+            .Where(u => u.ShowInTrombinoscope)
+            .Where(u => dbContext.Sessions
+                .Any(s => s.EnrolledUsers.Any(eu => eu.Id == u.Id) 
+                       && (s.EndDate < now || s.IsActive))) // Sessions terminées OU actives
+            .CountAsync();
+        Logger.LogInformation($"[TROMBINOSCOPE] Utilisateurs avec sessions actives ou terminées: {usersWithCompletedSessionsCount}");
+        
+        // Récupérer les utilisateurs avec leurs rôles ET qui ont au moins une session terminée ou active
+        // MODIFICATION: Ajouter "Utilisateur" aux rôles acceptés
+        var usersWithRoles = await (from user in dbContext.Users
+                                    where user.ShowInTrombinoscope == true
+                                    join userRole in dbContext.UserRoles on user.Id equals userRole.UserId
+                                    join role in dbContext.Roles on userRole.RoleId equals role.Id
+                                    where role.Name == "Admin" || role.Name == "Formateur" || role.Name == "Utilisateur"
+                                    // Sessions terminées OU actives
+                                    where dbContext.Sessions    
+                                        .Any(s => s.EnrolledUsers.Any(eu => eu.Id == user.Id) 
+                                               && (s.EndDate < now || s.IsActive))
+                                    select new { User = user, RoleName = role.Name })
+                               .ToListAsync();
 
-        Console.WriteLine($"=== FILTERED USERS WITH ROLES AND COMPLETED SESSIONS: {usersWithRoles.Count} ===");
+        Logger.LogInformation($"[TROMBINOSCOPE] === FILTERED USERS WITH ROLES AND SESSIONS: {usersWithRoles.Count} ===");
+        
+        // Debug: Afficher les sessions de chaque utilisateur
+        foreach (var item in usersWithRoles)
+        {
+            var userSessions = await dbContext.Sessions
+                .Where(s => s.EnrolledUsers.Any(u => u.Id == item.User.Id))
+                .Select(s => new { s.Title, s.StartDate, s.EndDate, IsCompleted = s.EndDate < now, IsActive = s.IsActive })
+                .ToListAsync();
+            
+            Logger.LogInformation($"[TROMBINOSCOPE] User: {item.User.Email} | Role: {item.RoleName} | Sessions: {userSessions.Count}");
+            foreach (var session in userSessions)
+            {
+                Logger.LogInformation($"[TROMBINOSCOPE]   - Session: {session.Title} | StartDate: {session.StartDate:yyyy-MM-dd HH:mm:ss} | EndDate: {session.EndDate:yyyy-MM-dd HH:mm:ss} | Completed: {session.IsCompleted} | Active: {session.IsActive}");
+            }
+        }
 
         teamMembers = new List<ApplicationUser>();
         userRoles.Clear();
         adminCount = 0;
         formateurCount = 0;
+        int utilisateurCount = 0; // Nouveau compteur
 
-        // Grouper les utilisateurs par ID pour gérer les utilisateurs avec plusieurs rôles
         var userGroups = usersWithRoles.GroupBy(x => x.User.Id);
 
         foreach (var userGroup in userGroups)
@@ -219,9 +295,9 @@
             var roles = userGroup.Select(x => x.RoleName).ToList();
 
             teamMembers.Add(user);
-            Console.WriteLine($"Adding to trombinoscope: {user.Email} | Roles: {string.Join(", ", roles)}");
+            Logger.LogInformation($"[TROMBINOSCOPE] Adding to trombinoscope: {user.Email} | Roles: {string.Join(", ", roles)}");
 
-            // Prioriser Admin sur Formateur si l'utilisateur a les deux rôles
+            // Prioriser Admin > Formateur > Utilisateur
             if (roles.Contains("Admin"))
             {
                 userRoles[user.Id] = "Admin";
@@ -232,18 +308,22 @@
                 userRoles[user.Id] = "Formateur";
                 formateurCount++;
             }
+            else if (roles.Contains("Utilisateur"))
+            {
+                userRoles[user.Id] = "Utilisateur";
+                utilisateurCount++;
+            }
         }
 
-        // Mettre à jour la liste filtrée
         filteredMembers = teamMembers.ToList();
-        Console.WriteLine($"=== FINAL COUNT: {filteredMembers.Count} ===");
+        Logger.LogInformation($"[TROMBINOSCOPE] === FINAL COUNT: {filteredMembers.Count} (Admin: {adminCount}, Formateur: {formateurCount}, Utilisateur: {utilisateurCount}) ===");
     }
 
     private string GetUserRole(ApplicationUser user)
     {
         if (user?.Id == null) return "Membre";
 
-        if (userRoles.TryGetValue(user.Id, out string role))
+        if (userRoles.TryGetValue(user.Id, out string? role))
             return role;
         return "Membre";
     }
@@ -255,6 +335,7 @@
         {
             "Admin" => "bg-danger text-white",
             "Formateur" => "bg-success text-white",
+            "Utilisateur" => "bg-primary text-white", // Nouveau badge pour utilisateur
             _ => "bg-secondary text-white"
         };
     }
@@ -266,6 +347,7 @@
         {
             "Admin" => "bi-shield-fill",
             "Formateur" => "bi-mortarboard",
+            "Utilisateur" => "bi-person-badge", // Nouvelle icône pour utilisateur
             _ => "bi-person"
         };
     }
@@ -277,6 +359,7 @@
         {
             "Admin" => "Administrateur de la plateforme",
             "Formateur" => "Formateur expert",
+            "Utilisateur" => "Apprenant actif", // Nouveau titre pour utilisateur
             _ => "Membre de l'équipe"
         };
     }
@@ -288,6 +371,7 @@
         {
             "Admin" => new List<string> { "Gestion", "Administration", "Support" },
             "Formateur" => new List<string> { "Formation", "Pédagogie", "Accompagnement" },
+            "Utilisateur" => new List<string> { "Apprentissage", "Formation continue" }, // Nouvelles spécialités
             _ => new List<string> { "Équipe" }
         };
     }

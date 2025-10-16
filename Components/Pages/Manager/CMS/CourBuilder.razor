@@ -4,7 +4,19 @@
 
 <div class="d-flex flex-wrap gap-2 mb-4">
     <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
-    <button type="button" class="btn btn-secondary" @onclick='() => AddBlock("questionnaire")'>Ajouter un questionnaire</button>
+    <button type="button" 
+            class="btn btn-secondary" 
+            @onclick='() => AddBlock("questionnaire")'
+            disabled="@HasQuestionnaire()">
+        Ajouter un questionnaire
+    </button>
+    @if (HasQuestionnaire())
+    {
+        <small class="text-muted align-self-center ms-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Un questionnaire est déjà présent dans ce cours
+        </small>
+    }
 </div>
 
 <div class="cours-container">
@@ -91,6 +103,12 @@
     [Parameter]
     public EventCallback OnContentChanged { get; set; }
 
+    // Méthode pour vérifier si un questionnaire existe déjà
+    private bool HasQuestionnaire()
+    {
+        return Blocks.Any(b => b.Type == "questionnaire" || b.Type == "quiz");
+    }
+
     // Méthode pour créer les paramètres du bloc avec CoursId
     private Dictionary<string, object> GetBlockParameters(CoursBlock block)
     {
@@ -120,6 +138,13 @@
     // Méthode pour ajouter un bloc
     public async Task AddBlock(string type)
     {
+        // Bloquer l'ajout d'un questionnaire si un existe déjà
+        if (type == "questionnaire" && HasQuestionnaire())
+        {
+            Console.WriteLine("Impossible d'ajouter un questionnaire : un questionnaire existe déjà dans ce cours");
+            return;
+        }
+
         int order = Blocks.Count > 0 ? Blocks.Max(b => b.Order) + 1 : 1;
         var newBlock = new CoursBlock { 
             Type = type, 

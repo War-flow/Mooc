@@ -352,7 +352,7 @@ function createVideoElement(url) {
     }
 
     throw new Error("Format non supporté");
-}
+} 
 
 // Création d'un élément audio optimisé
 function createAudioElement(url) {

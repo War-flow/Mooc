@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+ï»¿using Microsoft.EntityFrameworkCore;
 using Mooc.Data;
 
 namespace Mooc.Services
@@ -24,9 +24,9 @@ namespace Mooc.Services
 
         private string GetCompletionStatus()
         {
-            if (IsCompleted) return "Terminée";
+            if (IsCompleted) return "TerminÃ©e";
             if (CompletionPercentage > 0) return "En cours";
-            return "Non commencée";
+            return "Non commencÃ©e";
         }
     }
 
@@ -55,7 +55,7 @@ namespace Mooc.Services
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
 
-                // Récupérer tous les cours publiés de la session
+                // RÃ©cupÃ©rer tous les cours publiÃ©s de la session
                 var sessionCourses = await context.Courses
                     .Where(c => c.SessionId == sessionId && c.IsPublished)
                     .Select(c => c.Id)
@@ -73,7 +73,7 @@ namespace Mooc.Services
                     };
                 }
 
-                // Récupérer les progrès des cours
+                // RÃ©cupÃ©rer les progrÃ¨s des cours
                 var courseProgresses = await context.CourseProgresses
                     .Where(cp => cp.UserId == userId && sessionCourses.Contains(cp.CoursId))
                     .ToListAsync();
@@ -82,14 +82,14 @@ namespace Mooc.Services
                 var completedCount = completedCourses.Count;
                 var totalCount = sessionCourses.Count;
 
-                // Calculer la date de completion (dernière date de completion d'un cours)
+                // Calculer la date de completion (derniÃ¨re date de completion d'un cours)
                 DateTime? completionDate = null;
                 if (completedCount == totalCount && completedCourses.Any())
                 {
                     completionDate = completedCourses.Max(cp => cp.LastAccessed);
                 }
 
-                // Vérifier s'il y a un certificat
+                // VÃ©rifier s'il y a un certificat
                 var hasCertificate = await context.Certificates
                     .AnyAsync(c => c.UserId == userId && c.SessionId == sessionId);
 
@@ -124,7 +124,7 @@ namespace Mooc.Services
             {
                 using var context = await _contextFactory.CreateDbContextAsync();
 
-                // Récupérer toutes les sessions de l'utilisateur
+                // RÃ©cupÃ©rer toutes les sessions de l'utilisateur
                 var userSessionIds = await context.Users
                     .Where(u => u.Id == userId)
                     .SelectMany(u => u.EnrolledSessions)
