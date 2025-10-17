@@ -881,3 +881,31 @@
         transform: translateY(0);
     }
 }
+
+/* ========================= */
+/* FLOATIONG BUTTON */
+/* ========================= */
+
+.floating-add-question {
+    position: sticky;
+    bottom: 20px;
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+    z-index: 1000;
+}
+
+.floating-add-question .btn {
+    animation: fadeIn 0.3s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

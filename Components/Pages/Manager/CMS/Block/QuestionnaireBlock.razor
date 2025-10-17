@@ -65,6 +65,7 @@
                         var question = _questionnaireContent.Questions[questionIndex];
 
                         <div class="card mb-3 question-card">
+                            <!-- Contenu inchangé de la carte question -->
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">
                                     <i class="bi bi-question-circle me-2"></i>
@@ -89,7 +90,7 @@
                                 </div>
                             </div>
                             <div class="card-body">
-                                <!-- Texte de la question -->
+                                <!-- Contenu de la question (inchangé) -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Texte de la question</label>
                                     <InputTextArea class="form-control" @bind-Value="question.Question"
@@ -97,7 +98,6 @@
                                     <ValidationMessage For="@(() => question.Question)" />
                                 </div>
 
-                                <!-- Type de question -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Type de réponse</label>
                                     <InputSelect class="form-select" @bind-Value="question.Type"
@@ -108,13 +108,11 @@
                                     </InputSelect>
                                 </div>
 
-                                <!-- Options de réponse -->
                                 <div class="mb-3">
                                     <label class="form-label fw-bold">Réponses possibles</label>
 
                                     @if (question.Type == "true-false")
                                     {
-                                        <!-- Vrai/Faux simplifié -->
                                         <div class="d-flex gap-3">
                                             <div class="form-check">
                                                 <input class="form-check-valid" type="radio"
@@ -138,7 +136,6 @@
                                     }
                                     else
                                     {
-                                        <!-- Options multiples -->
                                         @for (int j = 0; j < question.Options.Count; j++)
                                         {
                                             var optionIndex = j;
@@ -179,8 +176,19 @@
                                             </button>
                                         }
                                     }
-                                </div>                           
+                                </div>
                             </div>
+                        </div>
+                    }
+
+                    <!-- Bouton flottant pour ajouter une question (visible après 2 questions) -->
+                    @if (_questionnaireContent.Questions.Count > 2)
+                    {
+                        <div class="floating-add-question">
+                            <button type="button" class="btn btn-success btn-lg shadow" @onclick="AddQuestion" title="Ajouter une question">
+                                <i class="bi bi-plus-circle me-2"></i>
+                                Ajouter une question
+                            </button>
                         </div>
                     }
                 }
