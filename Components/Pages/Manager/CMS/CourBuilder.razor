@@ -3,14 +3,34 @@
 <h3>Créateur de cours</h3>
 
 <div class="d-flex flex-wrap gap-2 mb-4">
-    <button type="button" class="btn btn-primary" @onclick='() => AddBlock("texte")'>Ajouter un cours</button>
+    <button type="button" 
+            class="btn btn-primary" 
+            @onclick='() => AddBlock("texte")'
+            disabled="@HasCoursBlock()">
+        Ajouter un cours
+    </button>
+    @if (HasCoursBlock())
+    {
+        <small class="text-muted align-self-center ms-2">
+            <i class="bi bi-info-circle me-1"></i>
+            Un bloc cours est déjà présent
+        </small>
+    }
+    
     <button type="button" 
             class="btn btn-secondary" 
             @onclick='() => AddBlock("questionnaire")'
-            disabled="@HasQuestionnaire()">
+            disabled="@(!HasCoursBlock() || HasQuestionnaire())">
         Ajouter un questionnaire
     </button>
-    @if (HasQuestionnaire())
+    @if (!HasCoursBlock())
+    {
+        <small class="text-muted align-self-center ms-2">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            Ajoutez d'abord un bloc cours
+        </small>
+    }
+    else if (HasQuestionnaire())
     {
         <small class="text-muted align-self-center ms-2">
             <i class="bi bi-info-circle me-1"></i>
@@ -19,12 +39,20 @@
     }
 </div>
 
+@if (!HasCoursBlock())
+{
+    <div class="alert alert-warning">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <strong>Attention :</strong> Chaque cours doit contenir au moins un bloc de contenu (cours).
+    </div>
+}
+
 <div class="cours-container">
     @if (!Blocks.Any())
     {
         <div class="alert alert-info">
             <i class="bi bi-info-circle me-2"></i>
-            Ajoutez des blocs de contenu pour créer votre cours
+            Ajoutez un bloc de cours pour commencer
         </div>
     }
 
@@ -37,7 +65,6 @@
 </div>
 
 @code {
-    // Ajout du paramètre CoursId
     [Parameter]
     public int CoursId { get; set; }
 
@@ -46,43 +73,19 @@
     /// </summary>
     public class CoursBlock
     {
-        /// <summary>Identifiant unique du bloc.</summary>
         public Guid Id { get; set; } = Guid.NewGuid();
-
-        /// <summary>Type du bloc (texte, questionnaire, etc.).</summary>
         public required string Type { get; set; }
-
-        /// <summary>Contenu générique du bloc.</summary>
         public object? Content { get; set; }
-
-        /// <summary>Ordre d'affichage du bloc.</summary>
         public int Order { get; set; }
-
-        /// <summary>Titre du bloc.</summary>
         public string Title { get; set; } = string.Empty;
-
-        /// <summary>Texte du bloc.</summary>
         public string Text { get; set; } = string.Empty;
-
-        /// <summary>Message d'information ou d'erreur.</summary>
         public string? Message { get; set; }
-
-        /// <summary>Identifiant du quiz associé (obsolète, conservé pour compatibilité).</summary>
         [Obsolete("Utilisez Content avec QuestionnaireContentModel pour le nouveau système")]
         public string? QuizId { get; set; }
-
-        /// <summary>URL d'un fichier associé.</summary>
         public string? FileUrl { get; set; }
-
-        /// <summary>Liste d'URLs de fichiers associés.</summary>
         public List<string> FileUrls { get; set; } = new();
-
-        /// <summary>Identifiant du cours associé (si applicable).</summary>
         public Guid CoursId { get; set; }
 
-        /// <summary>
-        /// Constructeur par défaut pour garantir l'initialisation des propriétés.
-        /// </summary>
         public CoursBlock()
         {
             Title = Title ?? string.Empty;
@@ -99,17 +102,21 @@
     [Parameter]
     public EventCallback<CoursBlock?> SelectedBlockChanged { get; set; }
 
-    // Ajouter un nouveau paramètre pour notifier les changements
     [Parameter]
     public EventCallback OnContentChanged { get; set; }
 
-    // Méthode pour vérifier si un questionnaire existe déjà
+    // ✅ Vérifie si un bloc de cours existe
+    private bool HasCoursBlock()
+    {
+        return Blocks.Any(b => b.Type == "texte");
+    }
+
+    // ✅ Vérifie si un questionnaire existe
     private bool HasQuestionnaire()
     {
         return Blocks.Any(b => b.Type == "questionnaire" || b.Type == "quiz");
     }
 
-    // Méthode pour créer les paramètres du bloc avec CoursId
     private Dictionary<string, object> GetBlockParameters(CoursBlock block)
     {
         var parameters = new Dictionary<string, object>
@@ -119,7 +126,6 @@
             ["OnDeleteRequested"] = EventCallback.Factory.Create<CoursBlock>(this, (b) => RemoveBlock(b))
         };
 
-        // Ajouter CoursId seulement si c'est un bloc qui en a besoin
         if (block.Type == "tableau" || block.Type == "texte" || block.Type == "questionnaire")
         {
             parameters["CoursId"] = CoursId;
@@ -128,17 +134,29 @@
         return parameters;
     }
 
-    // Méthode pour sélectionner un bloc
     private async Task SelectBlock(CoursBlock block)
     {
         SelectedBlock = block;
         await SelectedBlockChanged.InvokeAsync(block);
     }
 
-    // Méthode pour ajouter un bloc
     public async Task AddBlock(string type)
     {
-        // Bloquer l'ajout d'un questionnaire si un existe déjà
+        // ✅ Bloquer l'ajout d'un second bloc cours
+        if (type == "texte" && HasCoursBlock())
+        {
+            Console.WriteLine("Impossible d'ajouter un bloc cours : un bloc cours existe déjà");
+            return;
+        }
+
+        // ✅ Bloquer l'ajout d'un questionnaire sans bloc cours
+        if (type == "questionnaire" && !HasCoursBlock())
+        {
+            Console.WriteLine("Impossible d'ajouter un questionnaire : ajoutez d'abord un bloc cours");
+            return;
+        }
+
+        // ✅ Bloquer l'ajout d'un second questionnaire
         if (type == "questionnaire" && HasQuestionnaire())
         {
             Console.WriteLine("Impossible d'ajouter un questionnaire : un questionnaire existe déjà dans ce cours");
@@ -155,19 +173,22 @@
         
         Blocks.Add(newBlock);
         
-        // Sélectionner automatiquement le nouveau bloc
         SelectedBlock = newBlock;
         await SelectedBlockChanged.InvokeAsync(newBlock);
-        
-        // Notifier le changement
         await OnContentChanged.InvokeAsync();
         
         await InvokeAsync(() => StateHasChanged());
     }
 
-    // Méthode pour supprimer un bloc
     public async Task RemoveBlock(CoursBlock block)
     {
+        // ✅ Empêcher la suppression du dernier bloc cours
+        if (block.Type == "texte" && Blocks.Count(b => b.Type == "texte") <= 1)
+        {
+            Console.WriteLine("Impossible de supprimer le dernier bloc cours");
+            return;
+        }
+
         if (block == SelectedBlock)
         {
             SelectedBlock = null;
@@ -180,13 +201,10 @@
             Blocks[i].Order = i + 1;
         }
         
-        // Notifier le changement
         await OnContentChanged.InvokeAsync();
-        
         StateHasChanged();
     }
 
-    // Méthode pour déplacer un bloc vers le haut
     public void MoveBlockUp(CoursBlock block)
     {
         int index = Blocks.IndexOf(block);
@@ -200,7 +218,6 @@
         }
     }
 
-    // Méthode pour déplacer un bloc vers le bas
     public void MoveBlockDown(CoursBlock block)
     {
         int index = Blocks.IndexOf(block);
@@ -214,13 +231,11 @@
         }
     }
 
-    // Méthode pour obtenir la liste des blocs
     public List<CoursBlock> GetBlocks()
     {
         return Blocks;
     }
 
-    // Méthode pour définir les blocs
     public void SetBlocks(List<CoursBlock> blocks)
     {
         if (blocks == null)
@@ -257,7 +272,6 @@
     {
         "texte" => typeof(TextBlock),
         "questionnaire" => typeof(QuestionnaireBlock),
-        // Rétrocompatibilité : mapper "quiz" vers QuestionnaireBlock
         "quiz" => typeof(QuestionnaireBlock),
         _ => typeof(TextBlock)
     };

@@ -11,6 +11,7 @@
 @using Mooc.Services
 @using Microsoft.AspNetCore.WebUtilities
 @using Mooc.Components.Pages.Manager.CMS
+@inject ILogger<CoursCreator> _logger
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
 @inject FileUploadService FileUploadService
@@ -385,46 +386,67 @@
         {
             isSaving = true;
             isValidating = true;
+            showValidationErrors = false;
+            showValidationWarnings = false;
+            validationErrors.Clear();
+            validationWarnings.Clear();
             StateHasChanged();
 
-            // Étape 1 : Validation automatique
+            // ✅ ÉTAPE 1 : Validation stricte obligatoire
             var validationResult = await ValidateCourseContent();
             
+            // ✅ NOUVEAU : Bloquer si validation échoue
             if (!validationResult.IsValid)
             {
                 showValidationErrors = true;
-                validationErrors = validationResult.Errors;
+                validationErrors = validationResult.GetErrorMessages();
                 showValidationWarnings = validationResult.Warnings.Any();
-                validationWarnings = validationResult.Warnings;
+                validationWarnings = validationResult.GetWarningMessages();
+                
+                // ✅ Scroll vers le haut pour voir les erreurs
+                await InvokeAsync(StateHasChanged);
+                return; // ❌ ARRÊT : Ne pas enregistrer
+            }
+
+            // ✅ ÉTAPE 2 : Vérification supplémentaire des blocs
+            var blocks = coursBuilder?.GetBlocks() ?? new List<CourBuilder.CoursBlock>();
+            
+            var coursBlock = blocks.FirstOrDefault(b => b.Type == "texte");
+            var questionnaireBlock = blocks.FirstOrDefault(b => b.Type == "questionnaire" || b.Type == "quiz");
+            
+            if (coursBlock == null)
+            {
+                showValidationErrors = true;
+                validationErrors.Add("Le cours doit contenir au moins un bloc de contenu (cours).");
+                await InvokeAsync(StateHasChanged);
+                return;
+            }
+            
+            if (questionnaireBlock == null)
+            {
+                showValidationErrors = true;
+                validationErrors.Add("Le cours doit contenir un questionnaire d'évaluation.");
+                await InvokeAsync(StateHasChanged);
                 return;
             }
 
-            // Étape 2 : Si validation OK, afficher les avertissements mais continuer
+            // ✅ ÉTAPE 3 : Afficher les avertissements mais continuer
             if (validationResult.Warnings.Any())
             {
                 showValidationWarnings = true;
-                validationWarnings = validationResult.Warnings;
+                validationWarnings = validationResult.GetWarningMessages();
             }
 
-            // Masquer les erreurs de validation si tout est OK
-            showValidationErrors = false;
-            validationErrors.Clear();
-
-            // Étape 3 : Passer à l'enregistrement
+            // ✅ ÉTAPE 4 : Passer à l'enregistrement
             isValidating = false;
             StateHasChanged();
 
-            await Task.Delay(500); // Petit délai pour montrer le changement d'état
+            await Task.Delay(300); // Petit délai pour montrer le changement d'état
 
             using var context = await DbContextFactory.CreateDbContextAsync();
 
             // Sérialiser les blocs du CourBuilder
-            var blocksJson = string.Empty;
-            if (coursBuilder != null)
-            {
-                var blocks = coursBuilder.GetBlocks();
-                blocksJson = System.Text.Json.JsonSerializer.Serialize(blocks);
-            }
+            var blocksJson = System.Text.Json.JsonSerializer.Serialize(blocks);
 
             if (isEditing && CoursId.HasValue)
             {
@@ -442,9 +464,7 @@
 
                     await context.SaveChangesAsync();
                     
-                    // Afficher un message de succès temporaire
                     await ShowSuccessMessage("Cours mis à jour avec succès !");
-                    
                     NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
                 }
             }
@@ -466,9 +486,7 @@
                 context.Courses.Add(cours);
                 await context.SaveChangesAsync();
                 
-                // Afficher un message de succès temporaire
                 await ShowSuccessMessage("Cours créé avec succès !");
-                
                 NavigationManager.NavigateTo($"/Manager/Cours?sessionId={cours.SessionId}");
             }
         }
@@ -476,6 +494,7 @@
         {
             showError = true;
             errorMessage = $"Erreur lors de l'enregistrement : {ex.Message}";
+            _logger?.LogError(ex, "Erreur lors de l'enregistrement du cours");
         }
         finally
         {
@@ -571,9 +590,9 @@
         var validationResult = await ValidateCourseContent();
 
         showValidationErrors = !validationResult.IsValid;
-        validationErrors = validationResult.Errors;
+        validationErrors = validationResult.GetErrorMessages();
         showValidationWarnings = validationResult.Warnings.Any();
-        validationWarnings = validationResult.Warnings;
+        validationWarnings = validationResult.GetWarningMessages();
 
         // Met à jour l'indicateur de validation en temps réel
         realTimeValidationResult = validationResult;

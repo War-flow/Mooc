@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Mooc.Data;
 using System.Text.Json;
 
@@ -13,23 +13,70 @@ namespace Mooc.Services
 
     public class CourseValidationResult
     {
-        public bool IsValid { get; set; }
-        public List<string> Errors { get; set; } = new();
-        public List<string> Warnings { get; set; } = new();
+        public bool IsValid { get; set; } = true;
+        public List<ValidationMessage> Errors { get; set; } = new();
+        public List<ValidationMessage> Warnings { get; set; } = new();
         public int QuestionnaireCount { get; set; }
         public int TotalQuestions { get; set; }
         public int TotalBlocks { get; set; }
 
-        public void AddError(string error)
+        public void AddError(string error, string? context = null, string? suggestion = null)
         {
-            Errors.Add(error);
+            Errors.Add(new ValidationMessage 
+            { 
+                Message = error, 
+                Context = context,
+                Suggestion = suggestion,
+                Severity = ValidationSeverity.Error 
+            });
             IsValid = false;
         }
 
-        public void AddWarning(string warning)
+        public void AddWarning(string warning, string? context = null, string? suggestion = null)
         {
-            Warnings.Add(warning);
+            Warnings.Add(new ValidationMessage 
+            { 
+                Message = warning, 
+                Context = context,
+                Suggestion = suggestion,
+                Severity = ValidationSeverity.Warning 
+            });
         }
+
+        /// <summary>
+        /// Retourne tous les messages d'erreur sous forme de chaînes simples (compatibilité)
+        /// </summary>
+        public List<string> GetErrorMessages() => Errors.Select(e => e.ToString()).ToList();
+
+        /// <summary>
+        /// Retourne tous les messages d'avertissement sous forme de chaînes simples (compatibilité)
+        /// </summary>
+        public List<string> GetWarningMessages() => Warnings.Select(w => w.ToString()).ToList();
+    }
+
+    public class ValidationMessage
+    {
+        public required string Message { get; set; }
+        public string? Context { get; set; }
+        public string? Suggestion { get; set; }
+        public ValidationSeverity Severity { get; set; }
+
+        public override string ToString()
+        {
+            var result = Message;
+            if (!string.IsNullOrEmpty(Context))
+                result += $" ({Context})";
+            if (!string.IsNullOrEmpty(Suggestion))
+                result += $" - {Suggestion}";
+            return result;
+        }
+    }
+
+    public enum ValidationSeverity
+    {
+        Error,
+        Warning,
+        Info
     }
 
     public class CourseValidationService : ICourseValidationService
@@ -56,7 +103,11 @@ namespace Mooc.Services
 
                 if (cours == null)
                 {
-                    result.AddError("Cours introuvable");
+                    result.AddError(
+                        $"Le cours avec l'identifiant {coursId} est introuvable",
+                        "Validation du cours",
+                        "Vérifiez que le cours existe dans la base de données"
+                    );
                     return result;
                 }
 
@@ -66,7 +117,11 @@ namespace Mooc.Services
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Erreur lors de la validation du cours {CoursId}", coursId);
-                result.AddError("Erreur lors de la validation du cours");
+                result.AddError(
+                    "Une erreur technique s'est produite lors de la validation",
+                    $"Cours ID: {coursId}",
+                    "Consultez les logs pour plus de détails"
+                );
                 return result;
             }
         }
@@ -77,7 +132,11 @@ namespace Mooc.Services
 
             if (string.IsNullOrEmpty(content))
             {
-                result.AddError("Le cours doit contenir au moins un bloc questionnaire");
+                result.AddError(
+                    "Le cours ne contient aucun contenu",
+                    "Contenu du cours vide",
+                    "Ajoutez au moins un bloc de contenu (cours) pour créer un cours valide"
+                );
                 return result;
             }
 
@@ -92,7 +151,11 @@ namespace Mooc.Services
 
                 if (blocks == null || !blocks.Any())
                 {
-                    result.AddError("Le cours doit contenir au moins un bloc questionnaire");
+                    result.AddError(
+                        "Le cours doit contenir au moins un bloc de contenu",
+                        "Structure du cours invalide",
+                        "Créez un bloc de cours pour commencer à structurer votre contenu"
+                    );
                     return result;
                 }
 
@@ -100,163 +163,246 @@ namespace Mooc.Services
             }
             catch (JsonException ex)
             {
-                _logger.LogError(ex, "Erreur de d�s�rialisation du contenu du cours");
-                result.AddError("Format du contenu du cours invalide");
+                _logger.LogError(ex, "Erreur de désérialisation du contenu du cours");
+                result.AddError(
+                    "Le format du contenu du cours est invalide",
+                    "Erreur de désérialisation JSON",
+                    "Le contenu du cours a été corrompu. Essayez de recréer les blocs de contenu"
+                );
                 return result;
             }
         }
 
         public CourseValidationResult ValidateCoursBlocks(List<Mooc.Components.Pages.Manager.CMS.CourBuilder.CoursBlock> blocks)
         {
-            var result = new CourseValidationResult
-            {
-                TotalBlocks = blocks.Count,
-                IsValid = true
-            };
+            var result = new CourseValidationResult();
 
-            if (!blocks.Any())
+            if (blocks == null || !blocks.Any())
             {
-                result.AddError("Le cours doit contenir au moins un bloc questionnaire");
+                result.AddError(
+                    "Aucun bloc de contenu détecté",
+                    "Liste de blocs vide",
+                    "Ajoutez au moins un bloc de type 'cours' pour commencer"
+                );
                 return result;
             }
 
-            // Compter les blocs questionnaire
-            var questionnaireBlocks = blocks.Where(b => b.Type == "questionnaire").ToList();
+            result.TotalBlocks = blocks.Count;
+
+            // ✅ VALIDATION STRICTE : Vérifier qu'il y a exactement un bloc de type "texte"
+            var coursBlocks = blocks.Where(b => b.Type == "texte").ToList();
+            if (!coursBlocks.Any())
+            {
+                result.AddError(
+                    "Le cours doit contenir au moins un bloc de contenu pédagogique",
+                    "Aucun bloc de type 'cours' trouvé",
+                    "Cliquez sur 'Ajouter un cours' pour créer le contenu principal de votre cours"
+                );
+            }
+            else if (coursBlocks.Count > 1)
+            {
+                result.AddWarning(
+                    $"Le cours contient {coursBlocks.Count} blocs de cours",
+                    "Plusieurs blocs de cours détectés",
+                    "Pour une meilleure organisation, il est recommandé d'avoir un seul bloc de cours principal"
+                );
+            }
+            else
+            {
+                // ✅ NOUVEAU : Vérifier que le bloc cours n'est pas vide
+                var coursBlock = coursBlocks.First();
+                bool isCoursEmpty = string.IsNullOrWhiteSpace(coursBlock.Title) && 
+                                   string.IsNullOrWhiteSpace(coursBlock.Text);
+                
+                if (isCoursEmpty)
+                {
+                    result.AddError(
+                        "Le bloc de cours est vide",
+                        "Contenu du cours manquant",
+                        "Remplissez le titre et/ou le contenu du bloc de cours avant d'enregistrer"
+                    );
+                }
+            }
+
+            // ✅ VALIDATION STRICTE : Vérifier les questionnaires
+            var questionnaireBlocks = blocks.Where(b => b.Type == "questionnaire" || b.Type == "quiz").ToList();
             result.QuestionnaireCount = questionnaireBlocks.Count;
 
-            // **VALIDATION PRINCIPALE : Au moins un questionnaire obligatoire**
-            if (result.QuestionnaireCount == 0)
+            // ✅ NOUVEAU : Exiger au moins un questionnaire
+            if (questionnaireBlocks.Count == 0)
             {
-                result.AddError("Le cours doit contenir au moins un bloc questionnaire");
+                result.AddError(
+                    "Le cours doit contenir un questionnaire d'évaluation",
+                    "Aucun questionnaire trouvé",
+                    "Ajoutez un questionnaire pour permettre aux apprenants de valider leurs connaissances"
+                );
             }
-            else if (result.QuestionnaireCount > 1)
+            else if (questionnaireBlocks.Count > 1)
             {
-                result.AddWarning($"Le cours contient {result.QuestionnaireCount} questionnaires. Un seul questionnaire par cours est recommand�.");
+                result.AddError(
+                    $"Le cours contient {questionnaireBlocks.Count} questionnaires",
+                    "Limite de questionnaires dépassée",
+                    "Supprimez les questionnaires en trop pour n'en garder qu'un seul"
+                );
             }
 
-            // Valider chaque bloc questionnaire
-            foreach (var questionnaireBlock in questionnaireBlocks)
+            // Valider chaque questionnaire
+            int questionnaireIndex = 1;
+            foreach (var qBlock in questionnaireBlocks)
             {
-                ValidateQuestionnaireBlock(questionnaireBlock, result);
-            }
+                string questionnaireContext = questionnaireBlocks.Count > 1 
+                    ? $"Questionnaire #{questionnaireIndex}" 
+                    : "Questionnaire";
 
-            return result;
-        }
+                QuestionnaireContentModel? questionnaire = null;
 
-        private void ValidateQuestionnaireBlock(Mooc.Components.Pages.Manager.CMS.CourBuilder.CoursBlock questionnaireBlock, CourseValidationResult result)
-        {
-            try
-            {
-                if (questionnaireBlock.Content == null)
+                // ✅ CORRECTION : Gérer plusieurs types de Content
+                try
                 {
-                    result.AddError($"Le questionnaire '{questionnaireBlock.Title}' n'a pas de contenu d�fini");
-                    return;
-                }
-
-                var questionnaireContent = JsonSerializer.Deserialize<QuestionnaireContentModel>(
-                    questionnaireBlock.Content.ToString()!,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                if (questionnaireContent == null)
-                {
-                    result.AddError($"Le questionnaire '{questionnaireBlock.Title}' a un contenu invalide");
-                    return;
-                }
-
-                // Valider le titre du questionnaire (optionnel mais recommand�)
-                if (string.IsNullOrWhiteSpace(questionnaireContent.Title))
-                {
-                    result.AddWarning($"Le questionnaire '{questionnaireBlock.Title}' n'a pas de titre d�fini");
-                }
-
-                // Valider les questions
-                if (questionnaireContent.Questions == null || !questionnaireContent.Questions.Any())
-                {
-                    result.AddError($"Le questionnaire '{questionnaireBlock.Title}' doit contenir au moins une question");
-                    return;
-                }
-
-                // Compter le nombre total de questions
-                result.TotalQuestions += questionnaireContent.Questions.Count;
-
-                // Valider chaque question
-                for (int i = 0; i < questionnaireContent.Questions.Count; i++)
-                {
-                    var question = questionnaireContent.Questions[i];
-                    var questionNumber = i + 1;
-
-                    // Valider le texte de la question
-                    if (string.IsNullOrWhiteSpace(question.Question))
+                    if (qBlock.Content is JsonElement jsonElement)
                     {
-                        result.AddError($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Le texte de la question est obligatoire");
+                        // Cas 1 : Content est un JsonElement
+                        questionnaire = JsonSerializer.Deserialize<QuestionnaireContentModel>(
+                            jsonElement.GetRawText(),
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                        );
+                    }
+                    else if (qBlock.Content is QuestionnaireContentModel directModel)
+                    {
+                        // Cas 2 : Content est déjà un QuestionnaireContentModel
+                        questionnaire = directModel;
+                    }
+                    else if (qBlock.Content != null)
+                    {
+                        // Cas 3 : Tenter de désérialiser depuis string
+                        var jsonString = qBlock.Content.ToString();
+                        if (!string.IsNullOrEmpty(jsonString))
+                        {
+                            questionnaire = JsonSerializer.Deserialize<QuestionnaireContentModel>(
+                                jsonString,
+                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                            );
+                        }
                     }
 
-                    // Valider les options
-                    if (question.Options == null || question.Options.Count < 2)
+                    // ✅ Valider le questionnaire
+                    if (questionnaire == null || questionnaire.Questions == null || !questionnaire.Questions.Any())
                     {
-                        result.AddError($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Au moins 2 options de r�ponse sont requises");
+                        result.AddError(
+                            "Le questionnaire ne contient aucune question",
+                            questionnaireContext,
+                            "Ajoutez au moins une question avec plusieurs choix de réponses"
+                        );
                     }
                     else
                     {
-                        // V�rifier qu'il y a au moins une bonne r�ponse
-                        if (!question.Options.Any(o => o.IsCorrect))
-                        {
-                            result.AddError($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Au moins une r�ponse correcte est requise");
-                        }
+                        result.TotalQuestions += questionnaire.Questions.Count;
 
-                        // V�rifier que toutes les options ont du texte
-                        var emptyOptions = question.Options.Where(o => string.IsNullOrWhiteSpace(o.Text)).Count();
-                        if (emptyOptions > 0)
+                        // Valider chaque question
+                        for (int i = 0; i < questionnaire.Questions.Count; i++)
                         {
-                            result.AddError($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : {emptyOptions} option(s) sans texte");
-                        }
+                            var question = questionnaire.Questions[i];
+                            string questionContext = $"{questionnaireContext} - Question #{i + 1}";
 
-                        // Validation sp�cifique par type de question
-                        switch (question.Type)
-                        {
-                            case "multiple-choice":
-                                // Pour choix unique, v�rifier qu'il n'y a qu'une seule bonne r�ponse
-                                var correctCount = question.Options.Count(o => o.IsCorrect);
-                                if (correctCount > 1)
+                            if (string.IsNullOrWhiteSpace(question.Question))
+                            {
+                                result.AddError(
+                                    "La question n'a pas de texte",
+                                    questionContext,
+                                    "Saisissez le texte de la question avant de continuer"
+                                );
+                            }
+                            else
+                            {
+                                questionContext += $" ({question.Question.Substring(0, Math.Min(30, question.Question.Length))}...)";
+                            }
+
+                            if (question.Options == null || question.Options.Count < 2)
+                            {
+                                result.AddError(
+                                    "La question doit avoir au moins 2 choix de réponses",
+                                    questionContext,
+                                    $"Ajoutez {(question.Options?.Count == 0 ? "au moins 2" : "encore " + (2 - (question.Options?.Count ?? 0)))} choix de réponse"
+                                );
+                            }
+                            else if (question.Options.Count < 3)
+                            {
+                                result.AddWarning(
+                                    $"La question n'a que {question.Options.Count} choix",
+                                    questionContext,
+                                    "Il est recommandé d'avoir au moins 3 choix pour une meilleure évaluation"
+                                );
+                            }
+
+                            if (question.Options != null)
+                            {
+                                var correctAnswers = question.Options.Where(c => c.IsCorrect).ToList();
+                                
+                                if (!correctAnswers.Any())
                                 {
-                                    result.AddWarning($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Une seule r�ponse correcte attendue pour un choix unique (trouv�: {correctCount})");
+                                    result.AddError(
+                                        "Aucune réponse correcte n'est définie",
+                                        questionContext,
+                                        "Cochez au moins une option comme étant la réponse correcte"
+                                    );
                                 }
-                                break;
-
-                            case "true-false":
-                                // Pour vrai/faux, v�rifier qu'il y a exactement 2 options
-                                if (question.Options.Count != 2)
+                                else if (correctAnswers.Count == question.Options.Count)
                                 {
-                                    result.AddError($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Une question Vrai/Faux doit avoir exactement 2 options");
+                                    result.AddWarning(
+                                        "Toutes les réponses sont marquées comme correctes",
+                                        questionContext,
+                                        "Cela rend la question invalide. Décochez les mauvaises réponses"
+                                    );
                                 }
-                                break;
 
-                            case "multiple-select":
-                                // Pour choix multiple, au moins une bonne r�ponse (d�j� v�rifi�)
-                                break;
-
-                            default:
-                                result.AddWarning($"Le questionnaire '{questionnaireBlock.Title}' - Question {questionNumber} : Type de question non reconnu '{question.Type}'");
-                                break;
+                                // Vérifier les options vides
+                                var emptyOptions = question.Options.Where(o => string.IsNullOrWhiteSpace(o.Text)).Count();
+                                if (emptyOptions > 0)
+                                {
+                                    result.AddError(
+                                        $"{emptyOptions} option(s) sans texte détectée(s)",
+                                        questionContext,
+                                        "Saisissez le texte pour toutes les options ou supprimez celles qui sont vides"
+                                    );
+                                }
+                            }
                         }
                     }
                 }
+                catch (JsonException ex)
+                {
+                    _logger.LogError(ex, "Erreur lors de la désérialisation du questionnaire");
+                    result.AddError(
+                        "Format du questionnaire invalide",
+                        $"{questionnaireContext} - Erreur de désérialisation",
+                        "Le contenu du questionnaire ne peut pas être lu. Essayez de le recréer"
+                    );
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erreur lors de la validation du questionnaire");
+                    result.AddError(
+                        "Impossible de valider le questionnaire",
+                        $"{questionnaireContext} - Erreur technique: {ex.Message}",
+                        "Le format du questionnaire est invalide. Essayez de le recréer"
+                    );
+                }
 
-                // Recommandations
-                if (questionnaireContent.Questions.Count < 3)
-                {
-                    result.AddWarning($"Le questionnaire '{questionnaireBlock.Title}' contient seulement {questionnaireContent.Questions.Count} question(s). Au moins 3 questions sont recommand�es.");
-                }
-                else if (questionnaireContent.Questions.Count > 20)
-                {
-                    result.AddWarning($"Le questionnaire '{questionnaireBlock.Title}' contient {questionnaireContent.Questions.Count} questions. Un questionnaire trop long peut d�courager les apprenants.");
-                }
+                questionnaireIndex++;
             }
-            catch (Exception ex)
+
+            // ✅ Validation réussie
+            if (result.IsValid && result.Errors.Count == 0)
             {
-                _logger.LogError(ex, "Erreur lors de la validation du questionnaire {QuestionnaireTitle}", questionnaireBlock.Title);
-                result.AddError($"Erreur lors de la validation du questionnaire '{questionnaireBlock.Title}'");
+                _logger.LogInformation(
+                    "Validation réussie: {BlockCount} bloc(s), {QuestionnaireCount} questionnaire(s), {QuestionCount} question(s)",
+                    result.TotalBlocks,
+                    result.QuestionnaireCount,
+                    result.TotalQuestions
+                );
             }
+
+            return result;
         }
     }
 }
