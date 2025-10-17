@@ -269,23 +269,12 @@ else
                             </div>
 
                             <div class="navigation-center">
-                                @if (IsLastBlock() && !IsCurrentBlockCompleted())
+                                @if (IsLastBlock() && courseProgress?.IsCompleted == true)
                                 {
-                                    <!-- Bouton pour terminer le cours -->
-                                    <button class="btn btn-success @(CanCompleteCourse() ? "" : "disabled")"
-                                            @onclick="CompleteCourse"
-                                            disabled="@(!CanCompleteCourse())">
-                                        <i class="bi bi-check-circle me-1"></i>
-                                        Terminer le cours
-                                    </button>
-
-                                    @if (!CanCompleteCourse() && IsCurrentBlockQuiz())
-                                    {
-                                        <div class="text-warning small mt-1">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>
-                                            Complétez ce quiz pour terminer
-                                        </div>
-                                    }
+                                    <div class="alert alert-success mb-0">
+                                        <i class="bi bi-trophy-fill me-2"></i>
+                                        <strong>Cours terminé avec succès !</strong>
+                                    </div>
                                 }
                             </div>
 
@@ -578,10 +567,37 @@ else
             };
             courseProgress.BlockInteractions[CurrentBlockIndex.ToString()] = System.Text.Json.JsonSerializer.Serialize(quizInteraction);
 
-            await CourseStateService.SaveProgressAsync(courseProgress);
+            // ✅ Vérifier si tous les questionnaires du cours sont complétés
+            if (AreAllQuizCompleted())
+            {
+                // Terminer automatiquement le cours
+                await CompleteCourse();
+            }
+            else
+            {
+                await CourseStateService.SaveProgressAsync(courseProgress);
+            }
         }
 
         StateHasChanged();
+    }
+
+    // ✅ Nouvelle méthode pour vérifier si tous les questionnaires sont complétés
+    private bool AreAllQuizCompleted()
+    {
+        if (blocks == null || !blocks.Any()) return false;
+
+        // Récupérer tous les blocs de type questionnaire
+        var quizBlocks = blocks
+            .Select((block, index) => new { Block = block, Index = index })
+            .Where(x => x.Block.Type == "questionnaire")
+            .ToList();
+
+        // Si aucun questionnaire, on ne peut pas terminer automatiquement
+        if (!quizBlocks.Any()) return false;
+
+        // Vérifier que tous les questionnaires sont complétés
+        return quizBlocks.All(q => quizCompletionState.ContainsKey(q.Index) && quizCompletionState[q.Index]);
     }
 
     private void RetourVersListe()
