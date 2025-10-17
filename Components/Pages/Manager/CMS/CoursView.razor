@@ -9,6 +9,7 @@
 @using Mooc.Components.Pages.Manager.CMS.Block
 @using Mooc.Components.Pages.Manager.CMS.Block.ReadOnly
 @using Mooc.Services
+@implements IAsyncDisposable
 @inject IDbContextFactory<ApplicationDbContext> DbContextFactory
 @inject NavigationManager NavigationManager
 @inject CourseStateService CourseStateService
@@ -52,11 +53,18 @@ else
                     <div class="card-header bg-primary text-white">
                         <div class="d-flex justify-content-between align-items-center">
                             <h2 class="m-1">
-                                <i class="bi bi-book me-2"></i>
+                                <i class="bi @(IsReadOnlyMode ? "bi-eye-fill" : "bi-book") me-2"></i>
                                 @cours.Title
                             </h2>
                             <div class="course-status">
-                                @if (courseProgress?.IsCompleted == true)
+                                @if (IsReadOnlyMode)
+                                {
+                                    <span class="badge bg-info fs-6">
+                                        <i class="bi bi-eye-fill me-1"></i>
+                                        Mode consultation
+                                    </span>
+                                }
+                                else if (courseProgress?.IsCompleted == true)
                                 {
                                     <span class="badge bg-success fs-6">
                                         <i class="bi bi-trophy-fill me-1"></i>
@@ -81,6 +89,18 @@ else
                         </div>
                     </div>
                     <div class="card-body">
+                        <!-- **NOUVEAU: Bandeau d'information en mode lecture seule** -->
+                        @if (IsReadOnlyMode)
+                        {
+                            <div class="alert alert-info d-flex align-items-center mb-3">
+                                <i class="bi bi-info-circle me-3 fs-4"></i>
+                                <div>
+                                    <strong>Mode consultation</strong>
+                                    <p class="mb-0">Vous consultez ce cours que vous avez déjà terminé. Les quiz ne sont pas accessibles dans ce mode.</p>
+                                </div>
+                            </div>
+                        }
+
                         @if (!string.IsNullOrEmpty(cours.Description))
                         {
                             <p class="text-muted mb-3">@cours.Description</p>
@@ -121,7 +141,7 @@ else
                                 <div class="d-flex justify-content-between align-items-center">
                                     <button class="btn btn-outline-primary"
                                             @onclick="GoToPreviousBlock"
-                                            disabled="@(CurrentBlockIndex <= 0)">
+                                            disabled="@(CurrentBlockIndex <= 0 || (IsReadOnlyMode && IsBlockTypeQuiz(CurrentBlockIndex - 1)))">
                                         <i class="bi bi-arrow-left me-1"></i>
                                         Précédent
                                     </button>
@@ -134,7 +154,7 @@ else
 
                                     <button class="btn btn-outline-primary"
                                             @onclick="GoToNextBlock"
-                                            disabled="@(!CanNavigateToNext())">
+                                            disabled="@(!CanNavigateToNext() || (IsReadOnlyMode && IsBlockTypeQuiz(CurrentBlockIndex + 1)))">
                                         Suivant
                                         <i class="bi bi-arrow-right ms-1"></i>
                                     </button>
@@ -179,6 +199,7 @@ else
                                         var isCompleted = courseProgress?.CompletedBlocks.Contains(blockIndex) ?? false;
                                         var isCurrent = blockIndex == CurrentBlockIndex;
                                         var isNavigationAllowed = CanNavigateToBlock(blockIndex);
+                                        var isQuizInReadOnlyMode = IsReadOnlyMode && block.Type == "questionnaire";
 
                                         <div class="list-group-item @(isCurrent ? "active" : "") @(!isNavigationAllowed ? "disabled" : "") p-2"
                                              @onclick="() => HandleBlockNavigation(blockIndex)"
@@ -189,7 +210,11 @@ else
                                                     @(blockIndex + 1). @(!string.IsNullOrEmpty(block.Title) ? block.Title : GetBlockTypeDisplay(block.Type))
                                                 </span>
                                                 <div class="d-flex align-items-center">
-                                                    @if (!isNavigationAllowed && !isCurrent)
+                                                    @if (isQuizInReadOnlyMode)
+                                                    {
+                                                        <i class="bi bi-eye-slash-fill text-warning me-2" title="Quiz non accessible en mode consultation"></i>
+                                                    }
+                                                    else if (!isNavigationAllowed && !isCurrent)
                                                     {
                                                         <i class="bi bi-lock-fill text-muted me-2" title="Bloc verrouillé - terminez le cours une fois pour débloquer"></i>
                                                     }
@@ -206,7 +231,16 @@ else
                                         </div>
                                     }
                                 </div>
-                                @if (!HasCompletedCourseOnce())
+                                @if (IsReadOnlyMode)
+                                {
+                                    <div class="alert alert-info mt-3 mb-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <small>
+                                            <strong>Mode consultation :</strong> Vous pouvez consulter uniquement les blocs de texte. Les questionnaires ne sont pas accessibles.
+                                        </small>
+                                    </div>
+                                }
+                                else if (!HasCompletedCourseOnce())
                                 {
                                     <div class="alert alert-info mt-3 mb-0">
                                         <i class="bi bi-info-circle me-2"></i>
@@ -304,11 +338,14 @@ else
     </div>
 }
 
-@implements IAsyncDisposable
 
 @code {
     [Parameter] public int CoursId { get; set; }
     [Parameter] public int? BlockIndex { get; set; }
+
+    // **NOUVEAU: Paramètre pour le mode lecture seule**
+    [SupplyParameterFromQuery(Name = "readonly")]
+    public bool IsReadOnlyMode { get; set; }
 
     private Cours? cours;
     private List<CourBuilder.CoursBlock>? blocks;
@@ -425,15 +462,6 @@ else
         }
     }
 
-    // Navigation améliorée
-    private async Task GoToPreviousBlock()
-    {
-        if (CurrentBlockIndex > 0)
-        {
-            NavigationManager.NavigateTo(GetBlockUrl(CurrentBlockIndex - 1));
-        }
-    }
-
     private async Task GoToNextBlock()
     {
         if (!CanNavigateToNext())
@@ -445,25 +473,85 @@ else
             return;
         }
 
-        // Marquer le bloc actuel comme complété
-        if (courseProgress != null && !courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
+        // Marquer le bloc actuel comme complété (sauf en mode readonly)
+        if (!IsReadOnlyMode && courseProgress != null && !courseProgress.CompletedBlocks.Contains(CurrentBlockIndex))
         {
             await MarkBlockAsCompleted();
         }
 
         if (CurrentBlockIndex < (blocks?.Count ?? 0) - 1)
         {
-            NavigationManager.NavigateTo(GetBlockUrl(CurrentBlockIndex + 1));
+            var nextIndex = CurrentBlockIndex + 1;
+
+            // **NOUVEAU: En mode readonly, sauter les questionnaires**
+            if (IsReadOnlyMode)
+            {
+                while (nextIndex < blocks!.Count && blocks[nextIndex].Type == "questionnaire")
+                {
+                    nextIndex++;
+                }
+
+                // Si on a dépassé la fin, rester sur le bloc actuel
+                if (nextIndex >= blocks.Count)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert",
+                        "Il n'y a plus de blocs de texte disponibles. Les questionnaires ne sont pas accessibles en mode consultation.");
+                    return;
+                }
+            }
+
+            NavigationManager.NavigateTo(GetBlockUrl(nextIndex));
+        }
+    }
+
+    private async Task GoToPreviousBlock()
+    {
+        if (CurrentBlockIndex > 0)
+        {
+            var prevIndex = CurrentBlockIndex - 1;
+
+            // **NOUVEAU: En mode readonly, sauter les questionnaires**
+            if (IsReadOnlyMode)
+            {
+                while (prevIndex >= 0 && blocks![prevIndex].Type == "questionnaire")
+                {
+                    prevIndex--;
+                }
+
+                // Si on est revenu au début, rester sur le bloc actuel
+                if (prevIndex < 0)
+                {
+                    await JSRuntime.InvokeVoidAsync("alert",
+                        "Il n'y a plus de blocs de texte disponibles avant celui-ci.");
+                    return;
+                }
+            }
+
+            NavigationManager.NavigateTo(GetBlockUrl(prevIndex));
         }
     }
 
     private async Task GoToBlock(int blockIndex)
     {
+        // ✅ CORRECTION: Vérifier si le bloc est accessible avant la navigation
+        if (!CanNavigateToBlock(blockIndex))
+        {
+            // Si c'est un questionnaire en mode readonly, afficher un message
+            if (IsReadOnlyMode && blocks != null && blockIndex < blocks.Count && blocks[blockIndex].Type == "questionnaire")
+            {
+                await JSRuntime.InvokeVoidAsync("alert",
+                    "Les questionnaires ne sont pas accessibles en mode consultation. " +
+                    "Seuls les blocs de texte peuvent être consultés.");
+            }
+            return;
+        }
+
         if (blockIndex >= 0 && blockIndex < (blocks?.Count ?? 0))
         {
             NavigationManager.NavigateTo(GetBlockUrl(blockIndex));
         }
     }
+
 
     private async Task MarkBlockAsCompleted()
     {
@@ -609,7 +697,9 @@ else
 
     private string GetBlockUrl(int blockIndex)
     {
-        return $"/Cours/View/{CoursId}/Block/{blockIndex}";
+        // ✅ CORRECTION: Préserver le paramètre readonly dans l'URL
+        var baseUrl = $"/Cours/View/{CoursId}/Block/{blockIndex}";
+        return IsReadOnlyMode ? $"{baseUrl}?readonly=true" : baseUrl;
     }
 
     private string GetCurrentBlockTitle()
@@ -642,11 +732,12 @@ else
         var parameters = new Dictionary<string, object>
         {
             ["Block"] = block,
-            ["IsReadOnly"] = true
+            // **MODIFIÉ: Activer le mode lecture seule si IsReadOnlyMode est true OU si c'est un questionnaire**
+            ["IsReadOnly"] = IsReadOnlyMode || block.Type == "questionnaire"
         };
 
         // Pour les questionnaires
-        if (block.Type == "questionnaire") // Changé de "quiz"
+        if (block.Type == "questionnaire")
         {
             parameters["CoursId"] = CoursId;
             parameters["OnQuizCompleted"] = EventCallback.Factory.Create<bool>(this, OnQuizCompleted);
@@ -718,6 +809,19 @@ else
         if (blocks == null || targetBlockIndex < 0 || targetBlockIndex >= blocks.Count)
             return false;
 
+        // **NOUVEAU: En mode lecture seule, permettre seulement l'accès aux blocs de texte**
+        if (IsReadOnlyMode)
+        {
+            var targetBlock = blocks[targetBlockIndex];
+            // Bloquer l'accès aux questionnaires en mode readonly
+            if (targetBlock.Type == "questionnaire")
+            {
+                return false;
+            }
+            // Autoriser tous les autres blocs
+            return true;
+        }
+
         // Si le cours a déjà été complété une fois, autoriser la navigation libre
         if (HasCompletedCourseOnce())
         {
@@ -769,10 +873,19 @@ else
     {
         if (!CanNavigateToBlock(blockIndex))
         {
+            // **NOUVEAU: Message spécifique pour les quiz en mode readonly**
+            if (IsReadOnlyMode && blocks != null && blockIndex < blocks.Count && blocks[blockIndex].Type == "questionnaire")
+            {
+                await JSRuntime.InvokeVoidAsync("alert",
+                    "Les questionnaires ne sont pas accessibles en mode consultation. " +
+                    "Seuls les blocs de texte peuvent être consultés.");
+                return; // ✅ CORRECTION: Retour ajouté ici
+            }
+
             await JSRuntime.InvokeVoidAsync("alert",
                 "Navigation bloquée : Vous devez suivre les blocs dans l'ordre jusqu'à la fin du cours. " +
                 "Une fois le cours terminé, vous pourrez naviguer librement entre tous les blocs.");
-            return;
+            return; // ✅ Ce retour était déjà présent
         }
 
         await GoToBlock(blockIndex);
@@ -796,9 +909,57 @@ else
             // Rediriger vers le dernier bloc consulté si aucun bloc spécifié
             if (!BlockIndex.HasValue && blocks != null && blocks.Any())
             {
-                var targetBlock = Math.Max(0, Math.Min(courseProgress?.LastAccessedBlock ?? 0, blocks.Count - 1));
+                var targetBlock = courseProgress?.LastAccessedBlock ?? 0;
+
+                // ✅ CORRECTION: En mode readonly, trouver le premier bloc non-questionnaire
+                if (IsReadOnlyMode)
+                {
+                    targetBlock = 0;
+                    while (targetBlock < blocks.Count && blocks[targetBlock].Type == "questionnaire")
+                    {
+                        targetBlock++;
+                    }
+
+                    // Si tous les blocs sont des questionnaires, afficher un message
+                    if (targetBlock >= blocks.Count)
+                    {
+                        await JSRuntime.InvokeVoidAsync("alert",
+                            "Ce cours ne contient que des questionnaires qui ne sont pas accessibles en mode consultation.");
+                        NavigationManager.NavigateTo($"/session/{cours?.SessionId}");
+                        return;
+                    }
+                }
+
+                targetBlock = Math.Max(0, Math.Min(targetBlock, blocks.Count - 1));
                 NavigationManager.NavigateTo(GetBlockUrl(targetBlock), replace: true);
                 return;
+            }
+
+            // ✅ CORRECTION: Vérifier que le bloc actuel n'est pas un questionnaire en mode readonly
+            if (BlockIndex.HasValue && IsReadOnlyMode && blocks != null &&
+                BlockIndex.Value >= 0 && BlockIndex.Value < blocks.Count)
+            {
+                if (blocks[BlockIndex.Value].Type == "questionnaire")
+                {
+                    // Trouver le bloc de texte le plus proche
+                    var alternativeBlock = FindNearestTextBlock(BlockIndex.Value);
+
+                    if (alternativeBlock >= 0)
+                    {
+                        await JSRuntime.InvokeVoidAsync("alert",
+                            "Le questionnaire n'est pas accessible en mode consultation. " +
+                            "Vous avez été redirigé vers un bloc de texte.");
+                        NavigationManager.NavigateTo(GetBlockUrl(alternativeBlock), replace: true);
+                        return;
+                    }
+                    else
+                    {
+                        await JSRuntime.InvokeVoidAsync("alert",
+                            "Ce cours ne contient que des questionnaires qui ne sont pas accessibles en mode consultation.");
+                        NavigationManager.NavigateTo($"/session/{cours?.SessionId}");
+                        return;
+                    }
+                }
             }
 
             // Vérifier que l'index est valide
@@ -810,8 +971,8 @@ else
                 return;
             }
 
-            // Sauvegarder l'accès au bloc actuel
-            if (BlockIndex.HasValue && courseProgress != null && IsCurrentBlockValid())
+            // Sauvegarder l'accès au bloc actuel (sauf en mode readonly sur un questionnaire)
+            if (BlockIndex.HasValue && courseProgress != null && IsCurrentBlockValid() && !IsReadOnlyMode)
             {
                 courseProgress.LastAccessedBlock = BlockIndex.Value;
                 await CourseStateService.SaveProgressAsync(courseProgress);
@@ -839,5 +1000,39 @@ else
         {
             Console.WriteLine($"Erreur lors du nettoyage: {ex.Message}");
         }
+    }
+
+    // **NOUVELLE MÉTHODE: Vérifie si un bloc est un questionnaire**
+    private bool IsBlockTypeQuiz(int blockIndex)
+    {
+        if (blocks == null || blockIndex < 0 || blockIndex >= blocks.Count)
+            return false;
+
+        return blocks[blockIndex].Type == "questionnaire";
+    }
+
+    private int FindNearestTextBlock(int currentIndex)
+    {
+        if (blocks == null || blocks.Count == 0) return -1;
+
+        // Chercher vers le bas d'abord
+        for (int i = currentIndex + 1; i < blocks.Count; i++)
+        {
+            if (blocks[i].Type != "questionnaire")
+            {
+                return i;
+            }
+        }
+
+        // Chercher vers le haut
+        for (int i = currentIndex - 1; i >= 0; i--)
+        {
+            if (blocks[i].Type != "questionnaire")
+            {
+                return i;
+            }
+        }
+
+        return -1; // Aucun bloc de texte trouvé
     }
 }

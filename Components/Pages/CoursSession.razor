@@ -125,7 +125,7 @@ else
                                             <div class="progress-bar @GetProgressBarClass(courseScore.ScorePercentage)"
                                                  role="progressbar"
                                                  style="width: @courseScore.ScorePercentage%"
-                                                 aria-valuenow="@courseScore.ScorePercentage"
+                                                 aria-valuenow="?@courseScore.ScorePercentage"
                                                  aria-valuemin="0"
                                                  aria-valuemax="100">
                                             </div>
@@ -168,13 +168,14 @@ else
                     </div>
                     <div class="course-actions">
                         <div class="btn-group w-100">
-                            <button class="btn btn-outline-primary"
-                                 @onclick="() => VoirCours(cours.Id)"
-                                 disabled="@(!cours.IsPublished || IsSessionEnded() || GetCourseCompletionStatus(cours.Id) == "Terminé")">
-                                 <i class="bi bi-play-circle-fill me-1"></i>
-                                 @(GetCourseCompletionStatus(cours.Id) == "Terminé" ? "Terminé" :
-                                 cours.IsPublished ? "Démarrer" : "Bientôt")
-                            </button>
+                            <button class="btn @(GetCourseCompletionStatus(cours.Id) == "Terminé" ? "btn-outline-success" : "btn-outline-primary")"
+             @onclick="() => VoirCours(cours.Id)"
+             disabled="@(!cours.IsPublished || IsSessionEnded())">
+             <i class="bi @(GetCourseCompletionStatus(cours.Id) == "Terminé" ? "bi-eye-fill" : "bi-play-circle-fill") me-1"></i>
+             @(GetCourseCompletionStatus(cours.Id) == "Terminé" ? "Consulter" :
+             GetCourseCompletionStatus(cours.Id) == "En cours" ? "Continuer" :
+             cours.IsPublished ? "Démarrer" : "Bientôt")
+        </button>
                         </div>
                     </div>
                 </div>
@@ -682,22 +683,9 @@ else
             return;
         }
 
-        // **NOUVEAU: Vérifier si le cours est déjà terminé**
-        if (GetCourseCompletionStatus(coursId) == "Terminé")
-        {
-            tempErrorMessage = "Ce cours est déjà terminé. Vous ne pouvez pas le redémarrer.";
-            
-            // Programmer l'effacement du message après 3 secondes
-            errorMessageTimer?.Dispose();
-            errorMessageTimer = new Timer(_ => {
-                tempErrorMessage = null;
-                InvokeAsync(StateHasChanged);
-            }, null, TimeSpan.FromSeconds(3), Timeout.InfiniteTimeSpan);
-            
-            StateHasChanged();
-            return;
-        }
-
+        // **MODIFIÉ: Permettre l'accès en mode consultation si le cours est terminé**
+        var isCompleted = GetCourseCompletionStatus(coursId) == "Terminé";
+        
         // Vérifier si le cours est publié
         var cours = coursList.FirstOrDefault(c => c.Id == coursId);
         if (cours == null || !cours.IsPublished)
@@ -715,7 +703,14 @@ else
             return;
         }
 
-        // Si tout est OK, naviguer vers le cours
-        NavigationManager.NavigateTo($"/Cours/View/{coursId}");
+        // **NOUVEAU: Naviguer avec un paramètre de mode consultation si terminé**
+        if (isCompleted)
+        {
+            NavigationManager.NavigateTo($"/Cours/View/{coursId}?readonly=true");
+        }
+        else
+        {
+            NavigationManager.NavigateTo($"/Cours/View/{coursId}");
+        }
     }
 }
